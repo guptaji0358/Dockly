@@ -1,0 +1,41 @@
+#include "tray.h"
+#include "appcore.h"
+
+#include <QMenu>
+#include <QSystemTrayIcon>
+
+TrayController::TrayController(AppCore *core, QObject *parent)
+    : QObject(parent), m_core(core), m_icon(new QSystemTrayIcon(AppCore::appIcon(), this))
+{
+    m_icon->setToolTip(QStringLiteral("Launcher Hub"));
+
+    auto *menu = new QMenu();
+    menu->addAction(QStringLiteral("Open Launcher Hub"), this, &TrayController::showRequested);
+    menu->addSeparator();
+    menu->addAction(QStringLiteral("Quit"), this, &TrayController::quitRequested);
+    m_icon->setContextMenu(menu);
+    menu->setParent(nullptr);
+    connect(this, &QObject::destroyed, menu, &QObject::deleteLater);
+
+    connect(m_icon, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason r) {
+        if (r == QSystemTrayIcon::Trigger || r == QSystemTrayIcon::DoubleClick)
+            emit showRequested();
+    });
+
+    auto sync = [this] {
+        const bool on = m_core->settings()->boolean("minimizeToTray")
+                        && QSystemTrayIcon::isSystemTrayAvailable();
+        m_icon->setVisible(on);
+        emit activeChanged();
+    };
+    connect(m_core->settings(), &AppSettings::changed, this, [sync](const QString &k) {
+        if (k == QLatin1String("minimizeToTray"))
+            sync();
+    });
+    sync();
+}
+
+bool TrayController::isActive() const
+{
+    return m_icon->isVisible();
+}
