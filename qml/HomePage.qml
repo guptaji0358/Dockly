@@ -15,9 +15,10 @@ Item {
     ItemModel { id: searchModel; search: page.search }
 
     component Heading: Text {
-        color: core.theme.text
-        font.pixelSize: 17
+        color: core.theme.accent
+        font.pixelSize: 12
         font.weight: Font.DemiBold
+        font.letterSpacing: 4
     }
 
     ColumnLayout {
@@ -25,21 +26,24 @@ Item {
         visible: !page.searching
         spacing: 6
 
-        Heading { text: "★  Favorites" }
-        ItemGrid {
+        Heading { text: "★  FAVORITES" }
+        ItemSpace {
             Layout.fillWidth: true
             Layout.fillHeight: true
             host: page.host
             model: favModel
+            coreLabel: "FAVORITES"
             emptyText: "No favorites yet.\nRight-click any card and choose \"Add to Favorites\"."
         }
-        Heading { text: "Recent"; visible: page.recentOn; Layout.topMargin: 6 }
-        ItemGrid {
+        Heading { text: "RECENT"; visible: page.recentOn; Layout.topMargin: 6 }
+        ItemSpace {
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            Layout.preferredHeight: 128
+            strip: true
             visible: page.recentOn
             host: page.host
             model: recentModel
+            coreLabel: "RECENT"
             emptyText: "Items you open will show up here."
         }
     }
@@ -49,11 +53,12 @@ Item {
         visible: page.searching
         spacing: 6
         Heading { text: "Search results (" + searchModel.count + ")" }
-        ItemGrid {
+        ItemSpace {
             Layout.fillWidth: true
             Layout.fillHeight: true
             host: page.host
             model: searchModel
+            coreLabel: "RESULTS"
             emptyText: "Nothing matches your search."
         }
     }

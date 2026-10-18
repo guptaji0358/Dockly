@@ -17,6 +17,7 @@ ApplicationWindow {
 
     readonly property var th: core.theme
     property int tab: 0
+    Binding { target: Fx; property: "windowActive"; value: win.active }
     property var ctx: ({})
     property string ctxCollection: ""
     property var ctxCollections: []
@@ -131,6 +132,8 @@ ApplicationWindow {
             fade.restart()
     }
     Component.onCompleted: {
+        if (startRing)
+            ring.opened = true
         if (startPage >= 0) {
             tab = startPage
         } else {
@@ -149,212 +152,271 @@ ApplicationWindow {
 
     // ---- layout -----------------------------------------------------------
 
-    RowLayout {
-        anchors.fill: parent
-        spacing: 0
+    Nebula { id: nebula; anchors.fill: parent }
 
-        // Icon-only rail (hidden when the floating dock is selected)
-        Rectangle {
-            visible: !win.th.dock
-            Layout.preferredWidth: 76
-            Layout.fillHeight: true
-            color: win.th.sidebar
+    // pointer position feeds the star-field parallax
+    HoverHandler {
+        enabled: Fx.parallax
+        onPointChanged: {
+            nebula.px = point.position.x / Math.max(1, win.width)
+            nebula.py = point.position.y / Math.max(1, win.height)
+        }
+    }
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 10
-                anchors.topMargin: 16
-                spacing: 6
+    // ---- HUD: top bar ---------------------------------------------------------
+    Item {
+        id: top
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.margins: 20
+        height: 46
 
-                Icon {
-                    Layout.alignment: Qt.AlignHCenter
-                    name: "logo"
-                    size: 38
-                    color: "white"
+        Row {
+            id: brand
+            anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
+            Icon { name: "logo"; size: 28; color: win.th.accent; anchors.verticalCenter: parent.verticalCenter }
+            Column {
+                anchors.verticalCenter: parent.verticalCenter
+                Text {
+                    text: "DOCKLY"
+                    color: win.th.text
+                    font.pixelSize: 16
+                    font.weight: Font.Bold
+                    font.letterSpacing: 5
                 }
-                Item { Layout.preferredHeight: 12 }
-
-                Repeater {
-                    model: win.tabs
-                    delegate: Rectangle {
-                        id: navItem
-                        required property int index
-                        required property var modelData
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 46
-                        radius: win.th.radius === 0 ? 0 : 12
-                        color: win.tab === index ? win.th.accent : (navMouse.containsMouse ? "#22ffffff" : "transparent")
-                        Behavior on color { enabled: core.settings.values.animations; ColorAnimation { duration: 140 } }
-                        scale: navMouse.pressed ? 0.94 : 1
-                        Behavior on scale { enabled: core.settings.values.animations; NumberAnimation { duration: 90 } }
-                        Icon {
-                            anchors.centerIn: parent
-                            name: navItem.modelData.icon
-                            size: 24
-                            color: win.tab === navItem.index ? "white" : win.th.sidebarText
-                        }
-                        MouseArea {
-                            id: navMouse
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: win.tab = navItem.index
-                        }
-                        ToolTip.visible: navMouse.containsMouse
-                        ToolTip.delay: 400
-                        ToolTip.text: navItem.modelData.full + "   (Ctrl+" + (navItem.index + 1) + ")"
-                    }
+                Text {
+                    text: win.tabs[win.tab].full.toUpperCase()
+                    color: win.th.accent
+                    font.pixelSize: 10
+                    font.letterSpacing: 3
                 }
-                Item { Layout.fillHeight: true }
             }
         }
 
-        // Main column
-        ColumnLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.margins: 22
-            Layout.rightMargin: 14
-            Layout.bottomMargin: 8
-            spacing: 12
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 16
-                Row {
-                    visible: win.th.dock
-                    spacing: 8
-                    Icon { name: "logo"; size: 28; color: win.th.accent; anchors.verticalCenter: parent.verticalCenter }
-                    Text {
-                        text: "Dockly"
-                        color: win.th.text
-                        font.pixelSize: 18
-                        font.weight: Font.DemiBold
-                        font.family: win.th.headingFont
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
+        Glass {
+            id: searchBox
+            anchors.centerIn: parent
+            width: Math.max(180, Math.min(560, parent.width - brand.width - tools.width - 70))
+            height: 42
+            radius: 21
+            border.color: search.activeFocus ? win.th.accent : edge
+            tint: 0.5
+            Icon { x: 16; anchors.verticalCenter: parent.verticalCenter; name: "search"; size: 18; color: win.th.subtext }
+            TextField {
+                id: search
+                anchors.fill: parent
+                leftPadding: 46
+                rightPadding: 16
+                placeholderText: "Search everything…   ( / )"
+                color: win.th.text
+                placeholderTextColor: win.th.subtext
+                selectByMouse: true
+                verticalAlignment: TextInput.AlignVCenter
+                background: null
+                onTextChanged: {
+                    // any text jumps Home and searches every hub
+                    if (text.trim() !== "" && win.tab !== 0)
+                        win.tab = 0
                 }
-                TextField {
-                    id: search
-                    Layout.fillWidth: true
-                    implicitHeight: 40
-                    placeholderText: "Search everything...   (Ctrl+F)"
-                    color: win.th.text
-                    placeholderTextColor: win.th.subtext
-                    selectByMouse: true
-                    leftPadding: 44
-                    background: Rectangle {
-                        radius: win.th.radius === 0 ? 0 : 10
-                        color: win.th.surface
-                        border.width: win.th.style === "editorial" ? 2 : 1
-                        border.color: search.activeFocus ? win.th.accent : win.th.border
-                        Icon { x: 15; anchors.verticalCenter: parent.verticalCenter; name: "search"; size: 18; color: win.th.subtext }
-                    }
-                    onTextChanged: {
-                        // Global search: any text jumps to Home and shows matches across every hub.
-                        if (text.trim() !== "" && win.tab !== 0)
-                            win.tab = 0
-                    }
-                    Shortcut { sequences: [StandardKey.Find]; onActivated: { search.forceActiveFocus(); search.selectAll() } }
-                }
-                ViewToolbar {}
+                Keys.onEscapePressed: { text = ""; focus = false }
             }
+            Shortcut { sequences: [StandardKey.Find, "/"]; onActivated: { search.forceActiveFocus(); search.selectAll() } }
+        }
 
-            StackLayout {
-                id: stack
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                currentIndex: win.tab
+        Row {
+            id: tools
+            anchors.right: parent.right
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
 
-                HomePage { host: win; search: search.text }
-                CategoryPage { host: win; category: LH.Software }
-                CategoryPage { host: win; category: LH.Document }
-                CategoryPage { host: win; category: LH.Entertainment }
-                CategoryPage { host: win; category: LH.Web }
-                CollectionsPage { host: win }
-                SettingsPage { host: win }
-            }
+            ViewToolbar { visible: core.settings.values.layoutMode === "grid"; anchors.verticalCenter: parent.verticalCenter }
 
-            // Floating dock navigation
-            Rectangle {
-                id: dock
-                visible: win.th.dock
-                Layout.alignment: Qt.AlignHCenter
-                implicitWidth: dockRow.implicitWidth + 20
-                implicitHeight: 54
-                radius: win.th.radius === 0 ? 0 : 27
-                color: win.th.sidebar
-                border.width: Math.max(1, win.th.borderWidth)
-                border.color: win.th.border
+            Glass {
+                id: layoutSwitch
+                height: 42
+                width: 3 * 42 + 8
+                radius: 21
+                tint: 0.5
                 Row {
-                    id: dockRow
                     anchors.centerIn: parent
-                    spacing: 4
+                    spacing: 0
                     Repeater {
-                        model: win.tabs
-                        delegate: Rectangle {
-                            id: dockItem
-                            required property int index
+                        model: [{k: "hex", tip: "Honeycomb"}, {k: "orbit", tip: "Orbit"}, {k: "grid", tip: "Classic grid"}]
+                        delegate: Item {
+                            id: seg
                             required property var modelData
-                            width: 52
-                            height: 40
-                            radius: win.th.radius === 0 ? 0 : 20
-                            color: win.tab === index ? win.th.accent : (dockMouse.containsMouse ? "#22ffffff" : "transparent")
-                            Behavior on color { enabled: core.settings.values.animations; ColorAnimation { duration: 140 } }
-                            scale: dockMouse.containsMouse ? 1.08 : 1
-                            Behavior on scale { enabled: core.settings.values.animations; NumberAnimation { duration: 120 } }
-                            Icon {
+                            readonly property bool on: core.settings.values.layoutMode === modelData.k
+                            width: 42; height: 42
+                            Rectangle {
                                 anchors.centerIn: parent
-                                name: dockItem.modelData.icon
-                                size: 24
-                                color: win.tab === dockItem.index ? "white" : win.th.sidebarText
+                                width: 34; height: 34; radius: 17
+                                color: seg.on ? win.th.accent : (segMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.10) : "transparent")
+                                Behavior on color { enabled: Fx.animated; ColorAnimation { duration: 120 } }
                             }
+                            Icon { anchors.centerIn: parent; name: seg.modelData.k; size: 20; color: seg.on ? "white" : win.th.text }
                             MouseArea {
-                                id: dockMouse
+                                id: segMouse
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: win.tab = dockItem.index
+                                onClicked: core.settings.set("layoutMode", seg.modelData.k)
                             }
-                            ToolTip.visible: dockMouse.containsMouse
+                            ToolTip.visible: segMouse.containsMouse
                             ToolTip.delay: 400
-                            ToolTip.text: dockItem.modelData.full
+                            ToolTip.text: seg.modelData.tip
                         }
                     }
                 }
             }
 
-            Text {
-                id: toast
-                Layout.fillWidth: true
-                color: win.th.subtext
-                elide: Text.ElideRight
-                Timer { id: toastTimer; interval: 5000; onTriggered: toast.text = "" }
+            Glass {
+                height: 42
+                width: clock.implicitWidth + 28
+                radius: 21
+                tint: 0.5
+                Text {
+                    id: clock
+                    anchors.centerIn: parent
+                    color: win.th.text
+                    font.pixelSize: 14
+                    font.letterSpacing: 2
+                    text: Qt.formatTime(new Date(), "hh:mm")
+                    Timer {
+                        interval: 15000; running: Fx.live; repeat: true
+                        onTriggered: clock.text = Qt.formatTime(new Date(), "hh:mm")
+                    }
+                }
             }
         }
+    }
 
-        // Detail panel for the selected card (slides in from the right)
-        Item {
-            id: panelHost
-            Layout.preferredWidth: panel.shown ? 318 : 0
-            Layout.fillHeight: true
-            clip: true
-            visible: width > 1
-            Behavior on Layout.preferredWidth {
-                enabled: core.settings.values.animations
-                NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
-            }
-            DetailPanel {
-                id: panel
-                host: win
-                x: 0
-                y: 22
-                width: 300
-                height: parent.height - 44
-                opacity: shown ? 1 : 0
-                Behavior on opacity { enabled: core.settings.values.animations; NumberAnimation { duration: 200 } }
+    // ---- pages ---------------------------------------------------------------------
+    StackLayout {
+        id: stack
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: top.bottom
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: 24
+        anchors.rightMargin: 24
+        anchors.topMargin: 10
+        anchors.bottomMargin: 96
+        currentIndex: win.tab
+
+        HomePage { host: win; search: search.text }
+        CategoryPage { host: win; category: LH.Software }
+        CategoryPage { host: win; category: LH.Document }
+        CategoryPage { host: win; category: LH.Entertainment }
+        CategoryPage { host: win; category: LH.Web }
+        CollectionsPage { host: win }
+        SettingsPage { host: win }
+    }
+
+    // ---- floating detail panel ---------------------------------------------------------
+    Item {
+        id: panelHost
+        anchors.right: parent.right
+        anchors.top: top.bottom
+        anchors.bottom: parent.bottom
+        anchors.topMargin: 14
+        anchors.bottomMargin: 96
+        anchors.rightMargin: 20
+        width: 318
+        visible: panel.shown || panel.x < 330
+        DetailPanel {
+            id: panel
+            host: win
+            width: 300
+            height: parent.height
+            x: shown ? 0 : 340
+            opacity: shown ? 1 : 0
+            color: Qt.rgba(win.th.surface.r, win.th.surface.g, win.th.surface.b, 0.92)
+            radius: 18
+            Behavior on x { enabled: Fx.animated; NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+            Behavior on opacity { enabled: Fx.animated; NumberAnimation { duration: 200 } }
+        }
+    }
+
+    // ---- orb: opens the radial ring --------------------------------------------------------
+    Item {
+        id: orb
+        width: 66; height: 66
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 22
+        z: 20
+        scale: orbMouse.pressed ? 0.92 : (orbMouse.containsMouse ? 1.08 : 1)
+        Behavior on scale { enabled: Fx.animated; NumberAnimation { duration: 120 } }
+
+        Rectangle {   // pulsing aura
+            anchors.centerIn: parent
+            width: 66; height: 66; radius: 33
+            color: win.th.accent
+            opacity: 0.18
+            visible: Fx.glow
+            SequentialAnimation on scale {
+                running: Fx.live && Fx.glow
+                loops: Animation.Infinite
+                NumberAnimation { to: 1.55; duration: 1800; easing.type: Easing.InOutSine }
+                NumberAnimation { to: 1.0; duration: 1800; easing.type: Easing.InOutSine }
             }
         }
+        Rectangle {
+            anchors.fill: parent
+            radius: 33
+            gradient: Gradient {
+                GradientStop { position: 0; color: Qt.lighter(win.th.accent, 1.35) }
+                GradientStop { position: 1; color: Qt.darker(win.th.accent, 1.3) }
+            }
+            border.width: 2
+            border.color: Qt.rgba(1, 1, 1, 0.35)
+        }
+        Icon { anchors.centerIn: parent; name: "logo"; size: 32; color: "white" }
+        MouseArea {
+            id: orbMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            acceptedButtons: Qt.LeftButton
+            onClicked: ring.opened = !ring.opened
+        }
+        ToolTip.visible: orbMouse.containsMouse && !ring.opened
+        ToolTip.delay: 500
+        ToolTip.text: "Open the ring   (Ctrl+Space)"
+    }
+
+    Text {
+        id: toast
+        anchors.left: parent.left
+        anchors.leftMargin: 28
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 30
+        width: parent.width / 2 - 120
+        color: win.th.subtext
+        elide: Text.ElideRight
+        Timer { id: toastTimer; interval: 5000; onTriggered: toast.text = "" }
+    }
+
+    Ring {
+        id: ring
+        anchors.fill: parent
+        z: 30
+        tabs: win.tabs
+        current: win.tab
+        host: win
+        onPicked: i => win.tab = i
+    }
+
+    Shortcut { sequences: ["Ctrl+Space", "F2"]; onActivated: ring.opened = !ring.opened }
+    // middle click anywhere toggles the ring too
+    MouseArea {
+        anchors.fill: parent
+        z: -2
+        acceptedButtons: Qt.MiddleButton
+        onClicked: ring.opened = !ring.opened
     }
 
     // ---- drag & drop of files / folders / links onto the window ---------------------

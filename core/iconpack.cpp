@@ -26,6 +26,8 @@ const QHash<QString, QString> &markup()
         {"grid", R"(<rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/>)"},
         {"list", R"(<rect x="3.5" y="5" width="4" height="4" rx="1.1"/><rect x="3.5" y="15" width="4" height="4" rx="1.1"/><path d="M11 7h9.5M11 17h9.5"/>)"},
         {"compact", R"(<path d="M4 6h16M4 10h16M4 14h16M4 18h16"/>)"},
+        {"hex", R"(<path d="M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z"/>)"},
+        {"orbit", R"(<circle cx="12" cy="12" r="2.2"/><circle cx="12" cy="12" r="8.2"/><circle cx="18" cy="6.2" r="1.5"/>)"},
         {"search", R"(<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 20.5 20.5"/>)"},
         {"scan", R"(<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><path d="M4 12h16"/>)"},
         {"add", R"(<path d="M12 5v14M5 12h14"/>)"},

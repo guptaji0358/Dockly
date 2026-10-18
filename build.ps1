@@ -1,6 +1,6 @@
-# Configure + build both frontends with the Qt 6.11.1 MinGW kit, then (optionally) deploy.
+# Configure + build Dockly with the Qt 6.11.1 MinGW kit, then (optionally) deploy.
 #   .\build.ps1            build
-#   .\build.ps1 -Deploy    build + copy Qt DLLs/plugins into .\dist so the .exe files run anywhere
+#   .\build.ps1 -Deploy    build + copy Qt DLLs/plugins into .\dist so Dockly.exe runs anywhere
 param([switch]$Deploy)
 
 $qtRoot = 'D:\Apps\Qt6'
@@ -15,6 +15,6 @@ if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
 if ($Deploy) {
     New-Item -ItemType Directory -Force dist | Out-Null
-    Copy-Item build\DocklyWidgets.exe, build\DocklyQml.exe dist\ -Force
-    windeployqt --release --compiler-runtime --qmldir qml dist\DocklyWidgets.exe dist\DocklyQml.exe
+    Copy-Item build\qml\Dockly.exe dist\ -Force
+    windeployqt --release --compiler-runtime --qmldir qml dist\Dockly.exe
 }

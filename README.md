@@ -1,19 +1,29 @@
 # Dockly
 
-A launcher / hub / shortcut plate for Windows, built with C++17 and Qt 6, following the
-flowchart in the brief. One shared core, two interchangeable frontends:
-
-| Target | UI technology |
-|---|---|
-| `DocklyWidgets` | Qt Widgets (QSS themed) |
-| `DocklyQml` | Qt Quick / QML (Controls, Basic style) |
+A launcher / hub / shortcut plate for Windows, built with C++17 and Qt 6 (Qt Quick, GPU rendered).
+One core library, one frontend (`Dockly.exe`):
 
 ```
 core/     SQLite databases, settings, launching, validation, tray, theme   (static lib)
-widgets/  Widgets frontend
-qml/      QML frontend
+qml/      Qt Quick frontend: honeycomb / orbit / grid layouts, radial ring, GLSL aurora shader
 tests/    QtTest unit tests for the core
 ```
+
+## Interface
+
+- **Honeycomb / Orbit / Classic grid** - switch from the top bar. Honeycomb and orbit are pan (drag) and zoom (wheel) maps of floating glass hexagons that tilt toward the pointer.
+- **Radial ring** - the glowing orb (or `Ctrl+Space`, `F2`, middle click) opens a ring: sections on the inner ring, favourites on the outer one.
+- **Search** - `/` or `Ctrl+F`; `Ctrl+1..7` jump between hubs.
+
+## GPU settings (Settings > Performance)
+
+| Setting | Effect |
+|---|---|
+| Effects level: Low | flat gradient background, no motion effects |
+| Effects level: Balanced | animated aurora shader at 30 fps, tilt and floating tiles |
+| Effects level: High | aurora at full rate, star field, parallax, glow halos |
+| Graphics backend | OpenGL, Direct3D 11 or Software (no GPU); applies after restart |
+| Pause effects when in background | stops all animated effects while the window is not active |
 
 ## Build
 
@@ -75,9 +85,8 @@ catalog instead of becoming cards; the old file is renamed `data.json.migrated`)
 * **Animations**: hover lift + glow cross-fade, staggered card entrance, animated reordering,
   page fades, slide-in detail panel, pressed-button feedback. All switch off with the
   *Animations* setting.
-* **OpenGL**: the QML app renders its scene graph with OpenGL and the Widgets app draws the card
-  views on `QOpenGLWidget` viewports (4x multisampling). Set `LH_NO_GL=1` to fall back to
-  Qt's default renderers.
+* **OpenGL**: the scene graph renders with OpenGL by default (4x multisampling); pick another backend
+  in Settings, or set `LH_NO_GL=1` to use Qt's default.
 
 ## Drag & drop
 

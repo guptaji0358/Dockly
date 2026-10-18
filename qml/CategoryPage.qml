@@ -65,11 +65,12 @@ Item {
             }
         }
 
-        ItemGrid {
+        ItemSpace {
             Layout.fillWidth: true
             Layout.fillHeight: true
             host: page.host
             model: itemModel
+            coreLabel: page.title.toUpperCase()
             emptyText: page.empty
         }
     }

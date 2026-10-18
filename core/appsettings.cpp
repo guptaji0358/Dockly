@@ -26,7 +26,11 @@ QVariantMap AppSettings::defaults()
         {"cardSize", "medium"},   // small | medium | large
         {"viewStyle", "grid"},    // grid | list | compact
         {"animations", true},
-        {"floatingTiles", true},  // cards gently hover in place
+        {"floatingTiles", true},  // tiles gently float and tilt toward the cursor
+        {"layoutMode", "hex"},    // hex | orbit | grid
+        {"gpuLevel", "balanced"}, // low | balanced | high : how much the GPU is used for effects
+        {"graphicsApi", "opengl"}, // opengl | d3d11 | software (applies after restart)
+        {"pauseWhenInactive", true}, // stop animated effects while the window is in the background
         {"language", "English"},
     };
 }

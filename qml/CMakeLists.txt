@@ -1,17 +1,24 @@
-find_package(Qt6 REQUIRED COMPONENTS Qml Quick QuickControls2)
 qt_policy(SET QTP0001 NEW) # QML modules live under :/qt/qml/<URI>
 
-qt_add_executable(DocklyQml WIN32
+qt_add_executable(Dockly WIN32
     main.cpp
     itemimageprovider.h itemimageprovider.cpp
     iconimageprovider.h iconimageprovider.cpp
 )
 
-qt_add_qml_module(DocklyQml
-    URI LauncherUI
+set_source_files_properties(Fx.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+
+qt_add_qml_module(Dockly
+    URI DocklyUI
     VERSION 1.0
     QML_FILES
         Main.qml
+        Fx.qml
+        Nebula.qml
+        Tile.qml
+        ItemSpace.qml
+        Ring.qml
+        Glass.qml
         AppButton.qml
         AppDialog.qml
         ItemDialog.qml
@@ -32,5 +39,11 @@ qt_add_qml_module(DocklyQml
         SettingCombo.qml
 )
 
-target_link_libraries(DocklyQml PRIVATE lhcore Qt6::Qml Qt6::Quick Qt6::QuickControls2)
-lh_add_version_info(DocklyQml "Dockly (Qt Quick)")
+# GPU effects: compiled to .qsb for every graphics API at build time.
+qt_add_shaders(Dockly "dockly_shaders"
+    PREFIX "/qt/qml/DocklyUI"
+    FILES shaders/aurora.frag
+)
+
+target_link_libraries(Dockly PRIVATE lhcore Qt6::Qml Qt6::Quick Qt6::QuickControls2)
+lh_add_version_info(Dockly "Dockly")

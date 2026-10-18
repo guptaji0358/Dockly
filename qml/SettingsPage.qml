@@ -44,13 +44,14 @@ Item {
                 SettingGroup {
                     title: "Appearance"
                     SettingCombo {
-                        key: "style"; label: "Style"
+                        key: "style"; label: "Colour palette"
                         options: [{text: "Neon", value: "neon"}, {text: "Playful", value: "playful"},
                                   {text: "Editorial", value: "editorial"}]
                     }
                     SettingCombo {
-                        key: "navigation"; label: "Navigation"
-                        options: [{text: "Sidebar", value: "sidebar"}, {text: "Floating dock", value: "dock"}]
+                        key: "layoutMode"; label: "Layout"
+                        options: [{text: "Honeycomb", value: "hex"}, {text: "Orbit", value: "orbit"},
+                                  {text: "Classic grid", value: "grid"}]
                     }
                     SettingCombo {
                         key: "theme"; label: "Theme"
@@ -76,8 +77,31 @@ Item {
                             onClicked: core.settings.set("accent", "")
                         }
                     }
+                }
+
+                SettingGroup {
+                    title: "Performance  (GPU)"
+                    SettingCombo {
+                        key: "gpuLevel"; label: "Effects level"
+                        options: [{text: "Low - flat, no effects", value: "low"},
+                                  {text: "Balanced - aurora, tilt, float", value: "balanced"},
+                                  {text: "High - aurora, stars, parallax", value: "high"}]
+                    }
+                    SettingCombo {
+                        key: "graphicsApi"; label: "Graphics backend"
+                        options: [{text: "OpenGL", value: "opengl"}, {text: "Direct3D 11", value: "d3d11"},
+                                  {text: "Software (no GPU)", value: "software"}]
+                    }
+                    Text {
+                        text: "Graphics backend applies after restarting Dockly. Software mode turns the shader background off."
+                        color: page.th.subtext
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
                     SettingCheck { key: "animations"; text: "Animations" }
-                    SettingCheck { key: "floatingTiles"; text: "Floating tiles" }
+                    SettingCheck { key: "floatingTiles"; text: "Floating tiles (idle drift + tilt toward the pointer)" }
+                    SettingCheck { key: "pauseWhenInactive"; text: "Pause effects while Dockly is in the background" }
                 }
 
                 SettingGroup {
