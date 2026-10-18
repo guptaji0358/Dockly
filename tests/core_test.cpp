@@ -281,13 +281,11 @@ private slots:
         QCOMPARE(core->connectors()->addEntries(list), 2);
     }
 
-    void importersAndMediaAreSafeToCall()
+    void importersAreSafeToCall()
     {
         Connectors *cn = core->connectors();
         cn->vscodeRecent();             // empty when VS Code isn't installed
         cn->browserBookmarks("nope");   // unknown browser
-        cn->nowPlaying();
-        cn->spotifyRunning();
         QSignalSpy spy(cn, &Connectors::githubReady);
         cn->fetchGithub("not a valid name!");
         QCOMPARE(spy.count(), 1);

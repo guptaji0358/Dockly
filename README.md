@@ -25,7 +25,6 @@ The **Connectors** tab links Dockly with other apps:
 | Browser bookmarks | Pick bookmarks from Chrome, Edge or Brave and pin them. |
 | GitHub | Pin any user's public repositories (no sign-in). |
 | Visual Studio Code | Pin recent folders / workspaces; they open in VS Code (`vscode://`). |
-| Spotify / media | Play / pause / next / previous for any media player (global media keys), plus "now playing" from the Spotify window. |
 
 ## GPU settings (Settings > Performance)
 

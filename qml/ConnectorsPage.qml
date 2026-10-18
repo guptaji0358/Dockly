@@ -251,38 +251,6 @@ Item {
                         Text { visible: page.vscodeNote !== ""; text: page.vscodeNote; color: page.th.subtext; font.pixelSize: 12 }
                     }
                 }
-
-                // ---- planned ---------------------------------------------------------------
-                ConnectorCard {
-                    id: mediaCard
-                    title: "Spotify · media players"
-                    blurb: "Play, pause and skip any media player; Spotify also shows what is playing."
-                    iconName: "entertainment"
-                    lamp: spotify ? "on" : "off"
-                    stateText: spotify ? "Spotify running" : "Spotify not running"
-                    property bool spotify: false
-                    property string playing: ""
-                    function poll() { spotify = page.cn.spotifyRunning(); playing = page.cn.nowPlaying() }
-                    Timer { interval: 2000; repeat: true; running: page.visible; triggeredOnStart: true; onTriggered: mediaCard.poll() }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 12
-                        OrbButton { iconName: "prev"; tip: "Previous"; onClicked: page.cn.mediaKey("prev") }
-                        OrbButton { iconName: "play"; primary: true; diameter: 50; tip: "Play / pause"; onClicked: page.cn.mediaKey("playpause") }
-                        OrbButton { iconName: "next"; tip: "Next"; onClicked: page.cn.mediaKey("next") }
-                        Text {
-                            Layout.fillWidth: true
-                            Layout.leftMargin: 8
-                            elide: Text.ElideRight
-                            text: mediaCard.playing !== "" ? "♪  " + mediaCard.playing
-                                  : (mediaCard.spotify ? "Nothing playing in Spotify" : "Controls work with any player")
-                            color: mediaCard.playing !== "" ? page.th.accent : page.th.subtext
-                            font.pixelSize: 14
-                        }
-                    }
-                }
-
                 Item { Layout.preferredHeight: 8 }
             }
         }

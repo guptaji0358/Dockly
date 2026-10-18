@@ -49,11 +49,6 @@ public:
     Q_INVOKABLE void fetchGithub(const QString &user);                 // async -> githubReady
     Q_INVOKABLE int addEntries(const QVariantList &entries);           // [{name, target}] as web shortcuts
 
-    // Media: global media keys work with any player; Spotify's window title gives "now playing".
-    Q_INVOKABLE void mediaKey(const QString &key);                     // playpause | next | prev | stop
-    Q_INVOKABLE bool spotifyRunning() const;
-    Q_INVOKABLE QString nowPlaying() const;                            // "Artist - Title", empty when idle
-
 signals:
     void bridgeChanged();
     void receivedChanged();
