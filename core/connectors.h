@@ -44,9 +44,15 @@ public:
 
     Q_INVOKABLE QStringList installedBrowsers() const;                 // "chrome", "edge", "brave"
     Q_INVOKABLE QVariantList browserBookmarks(const QString &browser) const;
+    Q_INVOKABLE QVariantList bookmarksFromFile(const QString &path) const; // Chrome-format Bookmarks file
     Q_INVOKABLE QVariantList vscodeRecent() const;
     Q_INVOKABLE void fetchGithub(const QString &user);                 // async -> githubReady
     Q_INVOKABLE int addEntries(const QVariantList &entries);           // [{name, target}] as web shortcuts
+
+    // Media: global media keys work with any player; Spotify's window title gives "now playing".
+    Q_INVOKABLE void mediaKey(const QString &key);                     // playpause | next | prev | stop
+    Q_INVOKABLE bool spotifyRunning() const;
+    Q_INVOKABLE QString nowPlaying() const;                            // "Artist - Title", empty when idle
 
 signals:
     void bridgeChanged();

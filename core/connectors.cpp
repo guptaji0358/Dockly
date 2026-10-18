@@ -24,6 +24,10 @@
 #include <QTcpSocket>
 #include <QUrl>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
 namespace {
 constexpr int kDefaultPort = 47821;
 constexpr int kMaxRequest = 256 * 1024;
@@ -328,8 +332,15 @@ QStringList Connectors::installedBrowsers() const
 
 QVariantList Connectors::browserBookmarks(const QString &browser) const
 {
+    return bookmarksFromFile(bookmarksFile(browser));
+}
+
+QVariantList Connectors::bookmarksFromFile(const QString &path) const
+{
     QVariantList out;
-    QFile f(bookmarksFile(browser));
+    if (path.isEmpty())
+        return out;
+    QFile f(path);
     if (!f.open(QIODevice::ReadOnly))
         return out;
     const QJsonObject roots = QJsonDocument::fromJson(f.readAll()).object().value("roots").toObject();
@@ -438,4 +449,86 @@ int Connectors::addEntries(const QVariantList &entries)
     if (!ids.isEmpty())
         m_core->message(QStringLiteral("Added %1 shortcut(s).").arg(ids.size()));
     return ids.size();
+}
+
+// ---------------------------------------------------------------------------
+// Media
+// ---------------------------------------------------------------------------
+
+void Connectors::mediaKey(const QString &key)
+{
+#ifdef Q_OS_WIN
+    WORD vk = 0;
+    if (key == "playpause") vk = VK_MEDIA_PLAY_PAUSE;
+    else if (key == "next") vk = VK_MEDIA_NEXT_TRACK;
+    else if (key == "prev") vk = VK_MEDIA_PREV_TRACK;
+    else if (key == "stop") vk = VK_MEDIA_STOP;
+    if (!vk)
+        return;
+    INPUT in[2] = {};
+    in[0].type = INPUT_KEYBOARD;
+    in[0].ki.wVk = vk;
+    in[1] = in[0];
+    in[1].ki.dwFlags = KEYEVENTF_KEYUP;
+    SendInput(2, in, sizeof(INPUT));
+#else
+    Q_UNUSED(key)
+#endif
+}
+
+#ifdef Q_OS_WIN
+namespace {
+struct SpotifyScan {
+    bool running = false;
+    QString title;
+};
+
+BOOL CALLBACK scanWindow(HWND hwnd, LPARAM lp)
+{
+    auto *r = reinterpret_cast<SpotifyScan *>(lp);
+    DWORD pid = 0;
+    GetWindowThreadProcessId(hwnd, &pid);
+    HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!h)
+        return TRUE;
+    wchar_t path[MAX_PATH] = {};
+    DWORD len = MAX_PATH;
+    const bool ok = QueryFullProcessImageNameW(h, 0, path, &len);
+    CloseHandle(h);
+    if (!ok || !QString::fromWCharArray(path).endsWith("\\Spotify.exe", Qt::CaseInsensitive))
+        return TRUE;
+    r->running = true;
+    if (!IsWindowVisible(hwnd))
+        return TRUE;
+    wchar_t buf[512] = {};
+    GetWindowTextW(hwnd, buf, 512);
+    const QString t = QString::fromWCharArray(buf).trimmed();
+    // idle windows are called "Spotify", "Spotify Free" or "Spotify Premium"; playing ones "Artist - Song"
+    if (!t.isEmpty() && !t.startsWith("Spotify", Qt::CaseInsensitive) && t.contains(" - "))
+        r->title = t;
+    return TRUE;
+}
+} // namespace
+#endif
+
+bool Connectors::spotifyRunning() const
+{
+#ifdef Q_OS_WIN
+    SpotifyScan r;
+    EnumWindows(scanWindow, reinterpret_cast<LPARAM>(&r));
+    return r.running;
+#else
+    return false;
+#endif
+}
+
+QString Connectors::nowPlaying() const
+{
+#ifdef Q_OS_WIN
+    SpotifyScan r;
+    EnumWindows(scanWindow, reinterpret_cast<LPARAM>(&r));
+    return r.title;
+#else
+    return {};
+#endif
 }

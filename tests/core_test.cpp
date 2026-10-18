@@ -4,6 +4,7 @@
 
 #include <QApplication>
 #include <QFile>
+#include <QTcpSocket>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QTemporaryDir>
@@ -204,6 +205,93 @@ private slots:
         QCOMPARE(m.count(), 1);
         m.setSearch("e_a");
         QCOMPARE(m.count(), 0); // '_' is literal, not a wildcard
+    }
+
+    // ---- connectors -------------------------------------------------------------------
+
+    QByteArray httpRequest(int port, const QByteArray &method, const QByteArray &path, const QByteArray &token,
+                           const QByteArray &body = {}, const QByteArray &host = "127.0.0.1")
+    {
+        QTcpSocket sock;
+        sock.connectToHost("127.0.0.1", quint16(port));
+        for (int i = 0; i < 300 && sock.state() != QAbstractSocket::ConnectedState; ++i)
+            QTest::qWait(10);
+        QByteArray req = method + " " + path + " HTTP/1.1\r\nHost: " + host + "\r\n";
+        if (!token.isEmpty())
+            req += "Authorization: Bearer " + token + "\r\n";
+        req += "Content-Length: " + QByteArray::number(body.size()) + "\r\n\r\n" + body;
+        sock.write(req);
+        QByteArray out;
+        for (int i = 0; i < 300 && sock.state() != QAbstractSocket::UnconnectedState; ++i) {
+            QTest::qWait(10);
+            out += sock.readAll();
+        }
+        return out + sock.readAll();
+    }
+
+    void bridgeOnlyAcceptsPairedHttpLinks()
+    {
+        Connectors *cn = core->connectors();
+        cn->setBridgeEnabled(true);
+        QVERIFY(cn->bridgeRunning());
+        const QString code = cn->pairingCode();
+        const int port = cn->bridgePort();
+        QCOMPARE(code.section('.', 0, 0).toInt(), port);
+        const QByteArray token = code.section('.', 1).toUtf8();
+        QVERIFY(token.size() >= 24);
+
+        QVERIFY(httpRequest(port, "GET", "/ping", {}).contains("401"));
+        QVERIFY(httpRequest(port, "GET", "/ping", "wrong").contains("401"));
+        QVERIFY(httpRequest(port, "GET", "/ping", token, {}, "evil.example").contains("403"));
+        QVERIFY(httpRequest(port, "GET", "/ping", token).contains("\"ok\":true"));
+
+        const QByteArray goodBody = "{\"url\":\"https://bridge.example/page\",\"title\":\"Bridge Page\"}";
+        const QByteArray jsBody = "{\"url\":\"javascript:alert(1)\"}";
+        const QByteArray fileBody = "{\"url\":\"file:///c:/secret\"}";
+        const QByteArray reply = httpRequest(port, "POST", "/add", token, goodBody);
+        QVERIFY(reply.contains("\"added\":1"));
+        QCOMPARE(core->queryIds(LH::ModeCategory, LH::Web, "bridge.example", {}).size(), 1);
+
+        QVERIFY(httpRequest(port, "POST", "/add", token, jsBody).contains("400"));
+        QVERIFY(httpRequest(port, "POST", "/add", token, fileBody).contains("400"));
+        QCOMPARE(core->queryIds(LH::ModeCategory, LH::AllCategories, "javascript", {}).size(), 0);
+
+        // a regenerated token invalidates the old one
+        cn->regenerateToken();
+        QVERIFY(httpRequest(port, "GET", "/ping", token).contains("401"));
+        cn->setBridgeEnabled(false);
+        QVERIFY(!cn->bridgeRunning());
+    }
+
+    void bookmarksAreParsedFromChromeFormat()
+    {
+        QTemporaryFile f;
+        QVERIFY(f.open());
+        f.write("{\"roots\":{\"bookmark_bar\":{\"name\":\"Bookmarks bar\",\"type\":\"folder\",\"children\":["
+                "{\"name\":\"Qt\",\"type\":\"url\",\"url\":\"https://qt.io\"},"
+                "{\"name\":\"Dev\",\"type\":\"folder\",\"children\":["
+                "{\"name\":\"Docs\",\"type\":\"url\",\"url\":\"https://doc.qt.io\"},"
+                "{\"name\":\"Bad\",\"type\":\"url\",\"url\":\"javascript:alert(1)\"}]}]},"
+                "\"other\":{\"name\":\"Other\",\"type\":\"folder\",\"children\":[]}}}");
+        f.flush();
+        const QVariantList list = core->connectors()->bookmarksFromFile(f.fileName());
+        QCOMPARE(list.size(), 2); // the javascript: bookmark is dropped
+        QCOMPARE(list[0].toMap()["target"].toString(), QString("https://qt.io"));
+        QCOMPARE(list[1].toMap()["sub"].toString(), QString("Bookmarks bar / Dev"));
+        QCOMPARE(core->connectors()->addEntries(list), 2);
+    }
+
+    void importersAndMediaAreSafeToCall()
+    {
+        Connectors *cn = core->connectors();
+        cn->vscodeRecent();             // empty when VS Code isn't installed
+        cn->browserBookmarks("nope");   // unknown browser
+        cn->nowPlaying();
+        cn->spotifyRunning();
+        QSignalSpy spy(cn, &Connectors::githubReady);
+        cn->fetchGithub("not a valid name!");
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(!spy.first().at(1).toString().isEmpty());
     }
 };
 
