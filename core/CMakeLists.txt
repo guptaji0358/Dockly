@@ -9,6 +9,7 @@ add_library(lhcore STATIC
     appcore.h appcore.cpp
     itemmodel.h itemmodel.cpp
     tray.h tray.cpp
+    connectors.h connectors.cpp
 )
 
 target_include_directories(lhcore PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -1,4 +1,5 @@
 #include "appcore.h"
+#include "connectors.h"
 #include "iconpack.h"
 
 #include <QApplication>
@@ -45,7 +46,7 @@ bool isValidWebUrl(const QString &target)
     const QUrl u(target, QUrl::StrictMode);
     const QString scheme = u.scheme().toLower();
     return u.isValid() && !u.host().isEmpty()
-           && (scheme == "http" || scheme == "https" || scheme == "ftp");
+           && (scheme == "http" || scheme == "https" || scheme == "ftp" || scheme == "vscode");
 }
 
 QString autoName(LH::Category c, const QString &target)
@@ -70,6 +71,7 @@ AppCore::AppCore(QObject *parent)
     : QObject(parent)
     , m_settings(new AppSettings(this))
     , m_theme(new Theme(m_settings, this))
+    , m_connectors(new Connectors(this))
 {
     m_saveTimer.setSingleShot(true);
     m_saveTimer.setInterval(400);
@@ -191,6 +193,7 @@ void AppCore::init()
         migrateLegacyJson();
 
     applyStartWithWindows();
+    m_connectors->start();
     if (m_settings->boolean("checkMissingOnStartup"))
         checkItems();
     m_checkTimer.start();
@@ -795,7 +798,7 @@ QPixmap AppCore::pixmapFor(const QString &id, int size)
         const QString path = faviconPath(QUrl(it.target).host());
         if (QFile::exists(path))
             pm = QPixmap(path).scaled(size, size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        else
+        else if (QUrl(it.target).scheme().startsWith("http"))
             requestFavicon(QUrl(it.target).host());
         if (pm.isNull())
             pm = letterTile(QUrl(it.target).host(), it.name, size);

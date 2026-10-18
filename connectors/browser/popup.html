@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header><span class="logo">&#11041;</span><b>DOCKLY</b></header>
+
+  <section id="main" hidden>
+    <div id="title" class="title"></div>
+    <div id="url" class="url"></div>
+    <label>Collection (optional)
+      <select id="collection"><option value="">None</option></select>
+    </label>
+    <button id="addPage" class="primary">Add this page</button>
+    <button id="addTabs">Add all tabs in this window</button>
+  </section>
+
+  <section id="pair" hidden>
+    <p>Paste the pairing code from <b>Dockly &rsaquo; Connectors</b>.</p>
+    <input id="code" placeholder="47821.0123abcd...">
+    <button id="save" class="primary">Pair</button>
+  </section>
+
+  <div id="status"></div>
+  <a id="unpair" href="#" hidden>Change pairing</a>
+  <script src="dockly.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

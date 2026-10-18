@@ -1,6 +1,7 @@
 #pragma once
 
 #include "appsettings.h"
+#include "connectors.h"
 #include "database.h"
 #include "item.h"
 #include "softwarescanner.h"
@@ -32,6 +33,7 @@ class AppCore : public QObject
     Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(QString selectedId READ selectedId NOTIFY selectionChanged)
     Q_PROPERTY(int catalogCount READ catalogCount NOTIFY catalogChanged)
+    Q_PROPERTY(Connectors *connectors READ connectors CONSTANT)
 
 public:
     static AppCore *instance();
@@ -42,6 +44,7 @@ public:
 
     AppSettings *settings() const { return m_settings; }
     Theme *theme() const { return m_theme; }
+    Connectors *connectors() const { return m_connectors; }
     int iconVersion() const { return m_iconVersion; }
     bool scanning() const { return m_scanning; }
     QString version() const;
@@ -136,6 +139,7 @@ private:
 
     AppSettings *m_settings;
     Theme *m_theme;
+    Connectors *m_connectors = nullptr;
     Database m_db;
     mutable QHash<QString, Item> m_cache;
     QString m_selectedId;

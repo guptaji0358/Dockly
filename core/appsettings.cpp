@@ -30,6 +30,8 @@ QVariantMap AppSettings::defaults()
         {"layoutMode", "hex"},    // hex | orbit | grid
         {"gpuLevel", "balanced"}, // low | balanced | high : how much the GPU is used for effects
         {"graphicsApi", "opengl"}, // opengl | d3d11 | software (applies after restart)
+        {"bridgeEnabled", false},  // browser connector: loopback endpoint for the Chrome / Edge extension
+        {"bridgePort", 47821},
         {"pauseWhenInactive", true}, // stop animated effects while the window is in the background
         {"language", "English"},
     };

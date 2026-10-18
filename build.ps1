@@ -16,5 +16,6 @@ if ($LASTEXITCODE) { exit $LASTEXITCODE }
 if ($Deploy) {
     New-Item -ItemType Directory -Force dist | Out-Null
     Copy-Item build\Dockly.exe dist\ -Force
+    Copy-Item build\connectors dist\ -Recurse -Force
     windeployqt --release --compiler-runtime --qmldir qml dist\Dockly.exe
 }

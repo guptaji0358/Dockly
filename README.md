@@ -15,6 +15,18 @@ tests/    QtTest unit tests for the core
 - **Radial ring** - the glowing orb (or `Ctrl+Space`, `F2`, middle click) opens a ring: sections on the inner ring, favourites on the outer one.
 - **Search** - `/` or `Ctrl+F`; `Ctrl+1..7` jump between hubs.
 
+## Connectors
+
+The **Connectors** tab links Dockly with other apps:
+
+| Connector | What it does |
+|---|---|
+| Chrome / Edge / Brave | Browser extension (`connectors/browser`): add the current page, a link or all tabs as web shortcuts. Dockly listens on `127.0.0.1` only, requires a pairing code (secret token), accepts only `http(s)` links and answers cross-origin requests only for browser extensions. Load it via `chrome://extensions` > Developer mode > Load unpacked. |
+| Browser bookmarks | Pick bookmarks from Chrome, Edge or Brave and pin them. |
+| GitHub | Pin any user's public repositories (no sign-in). |
+| Visual Studio Code | Pin recent folders / workspaces; they open in VS Code (`vscode://`). |
+| Spotify / media | Planned (needs the Windows media-session API). |
+
 ## GPU settings (Settings > Performance)
 
 | Setting | Effect |

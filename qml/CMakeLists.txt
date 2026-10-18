@@ -35,6 +35,8 @@ qt_add_qml_module(Dockly
         HomePage.qml
         CategoryPage.qml
         CollectionsPage.qml
+        ConnectorsPage.qml
+        ConnectorPicker.qml
         SettingsPage.qml
         SettingGroup.qml
         SettingCheck.qml
@@ -49,3 +51,7 @@ qt_add_shaders(Dockly "dockly_shaders"
 
 target_link_libraries(Dockly PRIVATE lhcore Qt6::Qml Qt6::Quick Qt6::QuickControls2)
 lh_add_version_info(Dockly "Dockly")
+
+# Browser extension (Chrome / Edge) ships next to the executable.
+add_custom_command(TARGET Dockly POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/connectors $<TARGET_FILE_DIR:Dockly>/connectors)

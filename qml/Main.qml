@@ -47,6 +47,7 @@ ApplicationWindow {
         {icon: "entertainment", name: "Entertainment", full: "Entertainment Hub"},
         {icon: "web", name: "Web", full: "Web Shortcuts"},
         {icon: "collections", name: "Collections", full: "Collections"},
+        {icon: "connector", name: "Connectors", full: "Connectors"},
         {icon: "settings", name: "Settings", full: "Settings"}
     ]
 
@@ -320,6 +321,7 @@ ApplicationWindow {
         CategoryPage { host: win; category: LH.Entertainment }
         CategoryPage { host: win; category: LH.Web }
         CollectionsPage { host: win }
+        ConnectorsPage { host: win }
         SettingsPage { host: win }
     }
 
@@ -443,7 +445,7 @@ ApplicationWindow {
                 items.push(drop.text.trim())
             }
             // the tab you're on hints where files of an unknown type go
-            const hints = [-1, LH.Software, LH.Document, LH.Entertainment, LH.Web, -1, -1]
+            const hints = [-1, LH.Software, LH.Document, LH.Entertainment, LH.Web, -1, -1, -1]
             core.addDropped(items, hints[win.tab])
         }
     }
@@ -470,7 +472,7 @@ ApplicationWindow {
     NumberAnimation { id: fade; target: stack; property: "opacity"; from: 0; to: 1; duration: 180 }
 
     Repeater {
-        model: 7
+        model: 8
         delegate: Item {
             required property int index
             Shortcut { sequence: "Ctrl+" + (index + 1); onActivated: win.tab = index }
