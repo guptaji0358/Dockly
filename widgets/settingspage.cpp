@@ -116,6 +116,7 @@ SettingsPage::SettingsPage(AppCore *core, QWidget *parent)
         g->addLayout(f);
     }
     check(g, "Animations", "animations");
+    check(g, "Floating tiles", "floatingTiles");
 
     // --- Items ------------------------------------------------------
     g = group("Items");
@@ -192,7 +193,7 @@ SettingsPage::SettingsPage(AppCore *core, QWidget *parent)
         auto *row = new QHBoxLayout;
         auto *about = new QPushButton("About");
         auto *updates = new QPushButton("Check for Updates");
-        connect(about, &QPushButton::clicked, this, [this] { QMessageBox::about(this, "About Launcher Hub", m_core->aboutText()); });
+        connect(about, &QPushButton::clicked, this, [this] { QMessageBox::about(this, "About Dockly", m_core->aboutText()); });
         connect(updates, &QPushButton::clicked, this, [this] { QMessageBox::information(this, "Check for Updates", m_core->checkForUpdates()); });
         row->addWidget(about);
         row->addWidget(updates);

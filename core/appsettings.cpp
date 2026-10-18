@@ -26,6 +26,7 @@ QVariantMap AppSettings::defaults()
         {"cardSize", "medium"},   // small | medium | large
         {"viewStyle", "grid"},    // grid | list | compact
         {"animations", true},
+        {"floatingTiles", true},  // cards gently hover in place
         {"language", "English"},
     };
 }

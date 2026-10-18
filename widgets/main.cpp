@@ -18,8 +18,8 @@ int main(int argc, char *argv[])
     QSurfaceFormat::setDefaultFormat(fmt);
 
     QApplication app(argc, argv);
-    QApplication::setOrganizationName("LauncherHub");
-    QApplication::setApplicationName("LauncherHub");
+    QApplication::setOrganizationName("Robin Gupta Studios");
+    QApplication::setApplicationName("Dockly");
     QApplication::setApplicationVersion(LH_VERSION);
     QApplication::setStyle("Fusion");
     QApplication::setQuitOnLastWindowClosed(false); // the tray keeps the app alive

@@ -1,4 +1,4 @@
-qt_add_executable(LauncherHubWidgets WIN32
+qt_add_executable(DocklyWidgets WIN32
     main.cpp
     itemdelegate.h itemdelegate.cpp
     itemview.h itemview.cpp
@@ -12,4 +12,5 @@ qt_add_executable(LauncherHubWidgets WIN32
     mainwindow.h mainwindow.cpp
 )
 
-target_link_libraries(LauncherHubWidgets PRIVATE lhcore Qt6::OpenGLWidgets)
+target_link_libraries(DocklyWidgets PRIVATE lhcore Qt6::OpenGLWidgets)
+lh_add_version_info(DocklyWidgets "Dockly (Qt Widgets)")

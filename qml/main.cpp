@@ -26,8 +26,8 @@ int main(int argc, char *argv[])
     }
 
     QApplication app(argc, argv);
-    QApplication::setOrganizationName("LauncherHub");
-    QApplication::setApplicationName("LauncherHub");
+    QApplication::setOrganizationName("Robin Gupta Studios");
+    QApplication::setApplicationName("Dockly");
     QApplication::setApplicationVersion(LH_VERSION);
     QApplication::setQuitOnLastWindowClosed(false); // the tray keeps the app alive
     QQuickStyle::setStyle("Basic");

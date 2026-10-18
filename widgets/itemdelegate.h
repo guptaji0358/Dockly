@@ -21,6 +21,8 @@ public:
     // Animation state is owned by the view; these report 0..1 progress for an index.
     std::function<qreal(const QModelIndex &)> hoverProgress;
     std::function<qreal(const QModelIndex &)> enterProgress;
+    // Idle "floating" bob in px (positive = down); 0 when floating is off.
+    std::function<qreal(const QModelIndex &)> floatOffset;
 
     // Which hover button (if any) is under pos, for an item occupying itemRect.
     Button hitButton(const QRect &itemRect, const QPoint &pos) const;
@@ -31,7 +33,7 @@ public:
 private:
     int cardWidth() const;
     QRectF buttonRect(const QRectF &card, Button b) const;
-    void paintBackground(QPainter *p, const QRectF &r, int category, qreal lit) const;
+    void paintBackground(QPainter *p, const QRectF &r, int category, qreal lit, qreal ambient = 0) const;
     void paintButtons(QPainter *p, const QRectF &card, bool hover, bool favorite) const;
     void paintCard(QPainter *p, const QStyleOptionViewItem &opt, const QModelIndex &index) const;
     void paintRow(QPainter *p, const QStyleOptionViewItem &opt, const QModelIndex &index, bool compact) const;

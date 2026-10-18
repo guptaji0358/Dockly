@@ -10,7 +10,7 @@ ApplicationWindow {
     height: 780
     minimumWidth: 900
     minimumHeight: 560
-    title: "Launcher Hub"
+    title: "Dockly"
     color: th.bg
     font.family: "Segoe UI"
     font.pixelSize: 14
@@ -226,7 +226,7 @@ ApplicationWindow {
                     spacing: 8
                     Icon { name: "logo"; size: 28; color: win.th.accent; anchors.verticalCenter: parent.verticalCenter }
                     Text {
-                        text: "Launcher Hub"
+                        text: "Dockly"
                         color: win.th.text
                         font.pixelSize: 18
                         font.weight: Font.DemiBold

@@ -86,7 +86,7 @@ void ItemDelegate::paint(QPainter *p, const QStyleOptionViewItem &opt, const QMo
     p->restore();
 }
 
-void ItemDelegate::paintBackground(QPainter *p, const QRectF &r, int category, qreal lit) const
+void ItemDelegate::paintBackground(QPainter *p, const QRectF &r, int category, qreal lit, qreal ambient) const
 {
     const Theme *t = m_core->theme();
     const int rad = t->radius();
@@ -96,11 +96,12 @@ void ItemDelegate::paintBackground(QPainter *p, const QRectF &r, int category, q
         p->setPen(Qt::NoPen);
         p->setBrush(t->border());
         p->drawRect(r.translated(4 + lit, 4 + lit));
-    } else if (lit > 0.01) { // soft drop shadow that grows with the lift
+    } else if (qMax(lit, ambient) > 0.01) { // soft drop shadow that grows with the lift
+        const qreal sh = qMax(lit, ambient);
         p->setPen(Qt::NoPen);
         for (int i = 3; i >= 1; --i) {
-            p->setBrush(QColor(0, 0, 0, int(14 * lit * (4 - i))));
-            p->drawRoundedRect(r.adjusted(-i, i, i, i + 2).translated(0, kLift * lit), rad + i, rad + i);
+            p->setBrush(QColor(0, 0, 0, int(14 * sh * (4 - i))));
+            p->drawRoundedRect(r.adjusted(-i, i, i, i + 2).translated(0, kLift * sh), rad + i, rad + i);
         }
     }
     if (t->glow() && lit > 0.01) { // neon: soft halo around the lit card
@@ -190,8 +191,10 @@ void ItemDelegate::paintCard(QPainter *p, const QStyleOptionViewItem &opt, const
 
     QRectF r = QRectF(opt.rect).adjusted(3, 3 + kLift, -3, -3);
     r.translate(0, -kLift * h); // hover lift
+    const qreal bob = floatOffset ? floatOffset(index) * (1.0 - h) : 0.0; // idle float, settles on hover
+    r.translate(0, bob);
 
-    paintBackground(p, r, category, lit);
+    paintBackground(p, r, category, lit, floatOffset ? 0.45 : 0.0);
 
     const int iconSize = int(r.width() * 0.5 * (1.0 + 0.05 * h));
     const QRectF iconRect(r.center().x() - iconSize / 2.0, r.top() + 20 - 2 * h, iconSize, iconSize);

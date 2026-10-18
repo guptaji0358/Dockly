@@ -47,6 +47,7 @@ signals:
 protected:
     void resizeEvent(QResizeEvent *e) override;
     void paintEvent(QPaintEvent *e) override;
+    void showEvent(QShowEvent *e) override;
     void contextMenuEvent(QContextMenuEvent *e) override;
     void keyPressEvent(QKeyEvent *e) override;
     void mousePressEvent(QMouseEvent *e) override;
@@ -65,6 +66,8 @@ private:
     qreal enterOf(const QModelIndex &i) const;
     void setHoverId(const QString &id);
     void tick();
+    bool floating() const;
+    qreal floatOf(const QModelIndex &i) const;
     void startEnter();
     void startDrag(const QModelIndex &index);
     int dropRowFor(const QPoint &pos) const;
@@ -80,6 +83,7 @@ private:
     QHash<QString, qreal> m_hover;   // item id -> 0..1
     QString m_hoverId;
     QElapsedTimer m_enterClock;
+    QElapsedTimer m_floatClock;      // drives the idle floating motion
     bool m_entering = false;
 
     // drag & drop

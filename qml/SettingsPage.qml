@@ -77,6 +77,7 @@ Item {
                         }
                     }
                     SettingCheck { key: "animations"; text: "Animations" }
+                    SettingCheck { key: "floatingTiles"; text: "Floating tiles" }
                 }
 
                 SettingGroup {
@@ -150,7 +151,7 @@ Item {
                     Flow {
                         Layout.fillWidth: true
                         spacing: 8
-                        AppButton { text: "About"; onClicked: page.host.ask("About Launcher Hub", core.aboutText(), ["OK"]) }
+                        AppButton { text: "About"; onClicked: page.host.ask("About Dockly", core.aboutText(), ["OK"]) }
                         AppButton { text: "Check for Updates"; onClicked: page.host.ask("Check for Updates", core.checkForUpdates(), ["OK"]) }
                     }
                 }

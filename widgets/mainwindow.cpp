@@ -37,7 +37,7 @@ const char *kFullNames[] = {"Home", "Software Hub", "Documents Hub", "Entertainm
 MainWindow::MainWindow(AppCore *core, QWidget *parent)
     : QMainWindow(parent), m_core(core)
 {
-    setWindowTitle("Launcher Hub");
+    setWindowTitle("Dockly");
     setWindowIcon(AppCore::appIcon());
     resize(1240, 780);
     setMinimumSize(900, 560);
@@ -53,7 +53,7 @@ MainWindow::MainWindow(AppCore *core, QWidget *parent)
     m_logo = new QLabel;
     m_logo->setAlignment(Qt::AlignCenter);
     m_logo->setFixedHeight(44);
-    m_logo->setToolTip("Launcher Hub");
+    m_logo->setToolTip("Dockly");
     sl->addWidget(m_logo);
     sl->addSpacing(14);
 
@@ -104,7 +104,7 @@ MainWindow::MainWindow(AppCore *core, QWidget *parent)
     }
 
     // --- main column -----------------------------------------------------------
-    m_brand = new QLabel("Launcher Hub");
+    m_brand = new QLabel("Dockly");
     m_brand->setObjectName("h2");
     m_search = new QLineEdit;
     m_search->setPlaceholderText("Search everything...   (Ctrl+F)");
@@ -273,7 +273,7 @@ void MainWindow::showFromTray()
 
 bool MainWindow::acceptsDrop(const QMimeData *m)
 {
-    if (m->hasFormat("application/x-launcherhub-item"))
+    if (m->hasFormat("application/x-dockly-item"))
         return false; // internal card drags are handled by the views
     return m->hasUrls() || (m->hasText() && m->text().trimmed().startsWith("http"));
 }

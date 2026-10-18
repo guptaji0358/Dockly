@@ -1,13 +1,13 @@
 find_package(Qt6 REQUIRED COMPONENTS Qml Quick QuickControls2)
 qt_policy(SET QTP0001 NEW) # QML modules live under :/qt/qml/<URI>
 
-qt_add_executable(LauncherHubQml WIN32
+qt_add_executable(DocklyQml WIN32
     main.cpp
     itemimageprovider.h itemimageprovider.cpp
     iconimageprovider.h iconimageprovider.cpp
 )
 
-qt_add_qml_module(LauncherHubQml
+qt_add_qml_module(DocklyQml
     URI LauncherUI
     VERSION 1.0
     QML_FILES
@@ -32,4 +32,5 @@ qt_add_qml_module(LauncherHubQml
         SettingCombo.qml
 )
 
-target_link_libraries(LauncherHubQml PRIVATE lhcore Qt6::Qml Qt6::Quick Qt6::QuickControls2)
+target_link_libraries(DocklyQml PRIVATE lhcore Qt6::Qml Qt6::Quick Qt6::QuickControls2)
+lh_add_version_info(DocklyQml "Dockly (Qt Quick)")

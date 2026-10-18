@@ -42,9 +42,20 @@ Item {
     readonly property real lit: Math.max(t, selected ? 1 : 0)
     readonly property bool dropHover: dropArea.containsDrag
 
+    // idle "floating": grid cards drift up and down; hover settles them back into place
+    readonly property bool floating: animated && grid && core.settings.values.floatingTiles
+    property real floatY: 0
+    SequentialAnimation on floatY {
+        running: root.floating && root.visible
+        loops: Animation.Infinite
+        NumberAnimation { from: -3.5; to: 3.5; duration: 1500 + (root.index % 7) * 110; easing.type: Easing.InOutSine }
+        NumberAnimation { from: 3.5; to: -3.5; duration: 1500 + (root.index % 7) * 110; easing.type: Easing.InOutSine }
+    }
+    readonly property real restShadow: floating ? 0.45 : 0
+
     z: hovered ? 2 : 0
     scale: grid ? 1 + 0.025 * t : 1
-    transform: Translate { y: root.grid ? -4 * root.t : 0; x: root.grid ? 0 : 3 * root.t }
+    transform: Translate { y: root.grid ? -4 * root.t + (root.floating ? root.floatY * (1 - root.t) : 0) : 0; x: root.grid ? 0 : 3 * root.t }
 
     HoverHandler { id: hover }
 
@@ -59,14 +70,14 @@ Item {
     }
     // soft shadow that grows with the lift
     Rectangle {
-        visible: !root.th.hardShadow && root.t > 0.02
+        visible: !root.th.hardShadow && Math.max(root.t, root.restShadow) > 0.02
         x: bg.x
-        y: bg.y + 6 * root.t
+        y: bg.y + 6 * Math.max(root.t, root.restShadow)
         width: bg.width
         height: bg.height
         radius: bg.radius
         color: "#000000"
-        opacity: 0.22 * root.t
+        opacity: 0.22 * Math.max(root.t, root.restShadow)
     }
     // neon: soft halo around the lit card
     Repeater {
@@ -229,10 +240,10 @@ Item {
     // Drag this card (onto a collection, or within a collection to reorder).
     Drag.dragType: Drag.Automatic
     Drag.supportedActions: Qt.CopyAction
-    Drag.keys: ["application/x-launcherhub-item"]
+    Drag.keys: ["application/x-dockly-item"]
     Drag.mimeData: ({
-        "application/x-launcherhub-item": root.itemId,
-        "application/x-launcherhub-source": root.collectionId
+        "application/x-dockly-item": root.itemId,
+        "application/x-dockly-source": root.collectionId
     })
     DragHandler {
         id: dragHandler
@@ -254,11 +265,11 @@ Item {
     DropArea {
         id: dropArea
         anchors.fill: parent
-        keys: ["application/x-launcherhub-item"]
+        keys: ["application/x-dockly-item"]
         enabled: root.category === LH.Collection || root.collectionId !== ""
         onDropped: drop => {
-            const id = drop.getDataAsString("application/x-launcherhub-item")
-            const src = drop.getDataAsString("application/x-launcherhub-source")
+            const id = drop.getDataAsString("application/x-dockly-item")
+            const src = drop.getDataAsString("application/x-dockly-source")
             if (id === "" || id === root.itemId)
                 return
             if (root.category === LH.Collection && root.collectionId === "") {

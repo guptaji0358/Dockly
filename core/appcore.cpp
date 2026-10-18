@@ -140,6 +140,30 @@ QIcon AppCore::appIcon()
 // Startup / persistence
 // ---------------------------------------------------------------------------
 
+namespace {
+// Before the rename the data lived in <AppData>/LauncherHub/LauncherHub; carry it over once.
+void copyDir(const QDir &from, const QDir &to)
+{
+    QDir().mkpath(to.absolutePath());
+    for (const QFileInfo &fi : from.entryInfoList(QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot)) {
+        const QString dst = to.filePath(fi.fileName());
+        if (fi.isDir())
+            copyDir(QDir(fi.absoluteFilePath()), QDir(dst));
+        else
+            QFile::copy(fi.absoluteFilePath(), dst);
+    }
+}
+
+void migrateLegacyData(const QString &dataDir)
+{
+    if (QFile::exists(dataDir + "/settings.json") || QFile::exists(dataDir + "/library.db"))
+        return;
+    const QString legacy = QDir(dataDir).absoluteFilePath("../../LauncherHub/LauncherHub");
+    if (QDir(legacy).exists())
+        copyDir(QDir(QDir::cleanPath(legacy)), QDir(dataDir));
+}
+}
+
 QString AppCore::settingsPath() const { return m_dataDir + "/settings.json"; }
 
 void AppCore::init()
@@ -148,6 +172,8 @@ void AppCore::init()
     m_dataDir = qEnvironmentVariable("LH_DATA_DIR");
     if (m_dataDir.isEmpty())
         m_dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (qEnvironmentVariableIsEmpty("LH_DATA_DIR"))
+        migrateLegacyData(m_dataDir);
     QDir().mkpath(m_dataDir);
     QDir().mkpath(m_dataDir + "/icons");
     QDir().mkpath(m_dataDir + "/backups");
@@ -647,7 +673,7 @@ void AppCore::fetchFavicon(const QString &host, const QUrl &pageUrl)
         m_net = new QNetworkAccessManager(this);
     QNetworkRequest req(pageUrl);
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("LauncherHub/%1").arg(version()));
+    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("Dockly/%1").arg(version()));
     req.setTransferTimeout(8000);
     QNetworkReply *reply = m_net->get(req);
     connect(reply, &QNetworkReply::finished, this, [this, reply, host, pageUrl] {
@@ -796,7 +822,8 @@ void AppCore::applyStartWithWindows()
 #ifdef Q_OS_WIN
     QSettings run(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
                   QSettings::NativeFormat);
-    const QString name = QStringLiteral("LauncherHub");
+    const QString name = QStringLiteral("Dockly");
+    run.remove(QStringLiteral("LauncherHub")); // entry written by pre-rename builds
     if (m_settings->boolean("startWithWindows"))
         run.setValue(name, QStringLiteral("\"%1\" --minimized")
                                .arg(QDir::toNativeSeparators(QCoreApplication::applicationFilePath())));
@@ -807,14 +834,14 @@ void AppCore::applyStartWithWindows()
 
 QString AppCore::defaultBackupPath() const
 {
-    return m_dataDir + "/backups/LauncherHub-"
+    return m_dataDir + "/backups/Dockly-"
            + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss") + ".json";
 }
 
 bool AppCore::backupTo(const QString &path)
 {
     QJsonObject o;
-    o["app"] = QStringLiteral("LauncherHub");
+    o["app"] = QStringLiteral("Dockly");
     o["version"] = kBackupFormatVersion;
     o["settings"] = m_settings->toJson();
     o["data"] = m_db.exportAll();
@@ -840,8 +867,10 @@ bool AppCore::restoreFrom(const QString &path)
         return false;
     }
     const QJsonObject o = QJsonDocument::fromJson(f.readAll()).object();
-    if (o["app"].toString() != QLatin1String("LauncherHub") || !o["data"].isObject()) {
-        emit message(QStringLiteral("That file isn't a Launcher Hub backup."));
+    const QString appTag = o["app"].toString();
+    // Backups made before the rename carry the old "LauncherHub" tag.
+    if ((appTag != QLatin1String("Dockly") && appTag != QLatin1String("LauncherHub")) || !o["data"].isObject()) {
+        emit message(QStringLiteral("That file isn't a Dockly backup."));
         return false;
     }
     // Older (v1) backups flagged detected programs as autoDetected: keep those out of the cards.
@@ -898,13 +927,15 @@ void AppCore::clearCache()
 
 QString AppCore::checkForUpdates() const
 {
-    return QStringLiteral("You're running Launcher Hub %1.\nNo update server is configured for this build.")
+    return QStringLiteral("You're running Dockly %1.\nNo update server is configured for this build.")
         .arg(version());
 }
 
 QString AppCore::aboutText() const
 {
-    return QStringLiteral("Launcher Hub %1\nA launcher / hub / shortcut plate built with C++ and Qt %2.\n\n"
+    return QStringLiteral("Dockly %1\nA launcher / hub / shortcut plate built with C++ and Qt %2.\n\n"
+                          "Robin Gupta Studios (RGS™)\nAuthor: Robin Gupta\n"
+                          "Copyright © Robin Gupta\n\n"
                           "Data folder:\n%3")
         .arg(version(), QString::fromLatin1(qVersion()), QDir::toNativeSeparators(m_dataDir));
 }

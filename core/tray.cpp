@@ -7,10 +7,10 @@
 TrayController::TrayController(AppCore *core, QObject *parent)
     : QObject(parent), m_core(core), m_icon(new QSystemTrayIcon(AppCore::appIcon(), this))
 {
-    m_icon->setToolTip(QStringLiteral("Launcher Hub"));
+    m_icon->setToolTip(QStringLiteral("Dockly"));
 
     auto *menu = new QMenu();
-    menu->addAction(QStringLiteral("Open Launcher Hub"), this, &TrayController::showRequested);
+    menu->addAction(QStringLiteral("Open Dockly"), this, &TrayController::showRequested);
     menu->addSeparator();
     menu->addAction(QStringLiteral("Quit"), this, &TrayController::quitRequested);
     m_icon->setContextMenu(menu);

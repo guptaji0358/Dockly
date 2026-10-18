@@ -1,12 +1,12 @@
-# Launcher Hub
+# Dockly
 
 A launcher / hub / shortcut plate for Windows, built with C++17 and Qt 6, following the
 flowchart in the brief. One shared core, two interchangeable frontends:
 
 | Target | UI technology |
 |---|---|
-| `LauncherHubWidgets` | Qt Widgets (QSS themed) |
-| `LauncherHubQml` | Qt Quick / QML (Controls, Basic style) |
+| `DocklyWidgets` | Qt Widgets (QSS themed) |
+| `DocklyQml` | Qt Quick / QML (Controls, Basic style) |
 
 ```
 core/     SQLite databases, settings, launching, validation, tray, theme   (static lib)
@@ -27,7 +27,7 @@ Open the top-level `CMakeLists.txt` in Qt Creator to work on it there.
 
 ## Data: two SQLite files, read on demand
 
-Stored in `%APPDATA%\LauncherHub\LauncherHub\` (override with the `LH_DATA_DIR` environment variable):
+Stored in `%APPDATA%\Robin Gupta Studios\Dockly\` (override with the `LH_DATA_DIR` environment variable):
 
 | File | Holds |
 |---|---|

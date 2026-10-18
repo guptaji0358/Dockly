@@ -15,6 +15,6 @@ if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
 if ($Deploy) {
     New-Item -ItemType Directory -Force dist | Out-Null
-    Copy-Item build\LauncherHubWidgets.exe, build\LauncherHubQml.exe dist\ -Force
-    windeployqt --release --compiler-runtime --qmldir qml dist\LauncherHubWidgets.exe dist\LauncherHubQml.exe
+    Copy-Item build\DocklyWidgets.exe, build\DocklyQml.exe dist\ -Force
+    windeployqt --release --compiler-runtime --qmldir qml dist\DocklyWidgets.exe dist\DocklyQml.exe
 }

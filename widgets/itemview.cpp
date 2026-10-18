@@ -12,11 +12,15 @@
 #include <QMouseEvent>
 #include <QOpenGLWidget>
 #include <QPainter>
+#include <QShowEvent>
+#include <cmath>
 
 namespace {
-const char *kItemMime = "application/x-launcherhub-item";
+const char *kItemMime = "application/x-dockly-item";
 constexpr int kEnterMs = 280;     // per-card entrance duration
 constexpr int kStaggerMs = 35;    // delay between consecutive cards
+constexpr qreal kFloatAmp = 3.5;  // idle float amplitude in px
+constexpr qreal kFloatPeriodMs = 3200;
 }
 
 ItemView::ItemView(AppCore *core, QWidget *parent)
@@ -42,6 +46,8 @@ ItemView::ItemView(AppCore *core, QWidget *parent)
 
     m_delegate->hoverProgress = [this](const QModelIndex &i) { return hoverOf(i); };
     m_delegate->enterProgress = [this](const QModelIndex &i) { return enterOf(i); };
+    m_floatClock.start();
+    m_delegate->floatOffset = [this](const QModelIndex &i) { return floatOf(i); };
     m_anim.setInterval(16);
     connect(&m_anim, &QTimer::timeout, this, &ItemView::tick);
 
@@ -108,6 +114,8 @@ void ItemView::applySettings()
     setDropIndicatorShown(false);
     m_delegate->setViewportWidth(viewport()->width() - 12);
     doItemsLayout();
+    if (floating() && !m_anim.isActive())
+        m_anim.start();
     viewport()->update();
 }
 
@@ -126,6 +134,28 @@ qreal ItemView::enterOf(const QModelIndex &i) const
         return 1.0;
     const qint64 t = m_enterClock.elapsed() - qint64(qMin(i.row(), 24)) * kStaggerMs;
     return qBound<qreal>(0.0, qreal(t) / kEnterMs, 1.0);
+}
+
+// Grid cards drift up and down in a slow wave: each row is phase-shifted so the tiles ripple.
+bool ItemView::floating() const
+{
+    return m_delegate->viewStyle() == "grid" && m_core->settings()->boolean("animations")
+           && m_core->settings()->boolean("floatingTiles");
+}
+
+qreal ItemView::floatOf(const QModelIndex &i) const
+{
+    if (!floating())
+        return 0.0;
+    const qreal phase = 2 * M_PI * (qreal(m_floatClock.elapsed()) / kFloatPeriodMs + i.row() * 0.13);
+    return std::sin(phase) * kFloatAmp;
+}
+
+void ItemView::showEvent(QShowEvent *e)
+{
+    QListView::showEvent(e);
+    if (floating() && !m_anim.isActive())
+        m_anim.start();
 }
 
 void ItemView::setHoverId(const QString &id)
@@ -182,6 +212,8 @@ void ItemView::tick()
         else
             busy = true;
     }
+    if (floating() && isVisible())
+        busy = true;
     viewport()->update();
     if (!busy)
         m_anim.stop();
@@ -349,7 +381,7 @@ void ItemView::startDrag(const QModelIndex &index)
     const QString id = index.data(ItemModel::IdRole).toString();
     auto *mime = new QMimeData;
     mime->setData(kItemMime, id.toUtf8());
-    mime->setData("application/x-launcherhub-source", m_dragCollection.toUtf8());
+    mime->setData("application/x-dockly-source", m_dragCollection.toUtf8());
 
     // Drag pixmap: the card's icon over a soft disc.
     const int px = 56;
@@ -416,7 +448,7 @@ void ItemView::dragMoveEvent(QDragMoveEvent *e)
         }
     } else {
         // only cards that belong to the same collection can be reordered
-        if (QString::fromUtf8(e->mimeData()->data("application/x-launcherhub-source")) != m_dropCollection) {
+        if (QString::fromUtf8(e->mimeData()->data("application/x-dockly-source")) != m_dropCollection) {
             e->ignore();
             viewport()->update();
             return;
