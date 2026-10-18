@@ -19,6 +19,8 @@ qt_add_qml_module(Dockly
         ItemSpace.qml
         Ring.qml
         Glass.qml
+        OrbButton.qml
+        HudField.qml
         AppButton.qml
         AppDialog.qml
         ItemDialog.qml

@@ -61,7 +61,8 @@ int main(int argc, char *argv[])
     QCommandLineOption page("page", "Open this tab index first (diagnostics).", "index");
     QCommandLineOption ring("ring", "Open the radial menu at startup (diagnostics).");
     QCommandLineOption demo("demo", "Fill an empty library with sample cards (diagnostics).");
-    cli.addOptions({minimized, shot, page, ring, demo});
+    QCommandLineOption dialog("dialog", "Open a dialog at startup: software (diagnostics).", "name");
+    cli.addOptions({minimized, shot, page, ring, demo, dialog});
     cli.process(app);
 
     AppCore *core = AppCore::instance();
@@ -79,8 +80,12 @@ int main(int argc, char *argv[])
             {"Wikipedia", "https://wikipedia.org"}, {"Claude", "https://claude.ai"}};
         for (const auto &w : web)
             core->addItem(LH::Web, w.first, w.second);
-        for (const QString &id : core->queryIds(LH::ModeCategory, LH::Software, QString(), QString()).mid(0, 4))
+        const QStringList softIds = core->queryIds(LH::ModeCategory, LH::Software, QString(), QString());
+        for (const QString &id : softIds.mid(0, 4))
             core->setFavorite(id, true);
+        const QString dev = core->createCollection("Dev Tools");
+        core->addToCollection(dev, softIds.mid(0, 4));
+        core->createCollection("Morning");
     }
     TrayController tray(core);
     QObject::connect(&tray, &TrayController::quitRequested, &app, &QApplication::quit);
@@ -94,6 +99,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("core", core);
     engine.rootContext()->setContextProperty("tray", &tray);
     engine.rootContext()->setContextProperty("startRing", cli.isSet(ring));
+    engine.rootContext()->setContextProperty("startDialog", cli.value(dialog));
     engine.rootContext()->setContextProperty("startPage", cli.isSet(page) ? cli.value(page).toInt() : -1);
     engine.loadFromModule("DocklyUI", "Main");
     if (engine.rootObjects().isEmpty())

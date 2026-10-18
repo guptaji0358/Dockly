@@ -155,7 +155,7 @@ Item {
     Text {
         text: root.name
         color: root.th.text
-        font.pixelSize: 12
+        font.pixelSize: root.radius < 60 ? 10.5 : 12
         font.weight: Font.DemiBold
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignTop

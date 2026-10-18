@@ -35,10 +35,11 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 8
+        spacing: 6
 
         RowLayout {
             Layout.fillWidth: true
+            spacing: 8
             Text {
                 text: "Collections"
                 color: core.theme.text
@@ -46,76 +47,83 @@ Item {
                 font.weight: Font.DemiBold
                 Layout.fillWidth: true
             }
-            AppButton { primary: true; text: "Create Collection"; onClicked: page.host.addCollection() }
+            AppButton { primary: true; iconName: "add"; text: "Create Collection"; onClicked: page.host.addCollection() }
         }
 
+        // the collections themselves, as a strip of glowing nodes
+        Text {
+            text: "YOUR COLLECTIONS"
+            color: core.theme.accent
+            font.pixelSize: 11
+            font.letterSpacing: 4
+            font.weight: Font.DemiBold
+            Layout.topMargin: 4
+        }
+        ItemSpace {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 130
+            strip: true
+            host: page.host
+            model: collections
+            selectedId: page.current
+            emptyText: "No collections yet.  Create one to launch several items at once."
+            onItemClicked: id => page.current = id
+        }
+
+        // the selected collection: its members orbit it
         RowLayout {
             Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: 14
-
-            ItemGrid {
-                Layout.preferredWidth: 300
-                Layout.fillHeight: true
-                host: page.host
-                model: collections
-                styleOverride: "list"
-                selectedId: page.current
-                emptyText: "No collections yet.\nCreate one to launch several items at once."
-                onItemClicked: id => page.current = id
-            }
-
-            ColumnLayout {
+            Layout.topMargin: 4
+            spacing: 8
+            Text {
                 Layout.fillWidth: true
-                Layout.fillHeight: true
-                spacing: 8
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-                    Text {
-                        Layout.fillWidth: true
-                        elide: Text.ElideRight
-                        color: core.theme.text
-                        font.pixelSize: 17
-                        font.weight: Font.DemiBold
-                        text: page.info.name === undefined ? "Select or create a collection"
-                                                           : page.info.name + "  •  " + members.count + " item(s)"
-                    }
-                    AppButton {
-                        primary: true
-                        text: "Launch All"
-                        enabled: page.info.name !== undefined && members.count > 0
-                        onClicked: core.launchAll(page.current)
-                    }
-                    AppButton {
-                        text: "Add Existing Cards"
-                        enabled: page.info.name !== undefined
-                        onClicked: page.host.pickExisting(page.current)
-                    }
-                    AppButton {
-                        text: "Edit"
-                        enabled: page.info.name !== undefined
-                        onClicked: page.host.edit(page.current)
-                    }
-                    AppButton {
-                        text: "Delete"
-                        danger: true
-                        enabled: page.info.name !== undefined
-                        onClicked: page.host.remove(page.current)
-                    }
-                }
-
-                ItemGrid {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    host: page.host
-                    model: members
-                    collectionId: page.current
-                    emptyText: page.info.name === undefined ? ""
-                               : "This collection is empty.\nUse \"Add Existing Cards\" to fill it."
-                }
+                elide: Text.ElideRight
+                color: core.theme.text
+                font.pixelSize: 17
+                font.weight: Font.DemiBold
+                text: page.info.name === undefined ? "Select or create a collection"
+                                                   : page.info.name + "  ·  " + members.count + " item(s)"
             }
+            AppButton {
+                primary: true
+                iconName: "open"
+                text: "Launch All"
+                enabled: page.info.name !== undefined && members.count > 0
+                onClicked: core.launchAll(page.current)
+            }
+            AppButton {
+                iconName: "add"
+                text: "Add Cards"
+                enabled: page.info.name !== undefined
+                onClicked: page.host.pickExisting(page.current)
+            }
+            OrbButton {
+                diameter: 38
+                iconName: "edit"
+                tip: "Rename"
+                enabled: page.info.name !== undefined
+                onClicked: page.host.edit(page.current)
+            }
+            OrbButton {
+                diameter: 38
+                danger: true
+                iconName: "trash"
+                tip: "Delete collection"
+                enabled: page.info.name !== undefined
+                onClicked: page.host.remove(page.current)
+            }
+        }
+
+        ItemSpace {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            host: page.host
+            model: members
+            collectionId: page.current
+            coreLabel: page.info.name === undefined ? "" : page.info.name.toUpperCase()
+            emptyText: page.info.name === undefined ? ""
+                       : "This collection is empty.
+Use \"Add Cards\" to fill it."
         }
     }
 }

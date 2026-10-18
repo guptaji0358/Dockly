@@ -54,6 +54,7 @@ public:
     QStringList queryIds(int mode, int category, const QString &search, const QString &collectionId) const;
     QString subtitleFor(const Item &it) const;
     QPixmap pixmapFor(const QString &id, int size);
+    QPixmap pixmapForFile(const QString &path, int size); // shell icon of any file (catalog entries)
 
     // --- item management -------------------------------------------------
     Q_INVOKABLE QString addItem(int category, const QString &name, const QString &target);

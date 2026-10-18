@@ -23,6 +23,7 @@ ApplicationWindow {
     property var ctxCollections: []
     property string pendingAddItem: ""
     signal collectionCreated(string id)
+    ItemModel { id: diagModel; category: LH.Software }   // used by the --dialog panel diagnostic
 
     palette {
         window: th.bg
@@ -134,6 +135,12 @@ ApplicationWindow {
     Component.onCompleted: {
         if (startRing)
             ring.opened = true
+        if (startDialog === "panel")
+            core.select(diagModel.idAt(0))
+        if (startDialog === "software") {
+            core.refreshSoftware()
+            softwareDialog.openPicker()
+        }
         if (startPage >= 0) {
             tab = startPage
         } else {
@@ -301,7 +308,8 @@ ApplicationWindow {
         anchors.top: top.bottom
         anchors.bottom: parent.bottom
         anchors.leftMargin: 24
-        anchors.rightMargin: 24
+        anchors.rightMargin: panel.shown ? 352 : 24   // pages make room for the inspector
+        Behavior on anchors.rightMargin { enabled: Fx.animated; NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
         anchors.topMargin: 10
         anchors.bottomMargin: 96
         currentIndex: win.tab
@@ -333,8 +341,6 @@ ApplicationWindow {
             height: parent.height
             x: shown ? 0 : 340
             opacity: shown ? 1 : 0
-            color: Qt.rgba(win.th.surface.r, win.th.surface.g, win.th.surface.b, 0.92)
-            radius: 18
             Behavior on x { enabled: Fx.animated; NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
             Behavior on opacity { enabled: Fx.animated; NumberAnimation { duration: 200 } }
         }

@@ -762,6 +762,22 @@ QPixmap AppCore::letterTile(const QString &seed, const QString &label, int size)
     return pm;
 }
 
+QPixmap AppCore::pixmapForFile(const QString &path, int size)
+{
+    if (path.isEmpty() || size <= 0)
+        return {};
+    const QString key = QStringLiteral("file:") + path + QLatin1Char('|') + QString::number(size);
+    if (const auto c = m_pixCache.constFind(key); c != m_pixCache.cend())
+        return c.value();
+    if (m_pixCache.size() > 300)
+        m_pixCache.clear();
+    QPixmap pm = m_iconProvider.icon(QFileInfo(path)).pixmap(size);
+    if (pm.isNull())
+        pm = m_iconProvider.icon(QFileIconProvider::File).pixmap(size);
+    m_pixCache.insert(key, pm);
+    return pm;
+}
+
 QPixmap AppCore::pixmapFor(const QString &id, int size)
 {
     const Item it = item(id);
