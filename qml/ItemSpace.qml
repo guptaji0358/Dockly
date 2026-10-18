@@ -73,6 +73,13 @@ Item {
         Qt.callLater(fit)
     }
 
+    function panBy(dx, dy) {
+        fitting = false
+        userMoved = true
+        world.x += dx
+        world.y += dy
+    }
+
     function fit() {
         if (!spatial || width < 10 || height < 10)
             return
@@ -104,8 +111,11 @@ Item {
     onModeChanged: build()
     onTrChanged: build()
     onModelChanged: Qt.callLater(build)
-    onWidthChanged: if (!userMoved) Qt.callLater(fit)
-    onHeightChanged: if (!userMoved) Qt.callLater(fit)
+    // Re-centre after the window / panel changes size, but not instantly: opening the inspector on the
+    // first click of a double-click must not move the tile away from under the second click.
+    onWidthChanged: if (!userMoved) refit.restart()
+    onHeightChanged: if (!userMoved) refit.restart()
+    Timer { id: refit; interval: 700; onTriggered: if (!root.userMoved) root.fit() }
     Component.onCompleted: Qt.callLater(build)
 
     NumberAnimation on spin {
@@ -120,6 +130,24 @@ Item {
         anchors.fill: parent
         visible: root.spatial
         clip: true
+
+        // empty background: double-click re-centres. A plain MouseArea sitting under the tiles (a TapHandler
+        // on the canvas would steal clicks from the tiles).
+        MouseArea {
+            id: bg
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+            property point lastG
+            onPressed: m => lastG = mapToGlobal(m.x, m.y)
+            onPositionChanged: m => {
+                if (!pressed)
+                    return
+                const g = mapToGlobal(m.x, m.y)
+                root.panBy(g.x - lastG.x, g.y - lastG.y)
+                lastG = g
+            }
+            onDoubleClicked: root.fit()
+        }
 
         Item {
             id: world
@@ -191,23 +219,11 @@ Item {
                         root.itemClicked(itemId)
                     }
                     onFavoriteRequested: core.setFavorite(itemId, !favorite)
+                    onPanned: (dx, dy) => root.panBy(dx, dy)
                 }
             }
         }
 
-        DragHandler {
-            target: null
-            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-            property real lx: 0
-            property real ly: 0
-            onActiveChanged: { lx = 0; ly = 0; if (active) { root.fitting = false; root.userMoved = true } }
-            onTranslationChanged: {
-                world.x += translation.x - lx
-                world.y += translation.y - ly
-                lx = translation.x
-                ly = translation.y
-            }
-        }
         WheelHandler {
             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
             onWheel: event => {
@@ -221,10 +237,6 @@ Item {
                 world.x = px - wx * ns
                 world.y = py - wy * ns
             }
-        }
-        TapHandler {
-            acceptedButtons: Qt.LeftButton
-            onDoubleTapped: root.fit()
         }
 
         // zoom controls

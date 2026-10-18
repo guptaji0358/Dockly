@@ -460,6 +460,7 @@ QString AppCore::subtitleFor(const Item &it) const
 int AppCore::launch(const QString &id)
 {
     Item it = item(id);
+    qInfo() << "launch" << it.name << it.target;
     if (it.id.isEmpty())
         return LH::LaunchFailed;
     if (it.category == LH::Collection) {

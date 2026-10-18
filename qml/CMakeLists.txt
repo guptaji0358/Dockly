@@ -49,7 +49,7 @@ qt_add_shaders(Dockly "dockly_shaders"
     FILES shaders/aurora.frag
 )
 
-target_link_libraries(Dockly PRIVATE lhcore Qt6::Qml Qt6::Quick Qt6::QuickControls2)
+target_link_libraries(Dockly PRIVATE lhcore Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::GuiPrivate)
 lh_add_version_info(Dockly "Dockly")
 
 # Browser extension (Chrome / Edge) ships next to the executable.

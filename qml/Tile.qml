@@ -21,12 +21,13 @@ Item {
     signal clicked()
     signal menuRequested()
     signal favoriteRequested()
+    signal panned(real dx, real dy)
 
     readonly property var th: core.theme
     readonly property color accent: th.accentOf(category)
     readonly property real hexW: Math.sqrt(3) * radius
     readonly property real hexH: 2 * radius
-    readonly property bool hovered: mouse.containsMouse
+    readonly property bool hovered: mouse.containsMouse && inHex(mouse.mouseX, mouse.mouseY)
 
     width: hexW
     height: hexH
@@ -190,23 +191,53 @@ Item {
         }
     }
 
-    // pointer area follows the hexagon, not its bounding box (neighbouring tiles overlap)
-    Item {
-        id: hexMask
-        function contains(p) {
-            const w = root.hexW, r = root.radius
-            const dx = Math.abs(p.x - w / 2), dy = Math.abs(p.y - r)
-            return dx <= w / 2 && dy <= r - dx * r / w
-        }
+    // The pointer area is the hexagon, not its bounding box (neighbouring tiles overlap). A MouseArea
+    // always receives events for its whole rectangle, so presses outside the hexagon are declined and
+    // fall through to whatever lies underneath, and hover only counts inside the hexagon.
+    function inHex(x, y) {
+        const w = hexW, r = radius
+        const dx = Math.abs(x - w / 2), dy = Math.abs(y - r)
+        return dx <= w / 2 && dy <= r - dx * r / w
     }
     MouseArea {
         id: mouse
         anchors.fill: parent
         hoverEnabled: true
-        containmentMask: hexMask
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        cursorShape: Qt.PointingHandCursor
-        onClicked: m => { if (m.button === Qt.RightButton) root.menuRequested(); else root.clicked() }
-        onDoubleClicked: m => { if (m.button === Qt.LeftButton) root.opened() }
+        cursorShape: root.inHex(mouseX, mouseY) ? Qt.PointingHandCursor : Qt.ArrowCursor
+
+        // Dragging a tile pans the map (reported to the canvas); a press that barely moves is a click.
+        property point pressG
+        property point lastG
+        property bool moved: false
+
+        onPressed: m => {
+            if (!root.inHex(m.x, m.y)) {
+                m.accepted = false
+                return
+            }
+            pressG = mapToGlobal(m.x, m.y)
+            lastG = pressG
+            moved = false
+        }
+        onPositionChanged: m => {
+            if (!pressed || !(pressedButtons & Qt.LeftButton))
+                return
+            const g = mapToGlobal(m.x, m.y)
+            if (!moved && Math.hypot(g.x - pressG.x, g.y - pressG.y) > 8)
+                moved = true
+            if (moved)
+                root.panned(g.x - lastG.x, g.y - lastG.y)
+            lastG = g
+        }
+        onClicked: m => {
+            if (moved)
+                return
+            if (m.button === Qt.RightButton)
+                root.menuRequested()
+            else
+                root.clicked()
+        }
+        onDoubleClicked: m => { if (!moved && m.button === Qt.LeftButton) root.opened() }
     }
 }

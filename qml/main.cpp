@@ -11,6 +11,7 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -24,6 +25,11 @@
 #include <QSurfaceFormat>
 #include <QTimer>
 #include <QtQml>
+#include <qpa/qwindowsysteminterface.h>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
 
 namespace {
 QString dataDirPath()
@@ -41,6 +47,33 @@ void logHandler(QtMsgType, const QMessageLogContext &, const QString &msg)
         g_log->flush();
     }
     fprintf(stderr, "%s\n", msg.toLocal8Bit().constData());
+}
+// Show the window and really put it in front. Windows refuses to let a freshly started (or tray-hidden)
+// program steal focus from the app you are working in, so a plain show() can leave Dockly behind a
+// maximised window with only a blinking taskbar button - which looks like "nothing happened".
+void bringToFront(QQuickWindow *win)
+{
+    win->showNormal();
+    win->raise();
+    win->requestActivate();
+#ifdef Q_OS_WIN
+    const HWND h = reinterpret_cast<HWND>(win->winId());
+    if (IsIconic(h))
+        ShowWindow(h, SW_RESTORE);
+    // topmost for an instant puts the window above everything without waiting for permission ...
+    SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    SetWindowPos(h, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    // ... and attaching to the foreground thread lets us take keyboard focus as well
+    const DWORD fg = GetWindowThreadProcessId(GetForegroundWindow(), nullptr);
+    const DWORD me = GetCurrentThreadId();
+    if (fg && fg != me)
+        AttachThreadInput(me, fg, TRUE);
+    SetForegroundWindow(h);
+    BringWindowToTop(h);
+    if (fg && fg != me)
+        AttachThreadInput(me, fg, FALSE);
+#endif
+    qInfo() << "window brought to front, visible =" << win->isVisible();
 }
 } // namespace
 
@@ -84,7 +117,8 @@ int main(int argc, char *argv[])
     QCommandLineOption ring("ring", "Open the radial menu at startup (diagnostics).");
     QCommandLineOption demo("demo", "Fill an empty library with sample cards (diagnostics).");
     QCommandLineOption dialog("dialog", "Open a dialog at startup: software (diagnostics).", "name");
-    cli.addOptions({minimized, shot, page, ring, demo, dialog});
+    QCommandLineOption dbl("dblclick", "Send a double-click at x,y (window coordinates) after startup (diagnostics).", "x,y");
+    cli.addOptions({minimized, shot, page, ring, demo, dialog, dbl});
     cli.process(app);
 
     // One Dockly per data folder: starting it again brings the running one to the front instead of
@@ -164,11 +198,7 @@ int main(int argc, char *argv[])
 
     auto *win = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
     win->setIcon(AppCore::appIcon());
-    QObject::connect(&tray, &TrayController::showRequested, win, [win] {
-        win->showNormal();
-        win->raise();
-        win->requestActivate();
-    });
+    QObject::connect(&tray, &TrayController::showRequested, win, [win] { bringToFront(win); });
 
     QObject::connect(&instanceServer, &QLocalServer::newConnection, win, [&instanceServer, win] {
         while (QLocalSocket *c = instanceServer.nextPendingConnection()) {
@@ -176,16 +206,37 @@ int main(int argc, char *argv[])
             c->flush();
             c->disconnectFromServer();
             c->deleteLater();
-            win->showNormal();
-            win->raise();
-            win->requestActivate();
+            bringToFront(win);
         }
     });
 
     if (cli.isSet(minimized) && tray.isActive())
         ; // stay hidden; the tray icon brings the window back
-    else
+    else if (cli.isSet(shot))
         win->show();
+    else
+        bringToFront(win);
+
+    if (cli.isSet(dbl)) {
+        const QStringList xy = cli.value(dbl).split(',');
+        const QPointF pos(xy.value(0).toDouble(), xy.value(1).toDouble());
+        QTimer::singleShot(1500, &app, [win, pos] {
+            // goes through the same path as real input, including Qt's own double-click detection
+            QWindowSystemInterface::setSynchronousWindowSystemEvents(true);
+            // the window system interface works in native (device) pixels
+            const qreal dpr = win->devicePixelRatio();
+            const QPointF local = pos * dpr;
+            const QPointF global = QPointF(win->mapToGlobal(pos.toPoint())) * dpr;
+            auto mouse = [&](QEvent::Type t, Qt::MouseButtons state, Qt::MouseButton b) {
+                QWindowSystemInterface::handleMouseEvent(win, local, global, state, b, t);
+            };
+            mouse(QEvent::MouseMove, Qt::NoButton, Qt::NoButton);
+            for (int i = 0; i < 2; ++i) {
+                mouse(QEvent::MouseButtonPress, Qt::LeftButton, Qt::LeftButton);
+                mouse(QEvent::MouseButtonRelease, Qt::NoButton, Qt::LeftButton);
+            }
+        });
+    }
 
     if (cli.isSet(shot)) {
         const QString path = cli.value(shot);
