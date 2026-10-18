@@ -5,6 +5,12 @@
 #include "tray.h"
 
 #include <QApplication>
+#include <QCryptographicHash>
+#include <QDateTime>
+#include <QDir>
+#include <QLocalServer>
+#include <QLocalSocket>
+#include <QMessageBox>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -19,6 +25,25 @@
 #include <QTimer>
 #include <QtQml>
 
+namespace {
+QString dataDirPath()
+{
+    const QString env = qEnvironmentVariable("LH_DATA_DIR");
+    return env.isEmpty() ? QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) : env;
+}
+
+// Everything Qt / QML prints is also kept in <data folder>/dockly.log, because a GUI .exe has no console.
+QFile *g_log = nullptr;
+void logHandler(QtMsgType, const QMessageLogContext &, const QString &msg)
+{
+    if (g_log && g_log->isOpen()) {
+        g_log->write(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss  ").toUtf8() + msg.toUtf8() + '\n');
+        g_log->flush();
+    }
+    fprintf(stderr, "%s\n", msg.toLocal8Bit().constData());
+}
+} // namespace
+
 int main(int argc, char *argv[])
 {
     // The graphics API is a user setting (Settings > Performance); it has to be known before the
@@ -26,10 +51,7 @@ int main(int argc, char *argv[])
     QCoreApplication::setOrganizationName("Robin Gupta Studios");
     QCoreApplication::setApplicationName("Dockly");
     if (qEnvironmentVariableIsEmpty("LH_NO_GL")) {
-        QString dir = qEnvironmentVariable("LH_DATA_DIR");
-        if (dir.isEmpty())
-            dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-        QFile f(dir + "/settings.json");
+        QFile f(dataDirPath() + "/settings.json");
         QString api = QStringLiteral("opengl");
         if (f.open(QIODevice::ReadOnly)) {
             const QString v = QJsonDocument::fromJson(f.readAll()).object().value("graphicsApi").toString();
@@ -64,6 +86,36 @@ int main(int argc, char *argv[])
     QCommandLineOption dialog("dialog", "Open a dialog at startup: software (diagnostics).", "name");
     cli.addOptions({minimized, shot, page, ring, demo, dialog});
     cli.process(app);
+
+    // One Dockly per data folder: starting it again brings the running one to the front instead of
+    // opening a second copy (which is easy to mistake for "nothing happened" when it lives in the tray).
+    const QString dir = dataDirPath();
+    QDir().mkpath(dir);
+    const QString instanceKey = "Dockly-" + QString::fromLatin1(QCryptographicHash::hash(dir.toUtf8(), QCryptographicHash::Md5).toHex().left(12));
+    if (!cli.isSet(shot)) {
+        QLocalSocket probe;
+        probe.connectToServer(instanceKey);
+        if (probe.waitForConnected(250)) {
+            probe.write("show\n");
+            probe.waitForBytesWritten(500);
+            if (probe.waitForReadyRead(1500) && !cli.isSet(minimized))
+                return 0; // the running instance answered and is showing its window
+            if (probe.state() == QLocalSocket::ConnectedState && cli.isSet(minimized))
+                return 0; // autostart while already running: nothing to do
+        }
+    }
+    QLocalServer instanceServer;
+    QLocalServer::removeServer(instanceKey);
+    instanceServer.listen(instanceKey);
+
+    QFile logFile(dir + "/dockly.log");
+    if (logFile.size() > 512 * 1024)
+        logFile.remove();
+    if (logFile.open(QIODevice::Append | QIODevice::Text)) {
+        g_log = &logFile;
+        qInstallMessageHandler(logHandler);
+    }
+    qInfo() << "Dockly" << LH_VERSION << "starting, data folder" << dir;
 
     AppCore *core = AppCore::instance();
     core->init();
@@ -102,8 +154,13 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("startDialog", cli.value(dialog));
     engine.rootContext()->setContextProperty("startPage", cli.isSet(page) ? cli.value(page).toInt() : -1);
     engine.loadFromModule("DocklyUI", "Main");
-    if (engine.rootObjects().isEmpty())
+    if (engine.rootObjects().isEmpty()) {
+        qCritical() << "The interface failed to load.";
+        QMessageBox::critical(nullptr, "Dockly",
+                              "Dockly couldn't load its interface.\n\nDetails were written to:\n"
+                              + QDir::toNativeSeparators(dir + "/dockly.log"));
         return 1;
+    }
 
     auto *win = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
     win->setIcon(AppCore::appIcon());
@@ -111,6 +168,18 @@ int main(int argc, char *argv[])
         win->showNormal();
         win->raise();
         win->requestActivate();
+    });
+
+    QObject::connect(&instanceServer, &QLocalServer::newConnection, win, [&instanceServer, win] {
+        while (QLocalSocket *c = instanceServer.nextPendingConnection()) {
+            c->write("ok\n");
+            c->flush();
+            c->disconnectFromServer();
+            c->deleteLater();
+            win->showNormal();
+            win->raise();
+            win->requestActivate();
+        }
     });
 
     if (cli.isSet(minimized) && tray.isActive())
