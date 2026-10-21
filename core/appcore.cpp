@@ -708,33 +708,46 @@ void AppCore::fetchFavicon(const QString &host, const QUrl &pageUrl)
             }
             candidates = touch + plain;
         }
+        candidates << QUrl(QStringLiteral("%1://%2/apple-touch-icon.png").arg(pageUrl.scheme(), host));
         candidates << QUrl(QStringLiteral("%1://%2/favicon.ico").arg(pageUrl.scheme(), host));
         tryIcon(host, candidates);
     });
 }
 
-void AppCore::tryIcon(const QString &host, const QList<QUrl> &candidates)
+// Tries the candidates in order and keeps the first one that is at least 64px, since a 16px or
+// 32px favicon turns soft when it is scaled up to a card. If none is that large, the biggest one
+// seen is kept.
+void AppCore::tryIcon(const QString &host, const QList<QUrl> &candidates, const QImage &best)
 {
-    if (candidates.isEmpty())
-        return; // keep the letter tile
+    if (candidates.isEmpty()) {
+        if (!best.isNull())
+            storeIcon(host, best);
+        return; // otherwise keep the letter tile
+    }
     QNetworkRequest req(candidates.first());
     req.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
     req.setTransferTimeout(8000);
     QNetworkReply *reply = m_net->get(req);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, host, candidates] {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, host, candidates, best] {
         reply->deleteLater();
         QImage img;
         if (reply->error() == QNetworkReply::NoError)
             img = QImage::fromData(reply->readAll());
-        if (img.isNull()) {
-            tryIcon(host, candidates.mid(1));
+        if (img.width() >= 64) {
+            storeIcon(host, img);
             return;
         }
-        img.save(faviconPath(host), "PNG");
-        m_pixCache.clear();
-        ++m_iconVersion;
-        emit iconsChanged();
+        const bool bigger = !img.isNull() && (best.isNull() || img.width() > best.width());
+        tryIcon(host, candidates.mid(1), bigger ? img : best);
     });
+}
+
+void AppCore::storeIcon(const QString &host, const QImage &img)
+{
+    img.save(faviconPath(host), "PNG");
+    m_pixCache.clear();
+    ++m_iconVersion;
+    emit iconsChanged();
 }
 
 // Stand-in icon for sites without a (fetched) icon: rounded tile in a colour derived from the
@@ -796,11 +809,14 @@ QPixmap AppCore::pixmapFor(const QString &id, int size)
     QPixmap pm;
     switch (it.category) {
     case LH::Web: {
-        const QString path = faviconPath(QUrl(it.target).host());
-        if (QFile::exists(path))
+        const QString host = QUrl(it.target).host();
+        const QString path = faviconPath(host);
+        const bool cached = QFile::exists(path);
+        if (cached)
             pm = QPixmap(path).scaled(size, size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-        else if (QUrl(it.target).scheme().startsWith("http"))
-            requestFavicon(QUrl(it.target).host());
+        // a small cached icon (from before larger icons were preferred) is fetched again
+        if ((!cached || QImageReader(path).size().width() < 64) && QUrl(it.target).scheme().startsWith("http"))
+            requestFavicon(host);
         if (pm.isNull())
             pm = letterTile(QUrl(it.target).host(), it.name, size);
         break;

@@ -123,6 +123,10 @@ catalog instead of becoming cards; the old file is renamed `data.json.migrated`)
 
 * *Check for Updates* just reports the version: no update server is configured.
 * *Language* lists English only: strings are not translated yet, so the option is a placeholder.
-* Website icons are fetched from `https://<site>/favicon.ico` and cached locally.
+* Website icons are fetched from the page's `<link rel="icon">` / apple-touch-icon, then
+  `/apple-touch-icon.png` and `/favicon.ico`, and cached locally.
+* Some icons look blurry (for example Google, Spotify and Hugging Face). This is a source-file
+  size limit, not a rendering error: those sites publish only a 16-32px icon, which is scaled up
+  to fill a tile. Sites that publish a larger icon look sharp.
 * Command-line: `--minimized` (start in tray when tray is enabled), `--screenshot=file.png`
   and `--page=N` (diagnostics).

@@ -63,7 +63,8 @@ Item {
     opacity: Math.min(1, root.appear * 1.6)
     scale: (0.55 + 0.45 * appear) * (1 + 0.07 * t)
     transform: [
-        Translate { y: (Fx.floating ? root.bob * (1 - root.t) : 0) - 5 * root.t },
+        // whole pixels: a fractional offset resamples the bitmap every frame and blurs it
+        Translate { y: Math.round((Fx.floating ? root.bob * (1 - root.t) : 0) - 5 * root.t) },
         Rotation {
             origin.x: root.hexW / 2; origin.y: root.hexH / 2
             axis { x: 0; y: 1; z: 0 }
@@ -127,18 +128,21 @@ Item {
         }
     }
 
+    // icon and label are centred together on the hexagon's middle, where it is widest
+    readonly property real labelGap: 8
+
     // icon (moves against the tilt for parallax depth)
     Item {
         id: iconBox
         readonly property real sz: root.radius * 0.78
         width: sz
         height: sz
-        x: (root.hexW - sz) / 2 - (Fx.tilt ? root.mx * 7 * root.t : 0)
-        y: root.hexH * 0.2 - 3 * root.t - (Fx.tilt ? root.my * 6 * root.t : 0)
+        x: Math.round((root.hexW - sz) / 2 - (Fx.tilt ? root.mx * 7 * root.t : 0))
+        y: Math.round(root.radius - (sz + root.labelGap + label.height) / 2 - 3 * root.t - (Fx.tilt ? root.my * 6 * root.t : 0))
         Image {
             anchors.fill: parent
             source: root.iconSource
-            sourceSize: Qt.size(iconBox.sz * 2, iconBox.sz * 2)
+            sourceSize: Qt.size(iconBox.sz * 3, iconBox.sz * 3)
             fillMode: Image.PreserveAspectFit
             smooth: true
             mipmap: true
@@ -154,18 +158,23 @@ Item {
     }
 
     Text {
+        id: label
         text: root.name
         color: root.th.text
-        font.pixelSize: root.radius < 60 ? 10.5 : 12
+        font.pixelSize: root.radius < 60 ? 11 : 13
         font.weight: Font.DemiBold
+        // shrink the font until the label fits two lines inside the hexagon's lower, tapering half
+        fontSizeMode: Text.Fit
+        minimumPixelSize: 7
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignTop
-        wrapMode: Text.Wrap
+        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
         maximumLineCount: 2
         elide: Text.ElideRight
-        width: root.hexW * 0.74
+        width: root.hexW * 0.62
+        height: root.radius * 0.42
         x: (root.hexW - width) / 2
-        y: iconBox.y + iconBox.sz + 8
+        y: iconBox.y + iconBox.sz + root.labelGap
     }
 
     // favourite mark / toggle

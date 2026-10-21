@@ -135,7 +135,8 @@ private:
     QString faviconPath(const QString &host) const;
     QPixmap letterTile(const QString &seed, const QString &label, int size) const;
     void fetchFavicon(const QString &host, const QUrl &pageUrl);
-    void tryIcon(const QString &host, const QList<QUrl> &candidates);
+    void tryIcon(const QString &host, const QList<QUrl> &candidates, const QImage &best = {});
+    void storeIcon(const QString &host, const QImage &img);
 
     AppSettings *m_settings;
     Theme *m_theme;
