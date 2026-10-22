@@ -104,8 +104,10 @@ ApplicationWindow {
     function addFiles(category) {
         const files = core.pickFiles(category === LH.Document ? "Add Document" : "Add Media",
                                      core.fileFilter(category), true)
-        if (files.length > 0)
-            core.addFiles(category, files)
+        if (files.length === 1)
+            itemDialog.openAddTarget(category, files[0], "") // one file: offer name + icon first
+        else if (files.length > 1)
+            core.addFiles(category, files) // several: added directly, icons via Edit
     }
     function addSoftware() { softwareDialog.openPicker() }
     function addUrl() { itemDialog.openAdd(LH.Web) }
@@ -505,6 +507,10 @@ ApplicationWindow {
             onTriggered: win.edit(win.ctx.id)
         }
         MenuItem {
+            text: "Change Icon..."
+            onTriggered: win.edit(win.ctx.id)
+        }
+        MenuItem {
             readonly property bool applies: win.ctx.status !== 0 && win.ctx.category !== LH.Web
                                             && win.ctx.category !== LH.Collection
             text: "Locate Again..."
@@ -574,6 +580,9 @@ ApplicationWindow {
         onClosed: win.pendingAddItem = ""
     }
     PickDialog { id: pickDialog }
-    PickSoftwareDialog { id: softwareDialog }
+    PickSoftwareDialog {
+        id: softwareDialog
+        onCustomize: (target, name) => itemDialog.openAddTarget(LH.Software, target, name)
+    }
     ChoiceDialog { id: choice }
 }

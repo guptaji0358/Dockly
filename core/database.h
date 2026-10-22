@@ -25,6 +25,7 @@ public:
                          int recentLimit) const;
     bool insertItem(const Item &it);
     bool updateItem(const Item &it);
+    void setIcon(const QString &id, const QString &icon);
     void setFavorite(const QString &id, bool favorite);
     void setLastOpened(const QString &id);
     void deleteItem(const QString &id);

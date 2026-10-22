@@ -52,6 +52,8 @@ QJsonObject Item::toJson() const
     o["name"] = name;
     o["target"] = target;
     o["favorite"] = favorite;
+    if (!icon.isEmpty())
+        o["icon"] = icon;
     if (lastOpened.isValid())
         o["lastOpened"] = lastOpened.toString(Qt::ISODate);
     if (category == LH::Collection)
@@ -67,6 +69,7 @@ Item Item::fromJson(const QJsonObject &o)
     it.name = o["name"].toString();
     it.target = o["target"].toString();
     it.favorite = o["favorite"].toBool();
+    it.icon = o["icon"].toString();
     it.lastOpened = QDateTime::fromString(o["lastOpened"].toString(), Qt::ISODate);
     for (const QJsonValue &v : o["members"].toArray())
         it.members << v.toString();

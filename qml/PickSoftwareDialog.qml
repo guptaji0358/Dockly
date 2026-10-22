@@ -15,6 +15,8 @@ AppDialog {
     padding: 0
     width: Math.min(900, (Overlay.overlay ? Overlay.overlay.width : 900) - 60)
 
+    signal customize(string target, string name) // a single program: let the user set name + icon first
+
     function openPicker() {
         picked = ({})
         search.text = ""
@@ -117,7 +119,10 @@ AppDialog {
             tip: "Browse for an .exe…"
             onClicked: {
                 const f = core.pickFiles("Add Software", core.fileFilter(0), true)
-                if (f.length > 0) {
+                if (f.length === 1) {
+                    dlg.close()
+                    dlg.customize(f[0], "")
+                } else if (f.length > 1) {
                     core.addFiles(0, f)
                     dlg.close()
                 }
@@ -273,9 +278,11 @@ AppDialog {
                     const list = []
                     for (const t in dlg.picked)
                         list.push({target: t, name: dlg.picked[t]})
-                    if (list.length > 0)
-                        core.addSoftware(list)
                     dlg.close()
+                    if (list.length === 1)
+                        dlg.customize(list[0].target, list[0].name)
+                    else if (list.length > 1)
+                        core.addSoftware(list)
                 }
             }
         }

@@ -56,12 +56,17 @@ public:
     bool exists(const QString &id) const { return !item(id).id.isEmpty(); }
     QStringList queryIds(int mode, int category, const QString &search, const QString &collectionId) const;
     QString subtitleFor(const Item &it) const;
-    QPixmap pixmapFor(const QString &id, int size);
+    QPixmap pixmapFor(const QString &id, int size);          // what the card shows (custom icon if set)
+    QPixmap pixmapOriginal(const QString &id, int size);     // the automatic icon, ignoring any custom one
+    QPixmap pixmapForNew(int category, const QString &target, const QString &name, int size); // add dialog preview
     QPixmap pixmapForFile(const QString &path, int size); // shell icon of any file (catalog entries)
 
     // --- item management -------------------------------------------------
     Q_INVOKABLE QString addItem(int category, const QString &name, const QString &target);
     Q_INVOKABLE QStringList addFiles(int category, const QStringList &paths);
+    Q_INVOKABLE bool setItemIcon(const QString &id, const QString &imagePath); // copies the image in
+    Q_INVOKABLE void clearItemIcon(const QString &id);                         // back to the automatic icon
+    Q_INVOKABLE QString imageFilter() const;                                   // every readable image type
     Q_INVOKABLE bool updateItem(const QString &id, const QString &name, const QString &target);
     Q_INVOKABLE void removeItem(const QString &id);
     Q_INVOKABLE void setFavorite(const QString &id, bool favorite);
@@ -133,6 +138,7 @@ private:
     void applyStartWithWindows();
     void requestFavicon(const QString &host);
     QString faviconPath(const QString &host) const;
+    QPixmap originalPixmap(const Item &it, int size);
     QPixmap letterTile(const QString &seed, const QString &label, int size) const;
     void fetchFavicon(const QString &host, const QUrl &pageUrl);
     void tryIcon(const QString &host, const QList<QUrl> &candidates, const QImage &best = {});

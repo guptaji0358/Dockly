@@ -389,15 +389,66 @@ bool AppCore::updateItem(const QString &id, const QString &name, const QString &
         return false;
     m_pixCache.clear();
     ++m_iconVersion;
+    changed(); // drop the cached row first, or views reload the icon from the old row
     emit iconsChanged();
-    changed();
     return true;
+}
+
+bool AppCore::setItemIcon(const QString &id, const QString &imagePath)
+{
+    const Item it = item(id);
+    if (it.id.isEmpty() || !QImageReader(imagePath).canRead())
+        return false;
+    const QString dir = m_dataDir + "/customicons";
+    QDir().mkpath(dir);
+    // a fresh file name per change, so the icon cache never serves the previous image
+    const QString dest = QStringLiteral("%1/%2_%3.%4")
+                             .arg(dir, id)
+                             .arg(QDateTime::currentMSecsSinceEpoch())
+                             .arg(QFileInfo(imagePath).suffix().toLower());
+    if (!QFile::copy(imagePath, dest))
+        return false;
+    if (!it.icon.isEmpty())
+        QFile::remove(it.icon);
+    m_db.setIcon(id, dest);
+    m_pixCache.clear();
+    ++m_iconVersion;
+    changed(); // drop the cached row first, or views reload the icon from the old row
+    emit iconsChanged();
+    return true;
+}
+
+void AppCore::clearItemIcon(const QString &id)
+{
+    const Item it = item(id);
+    if (it.id.isEmpty() || it.icon.isEmpty())
+        return;
+    QFile::remove(it.icon);
+    m_db.setIcon(id, {});
+    m_pixCache.clear();
+    ++m_iconVersion;
+    changed();
+    emit iconsChanged();
+}
+
+QString AppCore::imageFilter() const
+{
+    QStringList exts;
+    for (const QByteArray &f : QImageReader::supportedImageFormats())
+        exts << QStringLiteral("*.") + QString::fromLatin1(f).toLower();
+    for (const char *extra : {"*.ico", "*.svg", "*.jfif", "*.jpe", "*.tif"})
+        if (!exts.contains(QLatin1String(extra)))
+            exts << QLatin1String(extra);
+    return QStringLiteral("Images (%1);;All files (*.*)").arg(exts.join(' '));
 }
 
 void AppCore::removeItem(const QString &id)
 {
-    if (!exists(id))
+    const Item gone = item(id);
+    if (gone.id.isEmpty())
         return;
+    if (!gone.icon.isEmpty())
+        QFile::remove(gone.icon);
     m_db.deleteItem(id);
     if (m_selectedId == id)
         select({});
@@ -421,6 +472,7 @@ QVariantMap AppCore::itemInfo(const QString &id) const
         {"id", it.id},
         {"name", it.name},
         {"target", it.target},
+        {"icon", it.icon},
         {"category", int(it.category)},
         {"categoryName", Item::categoryLabel(it.category)},
         {"favorite", it.favorite},
@@ -800,12 +852,57 @@ QPixmap AppCore::pixmapFor(const QString &id, int size)
     const Item it = item(id);
     if (it.id.isEmpty() || size <= 0)
         return {};
+    if (it.icon.isEmpty())
+        return pixmapOriginal(id, size);
     const QString key = id + QLatin1Char('|') + QString::number(size);
     if (const auto c = m_pixCache.constFind(key); c != m_pixCache.cend())
         return c.value();
     if (m_pixCache.size() > 300)
         m_pixCache.clear();
 
+    QPixmap pm;
+    QImageReader reader(it.icon);
+    reader.setAutoTransform(true);
+    const QSize s = reader.size();
+    if (s.isValid())
+        reader.setScaledSize(s.scaled(size, size, Qt::KeepAspectRatio));
+    const QImage img = reader.read();
+    if (!img.isNull())
+        pm = QPixmap::fromImage(img);
+    else
+        pm = pixmapOriginal(id, size); // custom file went missing or unreadable
+    m_pixCache.insert(key, pm);
+    return pm;
+}
+
+QPixmap AppCore::pixmapOriginal(const QString &id, int size)
+{
+    const Item it = item(id);
+    if (it.id.isEmpty() || size <= 0)
+        return {};
+    const QString key = QStringLiteral("o:") + id + QLatin1Char('|') + QString::number(size);
+    if (const auto c = m_pixCache.constFind(key); c != m_pixCache.cend())
+        return c.value();
+    if (m_pixCache.size() > 300)
+        m_pixCache.clear();
+    const QPixmap pm = originalPixmap(it, size);
+    m_pixCache.insert(key, pm);
+    return pm;
+}
+
+QPixmap AppCore::pixmapForNew(int category, const QString &target, const QString &name, int size)
+{
+    Item it;
+    it.category = LH::Category(category);
+    it.name = name;
+    it.target = it.category == LH::Web ? normalizeUrl(target) : QDir::toNativeSeparators(target.trimmed());
+    if (size <= 0 || (it.target.isEmpty() && it.category != LH::Collection))
+        return {};
+    return originalPixmap(it, size);
+}
+
+QPixmap AppCore::originalPixmap(const Item &it, int size)
+{
     QPixmap pm;
     switch (it.category) {
     case LH::Web: {
@@ -845,7 +942,6 @@ QPixmap AppCore::pixmapFor(const QString &id, int size)
         break;
     }
     }
-    m_pixCache.insert(key, pm);
     return pm;
 }
 

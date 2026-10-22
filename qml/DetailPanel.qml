@@ -265,6 +265,11 @@ Glass {
                 }
             }
             OrbButton {
+                iconName: "edit"
+                tip: "Change icon / edit…"
+                onClicked: panel.host.edit(panel.info.id)
+            }
+            OrbButton {
                 danger: true
                 iconName: "trash"
                 tip: "Delete card"

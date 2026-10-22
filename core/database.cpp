@@ -46,6 +46,7 @@ bool Database::open(const QString &dir)
            " id TEXT PRIMARY KEY, category INTEGER NOT NULL, name TEXT NOT NULL, target TEXT NOT NULL DEFAULT '',"
            " norm TEXT NOT NULL DEFAULT '', favorite INTEGER NOT NULL DEFAULT 0,"
            " last_opened TEXT, status INTEGER NOT NULL DEFAULT 0)");
+    q.exec("ALTER TABLE items ADD COLUMN icon TEXT NOT NULL DEFAULT ''"); // fails harmlessly when it exists
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_cat ON items(category, name COLLATE NOCASE)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_norm ON items(category, norm)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_fav ON items(favorite)");
@@ -84,6 +85,7 @@ static Item rowToItem(QSqlQuery &q)
     it.favorite = q.value(4).toInt() != 0;
     it.lastOpened = QDateTime::fromString(q.value(5).toString(), Qt::ISODate);
     it.status = LH::Status(q.value(6).toInt());
+    it.icon = q.value(7).toString();
     return it;
 }
 
@@ -92,7 +94,7 @@ bool Database::getItem(const QString &id, Item &out) const
     if (!m_open)
         return {};
     QSqlQuery q(lib());
-    q.prepare("SELECT id,category,name,target,favorite,last_opened,status FROM items WHERE id=?");
+    q.prepare("SELECT id,category,name,target,favorite,last_opened,status,icon FROM items WHERE id=?");
     q.addBindValue(id);
     if (!q.exec() || !q.next())
         return false;
@@ -160,7 +162,7 @@ bool Database::insertItem(const Item &it)
     if (!m_open)
         return {};
     QSqlQuery q(lib());
-    q.prepare("INSERT INTO items(id,category,name,target,norm,favorite,last_opened,status) VALUES(?,?,?,?,?,?,?,?)");
+    q.prepare("INSERT INTO items(id,category,name,target,norm,favorite,last_opened,status,icon) VALUES(?,?,?,?,?,?,?,?,?)");
     q.addBindValue(it.id);
     q.addBindValue(int(it.category));
     q.addBindValue(it.name);
@@ -169,6 +171,7 @@ bool Database::insertItem(const Item &it)
     q.addBindValue(it.favorite ? 1 : 0);
     q.addBindValue(it.lastOpened.isValid() ? QVariant(it.lastOpened.toString(Qt::ISODate)) : QVariant(QMetaType(QMetaType::QString)));
     q.addBindValue(int(it.status));
+    q.addBindValue(it.icon.isNull() ? QStringLiteral("") : it.icon); // never bind NULL
     return q.exec();
 }
 
@@ -184,6 +187,17 @@ bool Database::updateItem(const Item &it)
     q.addBindValue(int(it.status));
     q.addBindValue(it.id);
     return q.exec();
+}
+
+void Database::setIcon(const QString &id, const QString &icon)
+{
+    if (!m_open)
+        return;
+    QSqlQuery q(lib());
+    q.prepare("UPDATE items SET icon=? WHERE id=?");
+    q.addBindValue(icon.isNull() ? QStringLiteral("") : icon); // never bind NULL
+    q.addBindValue(id);
+    q.exec();
 }
 
 void Database::setFavorite(const QString &id, bool favorite)
@@ -466,7 +480,7 @@ QJsonObject Database::exportAll() const
         return {};
     QJsonArray items;
     QSqlQuery q(lib());
-    q.exec("SELECT id,category,name,target,favorite,last_opened,status FROM items ORDER BY rowid");
+    q.exec("SELECT id,category,name,target,favorite,last_opened,status,icon FROM items ORDER BY rowid");
     while (q.next()) {
         Item it = rowToItem(q);
         if (it.category == LH::Collection)

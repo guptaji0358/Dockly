@@ -110,6 +110,23 @@ private slots:
         QCOMPARE(core->addSoftware({QVariantMap{{"name", "Fake App"}, {"target", m_realFile.fileName()}}}), 0);
     }
 
+    void customIconReplacesOriginalOnlyWhenSet()
+    {
+        const QString id = core->addItem(LH::Web, "iconed", "https://iconed.example");
+        const QPixmap original = core->pixmapFor(id, 64);
+        QImage red(32, 32, QImage::Format_RGB32);
+        red.fill(Qt::red);
+        const QString png = m_dir.path() + "/own.bmp";
+        QVERIFY(red.save(png));
+        QVERIFY(core->setItemIcon(id, png));
+        QCOMPARE(core->pixmapFor(id, 64).toImage().pixel(32, 32), QColor(Qt::red).rgb());
+        QCOMPARE(core->pixmapOriginal(id, 64).toImage(), original.toImage()); // original stays reachable
+        QVERIFY(!core->setItemIcon(id, m_dir.path() + "/missing.png"));
+        core->clearItemIcon(id);
+        QCOMPARE(core->pixmapFor(id, 64).toImage(), original.toImage());
+        QVERIFY(core->imageFilter().contains("*.png"));
+    }
+
     void backupRestoreRoundTrip()
     {
         core->settings()->set("theme", "light");

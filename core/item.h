@@ -12,6 +12,7 @@ struct Item {
     LH::Category category = LH::Software;
     QString name;
     QString target; // file path, or URL for web shortcuts
+    QString icon; // optional user-chosen icon image (a copy kept in the data folder); empty = automatic
     bool favorite = false;
     LH::Status status = LH::Normal; // runtime only, recomputed by validation
     QDateTime lastOpened;
