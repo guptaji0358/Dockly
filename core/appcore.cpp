@@ -509,6 +509,39 @@ QString AppCore::subtitleFor(const Item &it) const
 // Launching
 // ---------------------------------------------------------------------------
 
+namespace {
+// Opens a URL in the chosen browser (an exe path), falling back to the system default.
+bool openWeb(const QString &url, const QString &browserExe)
+{
+    if (!browserExe.isEmpty() && QFileInfo::exists(browserExe)
+        && QProcess::startDetached(browserExe, {url}))
+        return true;
+    return QDesktopServices::openUrl(QUrl(url));
+}
+} // namespace
+
+QVariantList AppCore::browsers() const
+{
+    QVariantList out;
+    QSet<QString> seen;
+    // Browsers register under StartMenuInternet in either hive.
+    for (const char *root : {"HKEY_LOCAL_MACHINE", "HKEY_CURRENT_USER"}) {
+        QSettings reg(QStringLiteral("%1\\SOFTWARE\\Clients\\StartMenuInternet").arg(root), QSettings::NativeFormat);
+        for (const QString &key : reg.childGroups()) {
+            const QString name = reg.value(key + "/Default", key).toString();
+            QString cmd = reg.value(key + "/shell/open/command/Default").toString().trimmed();
+            if (cmd.startsWith('"'))
+                cmd = cmd.mid(1, cmd.indexOf('"', 1) - 1);
+            const QString path = QDir::fromNativeSeparators(cmd);
+            if (path.isEmpty() || !QFileInfo::exists(path) || seen.contains(path.toLower()))
+                continue;
+            seen.insert(path.toLower());
+            out.append(QVariantMap{{"text", name.isEmpty() ? key : name}, {"value", path}});
+        }
+    }
+    return out;
+}
+
 int AppCore::launch(const QString &id)
 {
     Item it = item(id);
@@ -532,7 +565,7 @@ int AppCore::launch(const QString &id)
     bool ok = false;
     switch (it.category) {
     case LH::Web:
-        ok = QDesktopServices::openUrl(QUrl(it.target));
+        ok = openWeb(it.target, m_settings->text("defaultBrowser"));
         break;
     case LH::Software:
         ok = QProcess::startDetached(it.target, {}, QFileInfo(it.target).absolutePath())

@@ -34,6 +34,7 @@ QVariantMap AppSettings::defaults()
         {"bridgePort", 47821},
         {"pauseWhenInactive", true}, // stop animated effects while the window is in the background
         {"language", "English"},
+        {"defaultBrowser", ""},   // empty = the system default; otherwise the browser's exe path
     };
 }
 

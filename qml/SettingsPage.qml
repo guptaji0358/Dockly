@@ -136,6 +136,21 @@ Item {
                 }
 
                 SettingGroup {
+                    title: "Browser"
+                    SettingCombo {
+                        key: "defaultBrowser"; label: "Default browser"
+                        options: [{text: "System default", value: ""}].concat(core.browsers())
+                    }
+                    Text {
+                        text: "Website tiles open in this browser instead of the one set in Windows."
+                        color: page.th.subtext
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                }
+
+                SettingGroup {
                     title: "Data"
                     Flow {
                         Layout.fillWidth: true

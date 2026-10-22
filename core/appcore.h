@@ -77,6 +77,7 @@ public:
     Q_INVOKABLE int launch(const QString &id); // returns LH::LaunchResult
     Q_INVOKABLE int launchAll(const QString &collectionId);
     Q_INVOKABLE void showInFolder(const QString &id);
+    Q_INVOKABLE QVariantList browsers() const; // installed browsers: [{text, value = exe path}]
 
     // --- drag & drop ------------------------------------------------------
     // Files, folders or URLs (as paths or url strings) dropped on the window; each goes to the
