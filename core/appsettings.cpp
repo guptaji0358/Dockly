@@ -34,6 +34,9 @@ QVariantMap AppSettings::defaults()
         {"bridgePort", 47821},
         {"pauseWhenInactive", true}, // stop animated effects while the window is in the background
         {"language", "English"},
+        {"dockEnabled", true},    // launch from a slim edge dock instead of opening the main window
+        {"dockEdge", "right"},    // left | right | top | bottom
+        {"dockAutoHide", true},   // slide away after launching / when the pointer leaves; hover the edge to bring it back
         {"defaultBrowser", ""},   // empty = the system default; otherwise the browser's exe path
     };
 }

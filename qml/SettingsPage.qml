@@ -34,6 +34,13 @@ Item {
                     title: "Startup"
                     SettingCheck { key: "startWithWindows"; text: "Start with Windows" }
                     SettingCheck { key: "minimizeToTray"; text: "Minimize to system tray" }
+                    SettingCheck { key: "dockEnabled"; text: "Open as a slim edge dock (the full window opens from the tray icon or the dock's gear)" }
+                    SettingCombo {
+                        key: "dockEdge"; label: "Dock position"
+                        options: [{text: "Right", value: "right"}, {text: "Left", value: "left"},
+                                  {text: "Top", value: "top"}, {text: "Bottom", value: "bottom"}]
+                    }
+                    SettingCheck { key: "dockAutoHide"; text: "Auto-hide the dock (slides away after launching; hover the screen edge to bring it back)" }
                     SettingCombo {
                         key: "defaultTab"; label: "Default tab on startup"
                         options: [{text: "Home", value: "home"}, {text: "Software", value: "software"},

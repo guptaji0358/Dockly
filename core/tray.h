@@ -5,7 +5,7 @@
 class AppCore;
 class QSystemTrayIcon;
 
-// System tray icon, visible only while "Minimize to System Tray" is enabled.
+// System tray icon, visible while "Minimize to System Tray" or the edge dock is enabled.
 class TrayController : public QObject
 {
     Q_OBJECT
@@ -15,9 +15,14 @@ public:
 
     bool isActive() const;
 
+    // from the dock: open the main window (id empty), or on that item's "target missing" dialog
+    Q_INVOKABLE void openMain(const QString &id = QString()) { emit openMainRequested(id); }
+
 signals:
     void activeChanged();
-    void showRequested();
+    void showRequested();     // open the main window
+    void dockRequested();     // reveal the edge dock
+    void openMainRequested(const QString &id);
     void quitRequested();
 
 private:

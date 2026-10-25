@@ -13,6 +13,7 @@ qt_add_qml_module(Dockly
     VERSION 1.0
     QML_FILES
         Main.qml
+        DockWindow.qml
         Fx.qml
         Nebula.qml
         Tile.qml

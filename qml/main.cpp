@@ -21,6 +21,7 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QScreen>
 #include <QSGRendererInterface>
 #include <QSurfaceFormat>
 #include <QTimer>
@@ -118,7 +119,9 @@ int main(int argc, char *argv[])
     QCommandLineOption demo("demo", "Fill an empty library with sample cards (diagnostics).");
     QCommandLineOption dialog("dialog", "Open a dialog at startup: software (diagnostics).", "name");
     QCommandLineOption dbl("dblclick", "Send a double-click at x,y (window coordinates) after startup (diagnostics).", "x,y");
-    cli.addOptions({minimized, shot, page, ring, demo, dialog, dbl});
+    QCommandLineOption window("window", "Open the main window even when the edge dock is enabled.");
+    QCommandLineOption dockShot("dockshot", "Save a screenshot of the opened dock and exit (diagnostics).", "file");
+    cli.addOptions({minimized, shot, page, ring, demo, dialog, dbl, window, dockShot});
     cli.process(app);
 
     // One Dockly per data folder: starting it again brings the running one to the front instead of
@@ -187,8 +190,20 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("startRing", cli.isSet(ring));
     engine.rootContext()->setContextProperty("startDialog", cli.value(dialog));
     engine.rootContext()->setContextProperty("startPage", cli.isSet(page) ? cli.value(page).toInt() : -1);
+    // the dock is a frameless window of its own; it is not created for the window screenshot diagnostics
+    const bool dockWanted = core->settings()->boolean("dockEnabled") && !cli.isSet(shot);
+    // the dock lives on the primary screen, inside the area the taskbar leaves free
+    QScreen *primary = QGuiApplication::primaryScreen();
+    engine.rootContext()->setContextProperty("workArea", QRectF(primary->availableGeometry()));
+    QObject::connect(primary, &QScreen::availableGeometryChanged, &engine, [&engine](const QRect &r) {
+        engine.rootContext()->setContextProperty("workArea", QRectF(r));
+    });
+    engine.rootContext()->setContextProperty("dockAllowed", !cli.isSet(shot));
+    engine.rootContext()->setContextProperty("dockPinned", cli.isSet(dockShot));
     engine.loadFromModule("DocklyUI", "Main");
-    if (engine.rootObjects().isEmpty()) {
+    if (!engine.rootObjects().isEmpty())
+        engine.loadFromModule("DocklyUI", "DockWindow");
+    if (engine.rootObjects().size() < 2) {
         qCritical() << "The interface failed to load.";
         QMessageBox::critical(nullptr, "Dockly",
                               "Dockly couldn't load its interface.\n\nDetails were written to:\n"
@@ -198,19 +213,40 @@ int main(int argc, char *argv[])
 
     auto *win = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
     win->setIcon(AppCore::appIcon());
+    auto *dockWin = qobject_cast<QQuickWindow *>(engine.rootObjects().at(1));
+    auto revealDock = [dockWin] { QMetaObject::invokeMethod(dockWin, "reveal"); };
     QObject::connect(&tray, &TrayController::showRequested, win, [win] { bringToFront(win); });
+    QObject::connect(&tray, &TrayController::dockRequested, dockWin, revealDock);
+    // the gear (no id) opens the full window; a tile whose target is gone opens it on that item's recovery dialog
+    QObject::connect(&tray, &TrayController::openMainRequested, win, [win](const QString &id) {
+        bringToFront(win);
+        if (!id.isEmpty())
+            QMetaObject::invokeMethod(win, "launch", Q_ARG(QVariant, id));
+    });
 
-    QObject::connect(&instanceServer, &QLocalServer::newConnection, win, [&instanceServer, win] {
+    QObject::connect(&instanceServer, &QLocalServer::newConnection, win, [&instanceServer, win, core, revealDock] {
         while (QLocalSocket *c = instanceServer.nextPendingConnection()) {
             c->write("ok\n");
             c->flush();
             c->disconnectFromServer();
             c->deleteLater();
-            bringToFront(win);
+            if (core->settings()->boolean("dockEnabled"))
+                revealDock();
+            else
+                bringToFront(win);
         }
     });
 
-    if (cli.isSet(minimized) && tray.isActive())
+    const bool diagnostics = cli.isSet(page) || cli.isSet(ring) || cli.isSet(dialog) || cli.isSet(window);
+    if (cli.isSet(dockShot)) {
+        const QString path = cli.value(dockShot);
+        QTimer::singleShot(2000, &app, [dockWin, path, &app] {
+            dockWin->grabWindow().save(path);
+            app.quit();
+        });
+    } else if (dockWanted && !diagnostics)
+        ; // slim dock only; the tray icon or the dock's gear opens the full window
+    else if (cli.isSet(minimized) && tray.isActive())
         ; // stay hidden; the tray icon brings the window back
     else if (cli.isSet(shot))
         win->show();
