@@ -1,6 +1,7 @@
 #include "appcore.h"
 #include "iconimageprovider.h"
 #include "itemimageprovider.h"
+#include "hotkey.h"
 #include "itemmodel.h"
 #include "tray.h"
 
@@ -218,6 +219,20 @@ int main(int argc, char *argv[])
     QObject::connect(&tray, &TrayController::showRequested, win, [win] { bringToFront(win); });
     QObject::connect(&tray, &TrayController::dockRequested, dockWin, revealDock);
     // the gear (no id) opens the full window; a tile whose target is gone opens it on that item's recovery dialog
+    QObject::connect(&tray, &TrayController::editMainRequested, win, [win](const QString &id) {
+        bringToFront(win);
+        QMetaObject::invokeMethod(win, "edit", Q_ARG(QVariant, id));
+    });
+    GlobalHotkey hotkey;
+    auto applyHotkey = [&hotkey, core] {
+        hotkey.setSequence(core->settings()->boolean("dockEnabled") ? core->settings()->text("dockHotkey") : QString());
+    };
+    QObject::connect(&hotkey, &GlobalHotkey::triggered, dockWin, [dockWin] { QMetaObject::invokeMethod(dockWin, "toggle"); });
+    QObject::connect(core->settings(), &AppSettings::changed, &app, [applyHotkey](const QString &k) {
+        if (k == QLatin1String("dockHotkey") || k == QLatin1String("dockEnabled"))
+            applyHotkey();
+    });
+    applyHotkey();
     QObject::connect(&tray, &TrayController::openMainRequested, win, [win](const QString &id) {
         bringToFront(win);
         if (!id.isEmpty())

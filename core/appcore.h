@@ -82,7 +82,7 @@ public:
     // --- drag & drop ------------------------------------------------------
     // Files, folders or URLs (as paths or url strings) dropped on the window; each goes to the
     // matching hub. hintCategory is used for files with an unknown type (-1 = documents).
-    Q_INVOKABLE int addDropped(const QStringList &items, int hintCategory = -1);
+    Q_INVOKABLE int addDropped(const QStringList &items, int hintCategory = -1, bool favorite = false);
     Q_INVOKABLE void moveMember(const QString &collectionId, const QString &itemId, int toRow);
 
     // --- collections -----------------------------------------------------

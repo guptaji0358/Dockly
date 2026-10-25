@@ -40,6 +40,12 @@ Item {
                         options: [{text: "Right", value: "right"}, {text: "Left", value: "left"},
                                   {text: "Top", value: "top"}, {text: "Bottom", value: "bottom"}]
                     }
+                    SettingCombo {
+                        key: "dockHotkey"; label: "Dock shortcut"
+                        options: [{text: "Ctrl + Alt + D", value: "Ctrl+Alt+D"}, {text: "Ctrl + Alt + Space", value: "Ctrl+Alt+Space"},
+                                  {text: "Ctrl + Shift + Space", value: "Ctrl+Shift+Space"}, {text: "Win + Shift + D", value: "Meta+Shift+D"},
+                                  {text: "None", value: ""}]
+                    }
                     SettingCheck { key: "dockAutoHide"; text: "Auto-hide the dock (slides away after launching; hover the screen edge to bring it back)" }
                     SettingCombo {
                         key: "defaultTab"; label: "Default tab on startup"

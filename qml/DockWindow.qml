@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Window
 import LH
 
@@ -24,7 +25,18 @@ Window {
     property real openness: shown ? 1 : 0
     Behavior on openness { NumberAnimation { duration: core.settings.values.animations ? 160 : 0; easing.type: Easing.OutCubic } }
 
-    function reveal() { shown = true; hideTimer.restart() }
+    function reveal() {
+        shown = true
+        hideTimer.interval = 3000 // opened without the pointer (hotkey, tray): give it a moment
+        hideTimer.restart()
+    }
+    function toggle() {
+        if (shown && openness > 0.5 && autoHide)
+            shown = false
+        else
+            reveal()
+    }
+    readonly property bool menuOpen: tileMenu.visible || dockMenu.visible
 
     // what is shown: favourites, or everything until there are any
     ItemModel { id: favs; mode: LH.ModeFavorites }
@@ -40,7 +52,7 @@ Window {
     readonly property real current: handle + (thickness - handle) * openness
 
     visible: (core.settings.values.dockEnabled && dockAllowed) || dockPinned
-    flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
+    flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
     color: "transparent"
     title: "Dockly dock"
 
@@ -66,7 +78,7 @@ Window {
         id: hideTimer
         interval: 700
         onTriggered: {
-            if (dock.autoHide && !hover.hovered)
+            if (dock.autoHide && !hover.hovered && !dock.menuOpen && !drops.containsDrag)
                 dock.shown = false
             interval = 700
         }
@@ -85,8 +97,31 @@ Window {
                     hideTimer.stop()
                 } else {
                     tip.label = ""
+                    hideTimer.interval = 700
                     hideTimer.restart()
                 }
+            }
+        }
+
+        // drop programs, files, folders or links here to add them (and pin them to the dock)
+        DropArea {
+            id: drops
+            anchors.fill: parent
+            onEntered: drag => {
+                drag.accepted = drag.hasUrls || drag.hasText
+                dock.shown = true
+                hideTimer.stop()
+            }
+            onExited: { hideTimer.interval = 700; hideTimer.restart() }
+            onDropped: drop => {
+                const items = []
+                if (drop.hasUrls)
+                    for (const u of drop.urls)
+                        items.push(u.toString())
+                else if (drop.hasText)
+                    items.push(drop.text.trim())
+                drop.accept()
+                core.addDropped(items, -1, true)
             }
         }
 
@@ -111,6 +146,11 @@ Window {
             border.color: dock.th.border
             border.width: 1
             opacity: dock.openness
+
+            TapHandler {
+                acceptedButtons: Qt.RightButton
+                onTapped: dockMenu.popup()
+            }
 
             ListView {
                 id: list
@@ -153,10 +193,18 @@ Window {
                         id: tileMouse
                         anchors.fill: parent
                         hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
                         cursorShape: Qt.PointingHandCursor
                         onEntered: dock.showTip(slot.name, slot)
                         onExited: if (tip.label === slot.name) tip.label = ""
-                        onClicked: {
+                        onClicked: mouse => {
+                            if (mouse.button === Qt.RightButton) {
+                                tip.label = ""
+                                tileMenu.itemId = slot.itemId
+                                tileMenu.pinned = favs.count > 0
+                                tileMenu.popup()
+                                return
+                            }
                             tip.label = ""
                             if (core.launch(slot.itemId) === LH.TargetMissing)
                                 tray.openMain(slot.itemId)
@@ -201,6 +249,56 @@ Window {
                 }
             }
         }
+    }
+
+    component DockMenu: Menu {
+        popupType: Popup.Window
+        palette.window: dock.th.surface
+        palette.windowText: dock.th.text
+        palette.text: dock.th.text
+        palette.highlight: dock.th.cardHover
+        palette.highlightedText: dock.th.text
+        palette.mid: dock.th.border
+        onVisibleChanged: if (!visible) { hideTimer.interval = 700; hideTimer.restart() }
+    }
+
+    DockMenu {
+        id: tileMenu
+        property string itemId
+        property bool pinned
+        MenuItem { text: "Open"; onTriggered: core.launch(tileMenu.itemId) }
+        MenuItem { text: "Edit..."; onTriggered: tray.editInMain(tileMenu.itemId) }
+        MenuItem {
+            text: "Remove from dock"
+            enabled: tileMenu.pinned
+            onTriggered: core.setFavorite(tileMenu.itemId, false)
+        }
+    }
+
+    DockMenu {
+        id: dockMenu
+        Menu {
+            title: "Position"
+            Repeater {
+                model: [{t: "Right", v: "right"}, {t: "Left", v: "left"}, {t: "Top", v: "top"}, {t: "Bottom", v: "bottom"}]
+                MenuItem {
+                    required property var modelData
+                    text: modelData.t
+                    checkable: true
+                    checked: dock.edge === modelData.v
+                    onTriggered: core.settings.set("dockEdge", modelData.v)
+                }
+            }
+        }
+        MenuItem {
+            text: "Auto-hide"
+            checkable: true
+            checked: core.settings.values.dockAutoHide
+            onTriggered: core.settings.set("dockAutoHide", checked)
+        }
+        MenuSeparator {}
+        MenuItem { text: "Open Dockly..."; onTriggered: tray.openMain() }
+        MenuItem { text: "Quit Dockly"; onTriggered: Qt.quit() }
     }
 
     function showTip(text, item) {

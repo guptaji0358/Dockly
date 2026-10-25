@@ -9,6 +9,7 @@ add_library(lhcore STATIC
     appcore.h appcore.cpp
     itemmodel.h itemmodel.cpp
     tray.h tray.cpp
+    hotkey.h hotkey.cpp
     connectors.h connectors.cpp
 )
 

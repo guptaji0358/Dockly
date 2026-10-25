@@ -17,12 +17,14 @@ public:
 
     // from the dock: open the main window (id empty), or on that item's "target missing" dialog
     Q_INVOKABLE void openMain(const QString &id = QString()) { emit openMainRequested(id); }
+    Q_INVOKABLE void editInMain(const QString &id) { emit editMainRequested(id); }
 
 signals:
     void activeChanged();
     void showRequested();     // open the main window
     void dockRequested();     // reveal the edge dock
     void openMainRequested(const QString &id);
+    void editMainRequested(const QString &id);
     void quitRequested();
 
 private:

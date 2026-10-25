@@ -626,7 +626,7 @@ void AppCore::showInFolder(const QString &id)
 // Drag & drop
 // ---------------------------------------------------------------------------
 
-int AppCore::addDropped(const QStringList &dropped, int hintCategory)
+int AppCore::addDropped(const QStringList &dropped, int hintCategory, bool favorite)
 {
     static const QSet<QString> programs = {"exe", "lnk", "bat", "cmd"};
     static const QSet<QString> media = {"mp4", "mkv", "avi", "mov", "webm", "mp3", "wav", "flac", "ogg", "m4a",
@@ -661,8 +661,11 @@ int AppCore::addDropped(const QStringList &dropped, int hintCategory)
             if (had)
                 id.clear();
         }
-        if (!id.isEmpty())
+        if (!id.isEmpty()) {
             ++added;
+            if (favorite)
+                setFavorite(id, true); // dropped on the dock: it should show up there
+        }
     }
     emit message(added ? QStringLiteral("Added %1 item(s) from drop.").arg(added)
                        : QStringLiteral("Nothing new to add from that drop."));
