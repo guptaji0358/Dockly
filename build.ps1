@@ -14,8 +14,13 @@ cmake --build build
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
 if ($Deploy) {
-    New-Item -ItemType Directory -Force dist | Out-Null
+    # dist\Dockly.exe is a stub; the app (DocklyApp.dll) and all Qt DLLs live in dist\DLLs
+    if (Test-Path dist) { Remove-Item dist -Recurse -Force }
+    New-Item -ItemType Directory -Force dist\DLLs | Out-Null
     Copy-Item build\Dockly.exe dist\ -Force
     Copy-Item build\connectors dist\ -Recurse -Force
-    windeployqt --release --compiler-runtime --qmldir qml dist\Dockly.exe
+    Copy-Item build\DocklyApp.dll dist\DLLs\ -Force
+    windeployqt --release --compiler-runtime --no-translations --qmldir qml --dir dist\DLLs build\DocklyApp.dll
+    # Qt plugin folders (platforms, qml, styles ...) must sit next to the exe; only loose DLLs stay in DLLs
+    Get-ChildItem dist\DLLs -Directory | Move-Item -Destination dist -Force
 }

@@ -79,7 +79,7 @@ void bringToFront(QQuickWindow *win)
 }
 } // namespace
 
-int main(int argc, char *argv[])
+extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
 {
     // The graphics API is a user setting (Settings > Performance); it has to be known before the
     // first window exists, so read it straight from settings.json. LH_NO_GL=1 forces Qt's default.

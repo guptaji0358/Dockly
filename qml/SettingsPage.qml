@@ -46,6 +46,11 @@ Item {
                                   {text: "Ctrl + Shift + Space", value: "Ctrl+Shift+Space"}, {text: "Win + Shift + D", value: "Meta+Shift+D"},
                                   {text: "None", value: ""}]
                     }
+                    SettingCombo {
+                        key: "dockOpacity"; label: "Dock background"
+                        options: [{text: "Transparent", value: 0}, {text: "Very light", value: 20}, {text: "Light", value: 40},
+                                  {text: "Medium", value: 70}, {text: "Solid", value: 100}]
+                    }
                     SettingCheck { key: "dockAutoHide"; text: "Auto-hide the dock (slides away after launching; hover the screen edge to bring it back)" }
                     SettingCombo {
                         key: "defaultTab"; label: "Default tab on startup"

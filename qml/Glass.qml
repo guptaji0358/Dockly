@@ -11,7 +11,7 @@ Rectangle {
 
     radius: 16
     color: Qt.rgba(th.surface.r, th.surface.g, th.surface.b, tint)
-    border.width: 1
+    border.width: 0
     border.color: edge
 
     Rectangle {   // top sheen

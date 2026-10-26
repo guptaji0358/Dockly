@@ -1,6 +1,6 @@
 qt_policy(SET QTP0001 NEW) # QML modules live under :/qt/qml/<URI>
 
-qt_add_executable(Dockly WIN32
+qt_add_library(DocklyApp SHARED
     main.cpp
     itemimageprovider.h itemimageprovider.cpp
     iconimageprovider.h iconimageprovider.cpp
@@ -8,8 +8,9 @@ qt_add_executable(Dockly WIN32
 
 set_source_files_properties(Fx.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
-qt_add_qml_module(Dockly
+qt_add_qml_module(DocklyApp
     URI DocklyUI
+    NO_PLUGIN
     VERSION 1.0
     QML_FILES
         Main.qml
@@ -45,14 +46,13 @@ qt_add_qml_module(Dockly
 )
 
 # GPU effects: compiled to .qsb for every graphics API at build time.
-qt_add_shaders(Dockly "dockly_shaders"
+qt_add_shaders(DocklyApp "dockly_shaders"
     PREFIX "/qt/qml/DocklyUI"
     FILES shaders/aurora.frag
 )
 
-target_link_libraries(Dockly PRIVATE lhcore Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::GuiPrivate)
-lh_add_version_info(Dockly "Dockly")
+target_link_libraries(DocklyApp PRIVATE lhcore Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::GuiPrivate)
 
 # Browser extension (Chrome / Edge) ships next to the executable.
-add_custom_command(TARGET Dockly POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/connectors $<TARGET_FILE_DIR:Dockly>/connectors)
+add_custom_command(TARGET DocklyApp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/connectors $<TARGET_FILE_DIR:DocklyApp>/connectors)

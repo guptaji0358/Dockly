@@ -142,9 +142,8 @@ Window {
             x: dock.edge === "right" ? parent.width - width - dock.margin : (dock.edge === "left" ? dock.margin : 0)
             y: dock.edge === "bottom" ? parent.height - height - dock.margin : (dock.edge === "top" ? dock.margin : 0)
             radius: 18
-            color: dock.th.surface
-            border.color: dock.th.border
-            border.width: 1
+            color: Qt.alpha(dock.th.surface, core.settings.values.dockOpacity / 100)
+            border.width: 0
             opacity: dock.openness
 
             TapHandler {
@@ -329,7 +328,7 @@ Window {
             anchors.fill: parent
             radius: 8
             color: dock.th.surface
-            border.color: dock.th.border
+            border.width: 0
             Text {
                 id: txt
                 anchors.centerIn: parent

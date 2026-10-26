@@ -35,7 +35,7 @@ void Theme::update()
 
     QColor defaultAccent;
     if (m_style == "neon") {
-        m_radius = 14; m_borderWidth = 1; m_glow = true; m_tinted = false; m_hardShadow = false;
+        m_radius = 14; m_borderWidth = 0; m_glow = true; m_tinted = false; m_hardShadow = false;
         m_headingFont = "Bahnschrift";
         if (m_dark) {
             m_bg = "#060913"; m_surface = "#0d1325"; m_card = "#0f1830"; m_cardHover = "#16264d";
