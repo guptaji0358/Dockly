@@ -505,10 +505,8 @@ Window {
 
         Rectangle {
             anchors.fill: parent
-            radius: 18
-            color: Qt.alpha(dock.th.surface, Math.max(core.settings.values.dockOpacity / 100, 0.92))
-            border.width: 1
-            border.color: Qt.alpha(fly.cat.col, 0.5)
+            color: "transparent"
+            border.width: 0
 
             Row {
                 x: 16
