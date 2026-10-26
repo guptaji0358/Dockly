@@ -36,6 +36,11 @@ Item {
                     SettingCheck { key: "minimizeToTray"; text: "Minimize to system tray" }
                     SettingCheck { key: "dockEnabled"; text: "Open as a slim edge dock (the full window opens from the tray icon or the dock's gear)" }
                     SettingCombo {
+                        key: "dockMode"; label: "Dock mode"
+                        options: [{text: "Categories (hover one to see its apps)", value: "categories"},
+                                  {text: "Favourites (a strip of pinned icons)", value: "favorites"}]
+                    }
+                    SettingCombo {
                         key: "dockEdge"; label: "Dock position"
                         options: [{text: "Right", value: "right"}, {text: "Left", value: "left"},
                                   {text: "Top", value: "top"}, {text: "Bottom", value: "bottom"}]

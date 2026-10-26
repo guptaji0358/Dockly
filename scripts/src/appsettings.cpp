@@ -35,6 +35,7 @@ QVariantMap AppSettings::defaults()
         {"pauseWhenInactive", true}, // stop animated effects while the window is in the background
         {"language", "English"},
         {"dockEnabled", true},    // launch from a slim edge dock instead of opening the main window
+        {"dockMode", "categories"}, // categories (hover a category for a grid of its apps) | favorites (a strip of pinned icons)
         {"dockEdge", "right"},    // left | right | top | bottom
         {"dockHotkey", "Ctrl+Alt+D"}, // system-wide shortcut that opens the dock; empty = none
         {"dockAutoHide", true},   // slide away after launching / when the pointer leaves; hover the edge to bring it back

@@ -40,6 +40,8 @@ Window {
 
     // Three views, always reached the same way: 0 = favourites (home, or everything until there are any),
     // 1 = the category picker, 2 = the items of one category (or the members of one collection)
+    readonly property bool catMode: core.settings.values.dockMode === "categories"
+    property int flyCat: -1 // category whose grid is open beside the dock (categories mode)
     property int view: 0
     property int browseCat: 0
     property bool inCollection: false
@@ -76,9 +78,12 @@ Window {
         else back()
     }
     // the dock always comes back on favourites
-    onOpennessChanged: if (openness === 0) { view = 0; inCollection = false }
+    onOpennessChanged: if (openness === 0) { view = 0; inCollection = false; flyCat = -1 }
 
-    readonly property int slots: (view === 1 ? cats.length : itemModel.count) + 2 // + the header and the gear
+    ItemModel { id: flyModel; mode: LH.ModeCategory; category: Math.max(dock.flyCat, 0) }
+
+    readonly property int slots: catMode ? cats.length + 1
+                                         : (view === 1 ? cats.length : itemModel.count) + 2 // + the header and the gear
     readonly property int length: {
         const wanted = slots * cell + 16
         const room = (vertical ? area.height : area.width) - 80
@@ -113,7 +118,7 @@ Window {
         id: hideTimer
         interval: 700
         onTriggered: {
-            if (dock.autoHide && !hover.hovered && !dock.menuOpen && !drops.containsDrag)
+            if (dock.autoHide && !hover.hovered && !dock.menuOpen && !drops.containsDrag && dock.flyCat < 0)
                 dock.shown = false
             interval = 700
         }
@@ -134,6 +139,7 @@ Window {
                     tip.label = ""
                     hideTimer.interval = 700
                     hideTimer.restart()
+                    flyTimer.restart()
                 }
             }
         }
@@ -191,7 +197,7 @@ Window {
                 id: list
                 anchors.fill: parent
                 anchors.margins: 6
-                visible: dock.view !== 1
+                visible: !dock.catMode && dock.view !== 1
                 orientation: dock.vertical ? ListView.Vertical : ListView.Horizontal
                 interactive: contentWidth > width || contentHeight > height
                 boundsBehavior: Flickable.StopAtBounds
@@ -238,12 +244,48 @@ Window {
                 }
             }
 
+            // categories mode: five big colour-coded icons; hovering one opens a grid of its apps beside the dock
+            ListView {
+                id: catStrip
+                anchors.fill: parent
+                anchors.margins: 6
+                visible: dock.catMode
+                orientation: list.orientation
+                interactive: contentWidth > width || contentHeight > height
+                boundsBehavior: Flickable.StopAtBounds
+                clip: true
+                model: dock.cats
+                footer: Gear { onHoveredChanged: if (hovered) dock.flyCat = -1 }
+
+                delegate: Slot {
+                    id: stripSlot
+                    required property var modelData
+                    onHoveredChanged: if (hovered) dock.openFly(modelData.cat, stripSlot)
+                    onActivated: dock.openFly(modelData.cat, stripSlot)
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: dock.iconSize
+                        height: dock.iconSize
+                        radius: 12
+                        color: Qt.alpha(stripSlot.modelData.col, dock.flyCat === stripSlot.modelData.cat ? 0.4 : 0.22)
+                        scale: stripSlot.pressed ? 0.88 : (stripSlot.hovered ? 1.08 : 1)
+                        Behavior on scale { NumberAnimation { duration: 90 } }
+                        Icon {
+                            anchors.centerIn: parent
+                            name: stripSlot.modelData.icon
+                            size: 24
+                            color: stripSlot.modelData.col
+                        }
+                    }
+                }
+            }
+
             // the category picker: five big colour-coded icons
             ListView {
                 id: catList
                 anchors.fill: parent
                 anchors.margins: 6
-                visible: dock.view === 1
+                visible: !dock.catMode && dock.view === 1
                 orientation: list.orientation
                 interactive: contentWidth > width || contentHeight > height
                 boundsBehavior: Flickable.StopAtBounds
@@ -415,6 +457,171 @@ Window {
         MenuSeparator {}
         MenuItem { text: "Open Dockly..."; onTriggered: tray.openMain() }
         MenuItem { text: "Quit Dockly"; onTriggered: Qt.quit() }
+    }
+
+    function openFly(cat, item) {
+        tip.label = ""
+        flyAnchor = item.mapToGlobal(item.width / 2, item.height / 2)
+        flyCat = cat
+        flyTimer.stop()
+    }
+    property point flyAnchor
+
+    Timer {
+        id: flyTimer
+        interval: 280
+        onTriggered: {
+            if (!hover.hovered && !flyHover.hovered && !dock.menuOpen) {
+                dock.flyCat = -1
+                hideTimer.restart()
+            }
+        }
+    }
+
+    // the grid of apps for the hovered category, in its own window since the dock itself is too slim to hold it
+    Window {
+        id: fly
+        readonly property var cat: dock.cats[Math.max(dock.flyCat, 0)]
+        readonly property int cols: 4
+        readonly property int tile: 88
+        readonly property int rows: Math.max(1, Math.ceil(flyModel.count / cols))
+        readonly property int gap: 4
+        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
+        color: "transparent"
+        visible: dock.flyCat >= 0 && dock.visible && dock.openness > 0.9
+        width: cols * tile + 28
+        height: Math.min(rows * tile + 74, dock.area.height - 40)
+        x: dock.edge === "right" ? dock.x - width - gap
+           : dock.edge === "left" ? dock.x + dock.width + gap
+           : Math.max(dock.area.x + 8, Math.min(dock.flyAnchor.x - width / 2, dock.area.x + dock.area.width - width - 8))
+        y: dock.edge === "bottom" ? dock.y - height - gap
+           : dock.edge === "top" ? dock.y + dock.height + gap
+           : Math.max(dock.area.y + 8, Math.min(dock.flyAnchor.y - height / 2, dock.area.y + dock.area.height - height - 8))
+
+        HoverHandler {
+            id: flyHover
+            onHoveredChanged: if (hovered) flyTimer.stop(); else flyTimer.restart()
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: 18
+            color: Qt.alpha(dock.th.surface, Math.max(core.settings.values.dockOpacity / 100, 0.92))
+            border.width: 1
+            border.color: Qt.alpha(fly.cat.col, 0.5)
+
+            Row {
+                x: 16
+                y: 14
+                spacing: 10
+                Rectangle {
+                    width: 26
+                    height: 26
+                    radius: 8
+                    color: Qt.alpha(fly.cat.col, 0.25)
+                    Icon { anchors.centerIn: parent; name: fly.cat.icon; size: 16; color: fly.cat.col }
+                }
+                Text {
+                    height: 26
+                    verticalAlignment: Text.AlignVCenter
+                    text: fly.cat.name + "  ·  " + flyModel.count
+                    color: dock.th.text
+                    font.family: "Segoe UI"
+                    font.pixelSize: 15
+                    font.bold: true
+                }
+            }
+
+            Text {
+                visible: flyModel.count === 0
+                anchors.centerIn: parent
+                width: parent.width - 40
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: "Nothing here yet.\nAdd some from the Dockly window."
+                color: dock.th.subtext
+                font.family: "Segoe UI"
+                font.pixelSize: 13
+            }
+
+            GridView {
+                x: 14
+                y: 54
+                width: parent.width - 28
+                height: parent.height - 68
+                cellWidth: fly.tile
+                cellHeight: fly.tile
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                model: flyModel
+
+                delegate: Item {
+                    id: cell
+                    required property string itemId
+                    required property string name
+                    required property string iconSource
+                    width: fly.tile
+                    height: fly.tile
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 2
+                        radius: 12
+                        color: dock.th.cardHover
+                        opacity: cellMouse.containsMouse ? 1 : 0
+                        Behavior on opacity { NumberAnimation { duration: 90 } }
+                    }
+                    Image {
+                        id: cellIcon
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: 8
+                        width: 44
+                        height: 44
+                        source: cell.iconSource
+                        sourceSize: Qt.size(88, 88)
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        mipmap: true
+                        scale: cellMouse.pressed ? 0.9 : (cellMouse.containsMouse ? 1.08 : 1)
+                        Behavior on scale { NumberAnimation { duration: 90 } }
+                    }
+                    Text {
+                        anchors.top: cellIcon.bottom
+                        anchors.topMargin: 5
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: fly.tile - 10
+                        horizontalAlignment: Text.AlignHCenter
+                        text: cell.name
+                        elide: Text.ElideRight
+                        maximumLineCount: 2
+                        wrapMode: Text.WordWrap
+                        color: dock.th.text
+                        font.family: "Segoe UI"
+                        font.pixelSize: 11
+                    }
+                    MouseArea {
+                        id: cellMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: mouse => {
+                            if (mouse.button === Qt.RightButton) {
+                                tileMenu.itemId = cell.itemId
+                                tileMenu.pinned = false
+                                tileMenu.popup()
+                                return
+                            }
+                            if (core.launch(cell.itemId) === LH.TargetMissing)
+                                tray.openMain(cell.itemId)
+                            dock.flyCat = -1
+                            if (dock.autoHide)
+                                dock.shown = false
+                        }
+                    }
+                }
+            }
+        }
     }
 
     function showTip(text, item) {
