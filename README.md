@@ -4,9 +4,9 @@ A launcher / hub / shortcut plate for Windows, built with C++17 and Qt 6 (Qt Qui
 One core library, one frontend (`Dockly.exe`):
 
 ```
-core/     SQLite databases, settings, launching, validation, tray, theme   (static lib)
+scripts/  C++ code: include/ (headers), src/ (.cpp), main/ (entry points); build.ps1 / build.bat
 qml/      Qt Quick frontend: honeycomb / orbit / grid layouts, radial ring, GLSL aurora shader
-tests/    QtTest unit tests for the core
+          core = SQLite, settings, launching, tray, theme (static lib); main/core_test.cpp = QtTest tests
 ```
 
 ## Interface
@@ -87,7 +87,7 @@ catalog instead of becoming cards; the old file is renamed `data.json.migrated`)
 * **View toolbar** next to the search box on every page: Grid / List / Compact switch and a
   card-size slider (these moved out of Settings).
 * **Custom SVG icons**: the whole icon set (navigation, toolbar, card buttons, warnings, the
-  rocket logo / app icon) is drawn from SVG markup embedded in `core/iconpack.cpp`; any colour
+  rocket logo / app icon) is drawn from SVG markup embedded in `scripts/src/iconpack.cpp`; any colour
   is applied at render time, so icons follow the skin.
 * **Web shortcuts show the site's real icon**: the page's `<link rel="icon">` / apple-touch-icon,
   then `/favicon.ico`, cached on disk. Until it arrives (or if a site has none) the card shows a

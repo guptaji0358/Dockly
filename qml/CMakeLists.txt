@@ -2,9 +2,9 @@ qt_policy(SET QTP0001 NEW) # QML modules live under :/qt/qml/<URI>
 qt_policy(SET QTP0004 NEW) # each QML subdirectory gets its own qmldir
 
 qt_add_library(DocklyApp SHARED
-    main.cpp
-    itemimageprovider.h itemimageprovider.cpp
-    iconimageprovider.h iconimageprovider.cpp
+    ${LH_MAIN}/app_main.cpp
+    ${LH_INCLUDE}/itemimageprovider.h ${LH_SRC}/itemimageprovider.cpp
+    ${LH_INCLUDE}/iconimageprovider.h ${LH_SRC}/iconimageprovider.cpp
 )
 
 set_source_files_properties(components/Fx.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
