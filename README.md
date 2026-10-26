@@ -39,11 +39,11 @@ The **Connectors** tab links Dockly with other apps:
 ## Build
 
 ```powershell
-.\build.ps1            # build both apps into .\build
-.\build.ps1 -Deploy    # also copy Qt runtime into .\dist (runs on any PC)
+.\scripts\build.ps1            # build both apps into .\build
+.\scripts\build.ps1 -Deploy    # also copy Qt runtime into .\dist (runs on any PC)
 ```
 
-Needs Qt 6.11 (MinGW 64) + CMake + Ninja; adjust `$qtRoot` in `build.ps1` if Qt lives elsewhere.
+Needs Qt 6.11 (MinGW 64) + CMake + Ninja; adjust `$qtRoot` in `scripts/build.ps1` if Qt lives elsewhere.
 Open the top-level `CMakeLists.txt` in Qt Creator to work on it there.
 
 ## Data: two SQLite files, read on demand

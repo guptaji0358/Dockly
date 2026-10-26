@@ -12,7 +12,7 @@ qt_standard_project_setup()
 function(lh_add_version_info target description)
     set(RC_NAME ${target})
     set(RC_DESCRIPTION ${description})
-    configure_file(${CMAKE_SOURCE_DIR}/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${target}.rc @ONLY)
+    configure_file(${CMAKE_SOURCE_DIR}/cmake/version.rc.in ${CMAKE_CURRENT_BINARY_DIR}/${target}.rc @ONLY)
     target_sources(${target} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/${target}.rc)
 endfunction()
 

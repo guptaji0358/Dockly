@@ -1,8 +1,8 @@
 @echo off
 rem Clean rebuild of Dockly (wipes .\build, reconfigures, compiles, deploys Qt DLLs into .\dist).
-rem   build.bat           full clean rebuild + deploy
-rem   build.bat nodeploy  full clean rebuild only
-cd /d "%~dp0"
+rem   scripts\build.bat         full clean rebuild + deploy
+rem   scripts\build.bat nodeploy  full clean rebuild only
+cd /d "%~dp0.."
 
 if exist build rmdir /s /q build
 if exist build (
@@ -11,9 +11,9 @@ if exist build (
 )
 
 if /i "%~1"=="nodeploy" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build.ps1
 ) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1 -Deploy
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build.ps1 -Deploy
 )
 if errorlevel 1 (
     echo.

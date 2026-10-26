@@ -1,4 +1,5 @@
 qt_policy(SET QTP0001 NEW) # QML modules live under :/qt/qml/<URI>
+qt_policy(SET QTP0004 NEW) # each QML subdirectory gets its own qmldir
 
 qt_add_library(DocklyApp SHARED
     main.cpp
@@ -6,7 +7,7 @@ qt_add_library(DocklyApp SHARED
     iconimageprovider.h iconimageprovider.cpp
 )
 
-set_source_files_properties(Fx.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(components/Fx.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(DocklyApp
     URI DocklyUI
@@ -15,34 +16,34 @@ qt_add_qml_module(DocklyApp
     QML_FILES
         Main.qml
         DockWindow.qml
-        Fx.qml
-        Nebula.qml
-        Tile.qml
-        ItemSpace.qml
-        Ring.qml
-        Glass.qml
-        OrbButton.qml
-        HudField.qml
-        AppButton.qml
-        AppDialog.qml
-        ItemDialog.qml
-        PickDialog.qml
-        ChoiceDialog.qml
-        Card.qml
-        Icon.qml
-        ViewToolbar.qml
-        DetailPanel.qml
-        PickSoftwareDialog.qml
-        ItemGrid.qml
-        HomePage.qml
-        CategoryPage.qml
-        CollectionsPage.qml
-        ConnectorsPage.qml
-        ConnectorPicker.qml
-        SettingsPage.qml
-        SettingGroup.qml
-        SettingCheck.qml
-        SettingCombo.qml
+        components/Fx.qml
+        components/Nebula.qml
+        components/Tile.qml
+        components/ItemSpace.qml
+        components/Ring.qml
+        components/Glass.qml
+        components/OrbButton.qml
+        components/HudField.qml
+        components/AppButton.qml
+        dialogs/AppDialog.qml
+        dialogs/ItemDialog.qml
+        dialogs/PickDialog.qml
+        dialogs/ChoiceDialog.qml
+        components/Card.qml
+        components/Icon.qml
+        components/ViewToolbar.qml
+        components/DetailPanel.qml
+        dialogs/PickSoftwareDialog.qml
+        components/ItemGrid.qml
+        pages/HomePage.qml
+        pages/CategoryPage.qml
+        pages/CollectionsPage.qml
+        pages/ConnectorsPage.qml
+        dialogs/ConnectorPicker.qml
+        pages/SettingsPage.qml
+        components/SettingGroup.qml
+        components/SettingCheck.qml
+        components/SettingCombo.qml
 )
 
 # GPU effects: compiled to .qsb for every graphics API at build time.

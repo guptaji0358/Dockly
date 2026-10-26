@@ -1,7 +1,8 @@
 # Configure + build Dockly with the Qt 6.11.1 MinGW kit, then (optionally) deploy.
-#   .\build.ps1            build
-#   .\build.ps1 -Deploy    build + copy Qt DLLs/plugins into .\dist so Dockly.exe runs anywhere
+#   .\scripts\build.ps1            build
+#   .\scripts\build.ps1 -Deploy    build + copy Qt DLLs/plugins into .\dist so Dockly.exe runs anywhere
 param([switch]$Deploy)
+Set-Location (Split-Path $PSScriptRoot -Parent)
 
 $qtRoot = 'D:\Apps\Qt6'
 $qt     = "$qtRoot\6.11.1\mingw_64"

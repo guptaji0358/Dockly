@@ -29,7 +29,7 @@ Item {
         property color colorA: root.th.accent
         property color colorB: Qt.hsla((root.th.accent.hslHue + 0.18) % 1, 0.7, 0.5, 1)
         property real intensity: root.th.dark ? 1.0 : 0.35
-        fragmentShader: "shaders/aurora.frag.qsb"
+        fragmentShader: "../shaders/aurora.frag.qsb"
 
         Timer {
             interval: Fx.auroraInterval
