@@ -280,6 +280,22 @@ int Connectors::addFromJson(const QVariantMap &o)
     const QString col = o.value("collection").toString();
     if (!col.isEmpty() && m_core->exists(col))
         m_core->addToCollection(col, {id});
+
+    // optional custom icon, sent by the extension as a small PNG data URL
+    const QString icon = o.value("icon").toString();
+    static const QString prefix = QStringLiteral("data:image/png;base64,");
+    if (icon.startsWith(prefix)) {
+        const QByteArray png = QByteArray::fromBase64(icon.mid(prefix.size()).toLatin1());
+        const QString tmp = QStandardPaths::writableLocation(QStandardPaths::TempLocation)
+                            + QStringLiteral("/dockly_ext_icon.png");
+        QFile f(tmp);
+        if (f.open(QIODevice::WriteOnly)) {
+            f.write(png);
+            f.close();
+            m_core->setItemIcon(id, tmp);
+            QFile::remove(tmp);
+        }
+    }
     return 1;
 }
 

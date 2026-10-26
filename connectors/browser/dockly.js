@@ -30,7 +30,7 @@ const Dockly = {
   add(items, collection) {
     const list = items
       .filter((t) => /^https?:\/\//i.test(t.url))
-      .map((t) => ({ url: t.url, title: t.title || "", collection }));
+      .map((t) => ({ url: t.url, title: t.title || "", collection, icon: t.icon }));
     return this.call("/add", { items: list });
   },
 };

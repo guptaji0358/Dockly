@@ -8,11 +8,25 @@
   <header><span class="logo">&#11041;</span><b>DOCKLY</b></header>
 
   <section id="main" hidden>
-    <div id="title" class="title"></div>
+    <label>Title
+      <input id="title" maxlength="120">
+    </label>
     <div id="url" class="url"></div>
     <label>Collection (optional)
       <select id="collection"><option value="">None</option></select>
     </label>
+    <label>Icon
+      <select id="iconMode">
+        <option value="auto">Automatic (site icon)</option>
+        <option value="tile">Colored letter tile</option>
+        <option value="upload">Upload image&hellip;</option>
+      </select>
+    </label>
+    <div id="iconRow" class="iconrow">
+      <canvas id="preview" width="48" height="48"></canvas>
+      <input id="color" type="color" value="#0891b2" title="Tile color" hidden>
+      <input id="file" type="file" accept="image/*" hidden>
+    </div>
     <button id="addPage" class="primary">Add this page</button>
     <button id="addTabs">Add all tabs in this window</button>
   </section>
