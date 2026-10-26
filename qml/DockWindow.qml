@@ -38,12 +38,47 @@ Window {
     }
     readonly property bool menuOpen: tileMenu.visible || dockMenu.visible
 
-    // what is shown: favourites, or everything until there are any
+    // Three views, always reached the same way: 0 = favourites (home, or everything until there are any),
+    // 1 = the category picker, 2 = the items of one category (or the members of one collection)
+    property int view: 0
+    property int browseCat: 0
+    property bool inCollection: false
+    property string collId
+
+    readonly property var cats: [
+        {name: "Apps", cat: 0, icon: "software", col: "#4C8DFF"},
+        {name: "Documents", cat: 1, icon: "documents", col: "#FFA94D"},
+        {name: "Entertainment", cat: 2, icon: "entertainment", col: "#F06595"},
+        {name: "Web", cat: 3, icon: "web", col: "#3DDC97"},
+        {name: "Collections", cat: 4, icon: "collections", col: "#A78BFA"}
+    ]
+
     ItemModel { id: favs; mode: LH.ModeFavorites }
     ItemModel { id: everything }
-    readonly property var itemModel: favs.count > 0 ? favs : everything
+    ItemModel {
+        id: browse
+        mode: dock.inCollection ? LH.ModeMembers : LH.ModeCategory
+        category: dock.browseCat
+        collectionId: dock.collId
+    }
+    readonly property var homeModel: favs.count > 0 ? favs : everything
+    readonly property var itemModel: view === 2 ? browse : homeModel
 
-    readonly property int slots: itemModel.count + 1 // + the gear
+    function back() {
+        if (inCollection)
+            inCollection = false
+        else
+            view = 1
+    }
+    function headerAction() {
+        if (view === 0) view = 1
+        else if (view === 1) view = 0
+        else back()
+    }
+    // the dock always comes back on favourites
+    onOpennessChanged: if (openness === 0) { view = 0; inCollection = false }
+
+    readonly property int slots: (view === 1 ? cats.length : itemModel.count) + 2 // + the header and the gear
     readonly property int length: {
         const wanted = slots * cell + 16
         const room = (vertical ? area.height : area.width) - 80
@@ -151,30 +186,42 @@ Window {
                 onTapped: dockMenu.popup()
             }
 
+            // favourites / one category's items
             ListView {
                 id: list
                 anchors.fill: parent
                 anchors.margins: 6
+                visible: dock.view !== 1
                 orientation: dock.vertical ? ListView.Vertical : ListView.Horizontal
                 interactive: contentWidth > width || contentHeight > height
                 boundsBehavior: Flickable.StopAtBounds
                 clip: true
                 model: dock.itemModel
+                header: Head {}
+                footer: Gear {}
 
-                delegate: Item {
+                delegate: Slot {
                     id: slot
                     required property string itemId
                     required property string name
                     required property string iconSource
-                    width: dock.cell - 4
-                    height: dock.cell - 4
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 12
-                        color: dock.th.cardHover
-                        opacity: tileMouse.containsMouse ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 90 } }
+                    required property int category
+                    tipText: name
+                    onActivated: {
+                        if (dock.view === 2 && category === LH.Collection) {
+                            dock.collId = itemId
+                            dock.inCollection = true
+                            return
+                        }
+                        if (core.launch(itemId) === LH.TargetMissing)
+                            tray.openMain(itemId)
+                        else if (dock.autoHide)
+                            dock.shown = false
+                    }
+                    onRightClicked: {
+                        tileMenu.itemId = itemId
+                        tileMenu.pinned = dock.view === 0 && favs.count > 0
+                        tileMenu.popup()
                     }
                     Image {
                         anchors.centerIn: parent
@@ -185,68 +232,138 @@ Window {
                         fillMode: Image.PreserveAspectFit
                         smooth: true
                         mipmap: true
-                        scale: tileMouse.pressed ? 0.88 : (tileMouse.containsMouse ? 1.08 : 1)
+                        scale: slot.pressed ? 0.88 : (slot.hovered ? 1.08 : 1)
                         Behavior on scale { NumberAnimation { duration: 90 } }
                     }
-                    MouseArea {
-                        id: tileMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        cursorShape: Qt.PointingHandCursor
-                        onEntered: dock.showTip(slot.name, slot)
-                        onExited: if (tip.label === slot.name) tip.label = ""
-                        onClicked: mouse => {
-                            if (mouse.button === Qt.RightButton) {
-                                tip.label = ""
-                                tileMenu.itemId = slot.itemId
-                                tileMenu.pinned = favs.count > 0
-                                tileMenu.popup()
-                                return
-                            }
-                            tip.label = ""
-                            if (core.launch(slot.itemId) === LH.TargetMissing)
-                                tray.openMain(slot.itemId)
-                            else if (dock.autoHide)
-                                dock.shown = false
-                        }
-                    }
                 }
+            }
 
-                // the last slot opens the full window
-                footer: Item {
-                    width: dock.vertical ? dock.cell - 4 : dock.cell
-                    height: dock.vertical ? dock.cell : dock.cell - 4
+            // the category picker: five big colour-coded icons
+            ListView {
+                id: catList
+                anchors.fill: parent
+                anchors.margins: 6
+                visible: dock.view === 1
+                orientation: list.orientation
+                interactive: contentWidth > width || contentHeight > height
+                boundsBehavior: Flickable.StopAtBounds
+                clip: true
+                model: dock.cats
+                header: Head {}
+                footer: Gear {}
+
+                delegate: Slot {
+                    id: catSlot
+                    required property var modelData
+                    tipText: modelData.name
+                    onActivated: {
+                        dock.browseCat = modelData.cat
+                        dock.inCollection = false
+                        dock.view = 2
+                    }
                     Rectangle {
                         anchors.centerIn: parent
-                        width: dock.cell - 12
-                        height: width
+                        width: dock.iconSize
+                        height: dock.iconSize
                         radius: 12
-                        color: dock.th.cardHover
-                        opacity: gearMouse.containsMouse ? 1 : 0
-                    }
-                    Icon {
-                        anchors.centerIn: parent
-                        name: "settings"
-                        size: 22
-                        color: gearMouse.containsMouse ? dock.th.text : dock.th.subtext
-                    }
-                    MouseArea {
-                        id: gearMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onEntered: dock.showTip("Open Dockly", gearMouse)
-                        onExited: if (tip.label === "Open Dockly") tip.label = ""
-                        onClicked: {
-                            tip.label = ""
-                            tray.openMain()
-                            if (dock.autoHide)
-                                dock.shown = false
+                        color: Qt.alpha(catSlot.modelData.col, 0.22)
+                        scale: catSlot.pressed ? 0.88 : (catSlot.hovered ? 1.08 : 1)
+                        Behavior on scale { NumberAnimation { duration: 90 } }
+                        Icon {
+                            anchors.centerIn: parent
+                            name: catSlot.modelData.icon
+                            size: 24
+                            color: catSlot.modelData.col
                         }
                     }
                 }
             }
+        }
+    }
+
+    // one icon slot: hover highlight, name tip, left click = activated, right click = rightClicked
+    component Slot: Item {
+        id: s
+        property string tipText
+        property alias hovered: m.containsMouse
+        property alias pressed: m.pressed
+        signal activated()
+        signal rightClicked()
+        default property alias content: holder.data
+        width: dock.cell - 4
+        height: dock.cell - 4
+
+        Rectangle {
+            anchors.fill: parent
+            radius: 12
+            color: dock.th.cardHover
+            opacity: m.containsMouse ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 90 } }
+        }
+        Item { id: holder; anchors.fill: parent }
+        MouseArea {
+            id: m
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            cursorShape: Qt.PointingHandCursor
+            onEntered: dock.showTip(s.tipText, s)
+            onExited: if (tip.label === s.tipText) tip.label = ""
+            onClicked: mouse => {
+                tip.label = ""
+                if (mouse.button === Qt.RightButton)
+                    s.rightClicked()
+                else
+                    s.activated()
+            }
+        }
+    }
+
+    // first slot, same place in every view: categories (from home), favourites (from the picker), back (inside a category)
+    component Head: Slot {
+        id: h
+        tipText: dock.view === 0 ? "Categories" : (dock.view === 1 ? "Favourites" : "Back")
+        onActivated: dock.headerAction()
+        Grid {
+            visible: dock.view === 0
+            anchors.centerIn: parent
+            columns: 2
+            spacing: 4
+            Repeater {
+                model: 4
+                Rectangle { width: 10; height: 10; radius: 3; color: h.hovered ? dock.th.text : dock.th.subtext }
+            }
+        }
+        Icon {
+            visible: dock.view === 1
+            anchors.centerIn: parent
+            name: "star"
+            size: 26
+            color: dock.th.favorite
+        }
+        Text {
+            visible: dock.view === 2
+            anchors.centerIn: parent
+            text: "\u2039"
+            font.pixelSize: 34
+            color: h.hovered ? dock.th.text : dock.th.accent
+        }
+    }
+
+    // last slot: opens the full window
+    component Gear: Slot {
+        id: g
+        tipText: "Open Dockly"
+        onActivated: {
+            tray.openMain()
+            if (dock.autoHide)
+                dock.shown = false
+        }
+        Icon {
+            anchors.centerIn: parent
+            name: "settings"
+            size: 22
+            color: g.hovered ? dock.th.text : dock.th.subtext
         }
     }
 
