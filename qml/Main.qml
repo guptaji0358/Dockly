@@ -11,6 +11,7 @@ ApplicationWindow {
     minimumWidth: 900
     minimumHeight: 560
     title: "Dockly"
+    flags: Qt.Window | Qt.FramelessWindowHint
     color: th.bg
     font.family: "Segoe UI"
     font.pixelSize: 14
@@ -47,6 +48,7 @@ ApplicationWindow {
         {icon: "entertainment", name: "Entertainment", full: "Entertainment Hub"},
         {icon: "web", name: "Web", full: "Web Shortcuts"},
         {icon: "collections", name: "Collections", full: "Collections"},
+        {icon: "github", name: "GitHub", full: "GitHub Repos"},
         {icon: "connector", name: "Connectors", full: "Connectors"},
         {icon: "settings", name: "Settings", full: "Settings"}
     ]
@@ -132,9 +134,27 @@ ApplicationWindow {
             Qt.callLater(hide)
     }
     onTabChanged: {
+        if (tabs[tab].name === "GitHub")
+            Qt.callLater(offerOrganize)
         if (core.settings.values.animations)
             fade.restart()
     }
+    // GitHub repos that were added before groups existed: offer to tidy them (asked once per launch)
+    property bool askedOrganize: false
+    function offerOrganize() {
+        if (askedOrganize)
+            return
+        const n = core.connectors.looseGithubCount()
+        if (n === 0)
+            return
+        askedOrganize = true
+        ask("Organize your GitHub repos?",
+            n + " GitHub repo(s) are mixed in with your Web shortcuts.\n\n"
+            + "Organize automatically files them into one category per repo owner, and you can still move them later. "
+            + "Nothing is deleted.",
+            ["Organize automatically", "Not now"], k => { if (k === 0) core.connectors.organizeGithub() })
+    }
+
     Component.onCompleted: {
         if (startRing)
             ring.opened = true
@@ -173,13 +193,121 @@ ApplicationWindow {
         }
     }
 
+    // ---- custom title bar (replaces the native Windows one) ------------------
+    Item {
+        id: titleBar
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: 34
+        z: 40
+
+        readonly property bool maxed: win.visibility === Window.Maximized
+
+        // drag to move, double-click to maximize / restore
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton
+            // start the OS move on first drag, not on press, so double-click still arrives
+            onPositionChanged: if (pressed) win.startSystemMove()
+            onDoubleClicked: titleBar.maxed ? win.showNormal() : win.showMaximized()
+        }
+
+        Row {
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 8
+            Icon { name: "logo"; size: 16; color: win.th.accent; anchors.verticalCenter: parent.verticalCenter }
+            Text {
+                text: win.title
+                color: win.th.subtext
+                font.pixelSize: 12
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+
+        Row {
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            Repeater {
+                model: [
+                    {glyph: "", act: 0},
+                    {glyph: "", act: 1},
+                    {glyph: "", act: 2}
+                ]
+                delegate: Rectangle {
+                    id: cap
+                    required property var modelData
+                    width: 46
+                    height: titleBar.height
+                    color: capMouse.containsMouse
+                           ? (modelData.act === 2 ? "#e81123" : Qt.rgba(1, 1, 1, 0.12))
+                           : "transparent"
+                    Text {
+                        anchors.centerIn: parent
+                        text: cap.modelData.act === 1 && titleBar.maxed ? "" : cap.modelData.glyph
+                        font.family: "Segoe MDL2 Assets"
+                        font.pixelSize: 10
+                        color: capMouse.containsMouse && cap.modelData.act === 2 ? "white" : win.th.text
+                    }
+                    MouseArea {
+                        id: capMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: {
+                            if (cap.modelData.act === 0)
+                                win.showMinimized()
+                            else if (cap.modelData.act === 1)
+                                titleBar.maxed ? win.showNormal() : win.showMaximized()
+                            else
+                                win.close()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ---- edge / corner resize handles (frameless windows have none) ------------
+    Repeater {
+        model: [
+            {e: Qt.LeftEdge, cur: Qt.SizeHorCursor},
+            {e: Qt.RightEdge, cur: Qt.SizeHorCursor},
+            {e: Qt.TopEdge, cur: Qt.SizeVerCursor},
+            {e: Qt.BottomEdge, cur: Qt.SizeVerCursor},
+            {e: Qt.LeftEdge | Qt.TopEdge, cur: Qt.SizeFDiagCursor},
+            {e: Qt.RightEdge | Qt.BottomEdge, cur: Qt.SizeFDiagCursor},
+            {e: Qt.RightEdge | Qt.TopEdge, cur: Qt.SizeBDiagCursor},
+            {e: Qt.LeftEdge | Qt.BottomEdge, cur: Qt.SizeBDiagCursor}
+        ]
+        delegate: MouseArea {
+            required property var modelData
+            readonly property bool l: (modelData.e & Qt.LeftEdge) !== 0
+            readonly property bool r: (modelData.e & Qt.RightEdge) !== 0
+            readonly property bool t: (modelData.e & Qt.TopEdge) !== 0
+            readonly property bool b: (modelData.e & Qt.BottomEdge) !== 0
+            readonly property bool corner: (l || r) && (t || b)
+            enabled: !titleBar.maxed
+            z: 50
+            x: l ? 0 : (r ? win.width - width : 8)
+            y: t ? 0 : (b ? win.height - height : 8)
+            width: (l || r) ? (corner ? 10 : 5) : win.width - 16
+            height: (t || b) ? (corner ? 10 : 5) : win.height - 16
+            cursorShape: modelData.cur
+            onPressed: win.startSystemResize(modelData.e)
+        }
+    }
+
     // ---- HUD: top bar ---------------------------------------------------------
     Item {
         id: top
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.top: parent.top
+        anchors.top: titleBar.bottom
         anchors.margins: 20
+        anchors.topMargin: 8
         height: 46
 
         Row {
@@ -323,6 +451,7 @@ ApplicationWindow {
         CategoryPage { host: win; category: LH.Entertainment }
         CategoryPage { host: win; category: LH.Web }
         CollectionsPage { host: win }
+        GitHubPage { host: win }
         ConnectorsPage { host: win }
         SettingsPage { host: win }
     }
@@ -447,7 +576,7 @@ ApplicationWindow {
                 items.push(drop.text.trim())
             }
             // the tab you're on hints where files of an unknown type go
-            const hints = [-1, LH.Software, LH.Document, LH.Entertainment, LH.Web, -1, -1, -1]
+            const hints = [-1, LH.Software, LH.Document, LH.Entertainment, LH.Web, -1, -1, -1, -1]
             core.addDropped(items, hints[win.tab])
         }
     }

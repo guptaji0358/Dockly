@@ -19,12 +19,16 @@ AppDialog {
     padding: 0
     width: Math.min(760, (Overlay.overlay ? Overlay.overlay.width : 760) - 60)
 
-    function openWith(heading, entries, note) {
+    property bool groupable: false   // offer "put these in a new category" (used for GitHub repos)
+
+    function openWith(heading, entries, note, groupable) {
         dlg.heading = heading
         dlg.entries = entries
         dlg.note = note || ""
+        dlg.groupable = groupable === true
         picked = ({})
         filter.text = ""
+        groupName.text = ""
         open()
     }
     function toggle(target, name) {
@@ -159,12 +163,36 @@ AppDialog {
 
     Rectangle {
         Layout.fillWidth: true
-        Layout.preferredHeight: 70
+        Layout.preferredHeight: dlg.groupable ? 130 : 70
         color: Qt.rgba(0, 0, 0, 0.22)
         bottomLeftRadius: 22
         bottomRightRadius: 22
+
+        // GitHub: keep the picks together in their own category
+        Column {
+            visible: dlg.groupable
+            x: 22; y: 10
+            width: parent.width - 44
+            spacing: 6
+            HudField {
+                id: groupName
+                width: parent.width
+                placeholderText: "New category name, e.g. Work repos (leave empty to add them loose)"
+            }
+            Text {
+                width: parent.width
+                text: "Tip: pick only your unique repos. Forks and old copies make the list long again. "
+                    + "Using a name you already made adds these repos to that category."
+                color: dlg.th.subtext
+                font.pixelSize: 11
+                wrapMode: Text.Wrap
+            }
+        }
         RowLayout {
-            anchors.fill: parent
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 70
             anchors.leftMargin: 22
             anchors.rightMargin: 22
             spacing: 12
@@ -185,7 +213,10 @@ AppDialog {
                     const list = []
                     for (const t in dlg.picked)
                         list.push({target: t, name: dlg.picked[t]})
-                    core.connectors.addEntries(list)
+                    if (dlg.groupable && groupName.text.trim() !== "")
+                        core.connectors.addEntriesToNewCollection(list, groupName.text)
+                    else
+                        core.connectors.addEntries(list)
                     dlg.close()
                 }
             }

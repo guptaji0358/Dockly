@@ -52,7 +52,8 @@ Window {
         {name: "Documents", cat: 1, icon: "documents", col: "#FFA94D"},
         {name: "Entertainment", cat: 2, icon: "entertainment", col: "#F06595"},
         {name: "Web", cat: 3, icon: "web", col: "#3DDC97"},
-        {name: "Collections", cat: 4, icon: "collections", col: "#A78BFA"}
+        {name: "Collections", cat: 4, icon: "collections", col: "#A78BFA"},
+        {name: "GitHub", cat: 5, icon: "github", col: "#E2E8F0"}   // 5 = repos of your GitHub groups
     ]
 
     ItemModel { id: favs; mode: LH.ModeFavorites }

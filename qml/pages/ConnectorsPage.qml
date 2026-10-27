@@ -17,7 +17,7 @@ Item {
         function onGithubReady(entries, error) {
             page.githubError = error
             if (error === "")
-                picker.openWith("GitHub · " + gh.text.trim(), entries, "public repositories")
+                picker.openWith("GitHub · " + gh.text.trim(), entries, "public repositories", true)
         }
     }
 
@@ -202,7 +202,7 @@ Item {
                 ConnectorCard {
                     title: "GitHub"
                     blurb: "Turn any user's public repositories into shortcuts. No sign-in or token needed."
-                    iconName: "connector"
+                    iconName: "github"
                     lamp: page.cn.busy ? "on" : "off"
                     stateText: page.cn.busy ? "Fetching…" : "Ready"
 

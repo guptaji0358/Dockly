@@ -38,6 +38,7 @@ qt_add_qml_module(DocklyApp
         pages/HomePage.qml
         pages/CategoryPage.qml
         pages/CollectionsPage.qml
+        pages/GitHubPage.qml
         pages/ConnectorsPage.qml
         dialogs/ConnectorPicker.qml
         pages/SettingsPage.qml

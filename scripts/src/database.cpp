@@ -136,11 +136,32 @@ QStringList Database::queryIds(int mode, int category, const QString &search, co
         sql += where + " ORDER BY name COLLATE NOCASE";
         break;
     default:
+        // a link counts as GitHub only for http(s)://[www.]github.com/...; Connectors::isGithubUrl must agree
+        const QString notGithub =
+            " x.target NOT LIKE 'https://github.com/%' AND x.target NOT LIKE 'http://github.com/%'"
+            " AND x.target NOT LIKE 'https://www.github.com/%' AND x.target NOT LIKE 'http://www.github.com/%'";
+        if (category == LH::GitHubView) {
+            // every repo that sits in a GitHub group (a collection holding only github.com links), grouped by group name
+            sql = "SELECT i.id FROM items i JOIN members m ON m.item_id=i.id JOIN items c ON c.id=m.collection_id"
+                  " WHERE c.category=4 AND i.category=3 AND c.id NOT IN"
+                  " (SELECT mm.collection_id FROM members mm JOIN items x ON x.id=mm.item_id WHERE" + notGithub + ")";
+            addSearch("i.");
+            sql += where + " GROUP BY i.id ORDER BY MIN(c.name) COLLATE NOCASE, MIN(m.pos)";
+            break;
+        }
         sql = "SELECT id FROM items WHERE 1=1";
         if (category != LH::AllCategories) {
             sql += " AND category=?";
             binds << category;
         }
+        // web shortcuts grouped into a collection (e.g. imported GitHub repos) live in that collection,
+        // not in the loose Web list; searching still finds them
+        // GitHub groups have their own page and dock icon, so the Collections list skips them
+        if (category == LH::Collection)
+            sql += " AND (id NOT IN (SELECT collection_id FROM members) OR id IN"
+                   " (SELECT mm.collection_id FROM members mm JOIN items x ON x.id=mm.item_id WHERE" + notGithub + "))";
+        if (category == LH::Web && needle.isEmpty())
+            sql += " AND id NOT IN (SELECT item_id FROM members)";
         addSearch(QString());
         sql += where + " ORDER BY name COLLATE NOCASE";
         break;
