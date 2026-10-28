@@ -18,7 +18,7 @@ Window {
     readonly property int cell: 52          // one icon slot
     readonly property int iconSize: 40
     readonly property int thickness: 64     // across the strip
-    readonly property int handle: 6         // what stays on the edge while collapsed
+    readonly property int handle: 8         // what stays on the edge while collapsed
     readonly property int margin: 6         // gap between the strip and the screen edge
 
     property bool shown: true
@@ -186,7 +186,7 @@ Window {
             anchors.fill: parent
             radius: 3
             color: dock.th.accent
-            opacity: 0.55 * (1 - dock.openness)
+            opacity: 0.95 * (1 - dock.openness)
             visible: opacity > 0.01
         }
 
