@@ -48,7 +48,7 @@ ApplicationWindow {
         {icon: "entertainment", name: "Entertainment", full: "Entertainment Hub"},
         {icon: "web", name: "Web", full: "Web Shortcuts"},
         {icon: "collections", name: "Collections", full: "Collections"},
-        {icon: "github", name: "GitHub", full: "GitHub Repos"},
+        {icon: "sites", name: "Sites", full: "Sites"},
         {icon: "connector", name: "Connectors", full: "Connectors"},
         {icon: "settings", name: "Settings", full: "Settings"}
     ]
@@ -134,25 +134,8 @@ ApplicationWindow {
             Qt.callLater(hide)
     }
     onTabChanged: {
-        if (tabs[tab].name === "GitHub")
-            Qt.callLater(offerOrganize)
         if (core.settings.values.animations)
             fade.restart()
-    }
-    // GitHub repos that were added before groups existed: offer to tidy them (asked once per launch)
-    property bool askedOrganize: false
-    function offerOrganize() {
-        if (askedOrganize)
-            return
-        const n = core.connectors.looseGithubCount()
-        if (n === 0)
-            return
-        askedOrganize = true
-        ask("Organize your GitHub repos?",
-            n + " GitHub repo(s) are mixed in with your Web shortcuts.\n\n"
-            + "Organize automatically files them into one category per repo owner, and you can still move them later. "
-            + "Nothing is deleted.",
-            ["Organize automatically", "Not now"], k => { if (k === 0) core.connectors.organizeGithub() })
     }
 
     Component.onCompleted: {
@@ -451,7 +434,7 @@ ApplicationWindow {
         CategoryPage { host: win; category: LH.Entertainment }
         CategoryPage { host: win; category: LH.Web }
         CollectionsPage { host: win }
-        GitHubPage { host: win }
+        SitesPage { host: win }
         ConnectorsPage { host: win }
         SettingsPage { host: win }
     }

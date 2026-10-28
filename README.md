@@ -26,6 +26,10 @@ The **Connectors** tab links Dockly with other apps:
 | GitHub | Pin any user's public repositories (no sign-in). |
 | Visual Studio Code | Pin recent folders / workspaces; they open in VS Code (`vscode://`). |
 
+## Sites
+
+The **Sites** tab keeps links to the websites you use most (GitHub, ChatGPT, Claude, YouTube... or any you add). A site is a small rule you edit: a name, the hosts it covers, and how its links are grouped (one group, by first folder such as a GitHub owner, or by subdomain). Any web shortcut you add, from the browser extension, an import, a drop or by hand, is filed into its site's group automatically, and each site with links gets its own dock icon. When you have 5 or more loose links on a host that is not a site yet, Dockly offers to make it one. Rules are stored in `sites.json` in the data folder.
+
 ## GPU settings (Settings > Performance)
 
 | Setting | Effect |

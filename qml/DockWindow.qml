@@ -47,14 +47,28 @@ Window {
     property bool inCollection: false
     property string collId
 
-    readonly property var cats: [
+    // the five built-in categories, then one entry per site that has links (100 + n = the n-th site)
+    readonly property var baseCats: [
         {name: "Apps", cat: 0, icon: "software", col: "#4C8DFF"},
         {name: "Documents", cat: 1, icon: "documents", col: "#FFA94D"},
         {name: "Entertainment", cat: 2, icon: "entertainment", col: "#F06595"},
         {name: "Web", cat: 3, icon: "web", col: "#3DDC97"},
-        {name: "Collections", cat: 4, icon: "collections", col: "#A78BFA"},
-        {name: "GitHub", cat: 5, icon: "github", col: "#E2E8F0"}   // 5 = repos of your GitHub groups
+        {name: "Collections", cat: 4, icon: "collections", col: "#A78BFA"}
     ]
+    property var siteCats: core.sites.dockEntries()
+    readonly property var cats: baseCats.concat(siteCats)
+    Connections {
+        target: core
+        function onItemsChanged() { Qt.callLater(dock.refreshSites) }
+    }
+    Connections {
+        target: core.sites
+        function onChanged() { Qt.callLater(dock.refreshSites) }
+    }
+    function refreshSites() {
+        siteCats = core.sites.dockEntries()
+        if (flyCat >= 0 && !cats.some(c => c.cat === flyCat)) flyCat = -1
+    }
 
     ItemModel { id: favs; mode: LH.ModeFavorites }
     ItemModel { id: everything }
@@ -482,7 +496,7 @@ Window {
     // the grid of apps for the hovered category, in its own window since the dock itself is too slim to hold it
     Window {
         id: fly
-        readonly property var cat: dock.cats[Math.max(dock.flyCat, 0)]
+        readonly property var cat: dock.cats.find(c => c.cat === dock.flyCat) ?? dock.cats[0]
         readonly property int cols: 4
         readonly property int tile: 88
         readonly property int rows: Math.max(1, Math.ceil(flyModel.count / cols))

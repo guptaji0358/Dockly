@@ -72,6 +72,7 @@ AppCore::AppCore(QObject *parent)
     , m_settings(new AppSettings(this))
     , m_theme(new Theme(m_settings, this))
     , m_connectors(new Connectors(this))
+    , m_sites(new Sites(this))
 {
     m_saveTimer.setSingleShot(true);
     m_saveTimer.setInterval(400);
@@ -192,6 +193,7 @@ void AppCore::init()
     if (m_db.libraryIsNew() && QFile::exists(m_dataDir + "/data.json"))
         migrateLegacyJson();
 
+    m_sites->load(m_dataDir);
     applyStartWithWindows();
     m_connectors->start();
     if (m_settings->boolean("checkMissingOnStartup"))
@@ -269,8 +271,13 @@ QStringList AppCore::queryIds(int mode, int category, const QString &search, con
 {
     if (m_closed)
         return {};
+    if (mode == LH::ModeCategory && category >= LH::SiteViewBase)
+        return m_sites->viewIds(category - LH::SiteViewBase, search);
     const int recentCap = m_settings->boolean("recentEnabled") ? m_settings->integer("maxRecent") : 0;
-    return m_db.queryIds(mode, category, search, collectionId, recentCap);
+    QStringList ids = m_db.queryIds(mode, category, search, collectionId, recentCap);
+    if (mode == LH::ModeCategory && category == LH::Collection) // site groups live on their site's page
+        ids.removeIf([this](const QString &id) { return m_sites->isSiteGroup(id); });
+    return ids;
 }
 
 void AppCore::select(const QString &id)
@@ -341,6 +348,8 @@ QString AppCore::addItem(int category, const QString &nameIn, const QString &tar
     if (!m_db.insertItem(it))
         return {};
     changed();
+    if (cat == LH::Web && m_autoFile)
+        m_sites->autoFile(it.id); // files it into its site's group when a site matches
     return it.id;
 }
 

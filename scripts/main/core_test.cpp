@@ -298,6 +298,96 @@ private slots:
         QCOMPARE(core->connectors()->addEntries(list), 2);
     }
 
+    static int siteIndex(Sites *s, const QString &id)
+    {
+        for (const QVariant &v : s->list())
+            if (v.toMap()["id"].toString() == id)
+                return v.toMap()["index"].toInt();
+        return -1;
+    }
+
+    void sitesFileLinksAutomatically()
+    {
+        Sites *s = core->sites();
+        const int gpt = siteIndex(s, "chatgpt"), gh = siteIndex(s, "github");
+        QVERIFY(gpt >= 0 && gh >= 0); // presets are seeded
+
+        const QString chat = core->addItem(LH::Web, "Chat", "https://chatgpt.com/c/abc");
+        const QString repo = core->addItem(LH::Web, "Dockly", "https://github.com/siteowner/dockly");
+        const QString bare = core->addItem(LH::Web, "Profile", "https://github.com/siteowner");
+        QVERIFY(!chat.isEmpty() && !repo.isEmpty() && !bare.isEmpty());
+
+        // each link landed in its site's group; a link with nothing to group by stays loose
+        QCOMPARE(s->viewIds(gpt, {}), QStringList{chat});
+        QVERIFY(s->viewIds(gh, {}).contains(repo));
+        QVERIFY(!s->viewIds(gh, {}).contains(bare));
+        QVERIFY(core->queryIds(LH::ModeCategory, LH::Web, {}, {}).contains(bare));
+        QVERIFY(!core->queryIds(LH::ModeCategory, LH::Web, {}, {}).contains(chat));
+        QCOMPARE(s->viewIds(gh, "dockly"), QStringList{repo});
+        QVERIFY(s->viewIds(gh, "no-such-thing").isEmpty());
+
+        // the group is a site group, so the Collections list hides it
+        QStringList names;
+        for (const QString &id : core->queryIds(LH::ModeCategory, LH::Collection, {}, {}))
+            names << core->item(id).name;
+        QVERIFY(!names.contains("ChatGPT"));
+        QVERIFY(!names.contains("GitHub · siteowner"));
+        QCOMPARE(s->groups(gpt).size(), 1);
+
+        // the dock offers an entry for each site that has links
+        bool dockHasChat = false;
+        for (const QVariant &v : s->dockEntries())
+            dockHasChat |= v.toMap()["cat"].toInt() == LH::SiteViewBase + gpt;
+        QVERIFY(dockHasChat);
+    }
+
+    void importerPickedGroupIsNotOverridden()
+    {
+        core->connectors()->addEntriesToNewCollection(
+            {QVariantMap{{"name", "Mine"}, {"target", "https://claude.ai/chat/mine1"}}}, "My Claude chats");
+        const int claude = siteIndex(core->sites(), "claude");
+        const QStringList ids = core->sites()->viewIds(claude, {});
+        QCOMPARE(ids.size(), 1); // only in the group the user named, not also in "Claude"
+        QCOMPARE(core->sites()->groups(claude).first().toMap()["name"].toString(), QString("My Claude chats"));
+    }
+
+    void sitesCanBeDefinedByTheUser()
+    {
+        Sites *s = core->sites();
+        QVERIFY(!s->saveSite({{"name", ""}, {"hosts", "x.example"}}));  // a name is required
+        QVERIFY(!s->saveSite({{"name", "X"}, {"hosts", "  "}}));         // and at least one host
+
+        // a host with many loose links is suggested, and accepting it files them
+        for (int i = 0; i < 5; ++i)
+            core->addItem(LH::Web, {}, QString("https://notes.example/page%1").arg(i));
+        bool suggested = false;
+        for (const QVariant &v : s->suggestions())
+            suggested |= v.toMap()["host"].toString() == "notes.example";
+        QVERIFY(suggested);
+        QVERIFY(s->acceptSuggestion("notes.example"));
+        const int idx = siteIndex(s, s->list().last().toMap()["id"].toString());
+        QCOMPARE(s->viewIds(idx, {}).size(), 5);
+        QCOMPARE(s->looseCount(), 0);
+
+        // later links on that host are filed on arrival, subdomains included
+        const QString extra = core->addItem(LH::Web, {}, "https://www.notes.example/new");
+        QVERIFY(s->viewIds(idx, {}).contains(extra));
+
+        // a dismissed host is not suggested again
+        for (int i = 0; i < 5; ++i)
+            core->addItem(LH::Web, {}, QString("https://dismiss.example/p%1").arg(i));
+        s->dismissSuggestion("dismiss.example");
+        for (const QVariant &v : s->suggestions())
+            QVERIFY(v.toMap()["host"].toString() != "dismiss.example");
+
+        // removing the rule turns its group back into an ordinary collection
+        s->removeSite(s->list().at(idx).toMap()["id"].toString());
+        QStringList names;
+        for (const QString &id : core->queryIds(LH::ModeCategory, LH::Collection, {}, {}))
+            names << core->item(id).name;
+        QVERIFY(names.contains("Notes"));
+    }
+
     void importersAreSafeToCall()
     {
         Connectors *cn = core->connectors();

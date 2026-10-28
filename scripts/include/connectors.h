@@ -48,12 +48,6 @@ public:
     Q_INVOKABLE QVariantList vscodeRecent() const;
     Q_INVOKABLE void fetchGithub(const QString &user);                 // async -> githubReady
     Q_INVOKABLE int addEntries(const QVariantList &entries);           // [{name, target}] as web shortcuts
-    // collections whose members are all GitHub links: [{id, name, repos: [{id, name, path}]}]
-    Q_INVOKABLE QVariantList githubGroups() const;
-    // GitHub repos already added as plain Web shortcuts (in no group yet), and a one-click tidy-up
-    // that files them into one category per repo owner
-    Q_INVOKABLE int looseGithubCount() const;
-    Q_INVOKABLE int organizeGithub();
     Q_INVOKABLE int addEntriesToNewCollection(const QVariantList &entries, const QString &name); // same, grouped in a new collection
 
 signals:

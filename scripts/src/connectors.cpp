@@ -464,100 +464,17 @@ int Connectors::addEntries(const QVariantList &entries)
     return ids.size();
 }
 
-// http(s)://[www.]github.com/<something>; Database::queryIds uses the same rule in SQL
-static bool isGithubUrl(const QString &target)
-{
-    const QUrl u(target);
-    const QString host = u.host().toLower();
-    return (u.scheme() == QLatin1String("https") || u.scheme() == QLatin1String("http"))
-        && (host == QLatin1String("github.com") || host == QLatin1String("www.github.com"))
-        && u.path().startsWith('/');
-}
-
-QVariantList Connectors::githubGroups() const
-{
-    QVariantList out;
-    for (const QVariant &cv : m_core->collectionsList()) {
-        const QVariantMap c = cv.toMap();
-        const QString cid = c.value("id").toString();
-        const QStringList ids = m_core->queryIds(LH::ModeMembers, LH::AllCategories, QString(), cid);
-        QVariantList repos;
-        bool allGithub = !ids.isEmpty();
-        for (const QString &id : ids) {
-            const Item it = m_core->item(id);
-            if (!isGithubUrl(it.target)) {
-                allGithub = false;
-                break;
-            }
-            QString path = QUrl(it.target).path();
-            if (path.startsWith('/'))
-                path.remove(0, 1);
-            repos.append(QVariantMap{{"id", id}, {"name", it.name}, {"path", path}});
-        }
-        if (allGithub)
-            out.append(QVariantMap{{"id", cid}, {"name", c.value("name")}, {"repos", repos}});
-    }
-    return out;
-}
-
-// owner -> ids of the loose github.com/<owner>/<repo> shortcuts
-static QMap<QString, QStringList> looseGithubByOwner(const AppCore *core)
-{
-    QMap<QString, QStringList> byOwner;
-    for (const QString &id : core->queryIds(LH::ModeCategory, LH::Web, QString(), QString())) {
-        if (!isGithubUrl(core->item(id).target))
-            continue;
-        const QUrl u(core->item(id).target);
-        const QStringList seg = u.path().split('/', Qt::SkipEmptyParts);
-        if (seg.size() >= 2)
-            byOwner[seg.first()] << id;
-    }
-    return byOwner;
-}
-
-int Connectors::looseGithubCount() const
-{
-    int n = 0;
-    for (const QStringList &ids : looseGithubByOwner(m_core))
-        n += ids.size();
-    return n;
-}
-
-int Connectors::organizeGithub()
-{
-    int moved = 0;
-    const QMap<QString, QStringList> byOwner = looseGithubByOwner(m_core);
-    for (auto it = byOwner.cbegin(); it != byOwner.cend(); ++it) {
-        const QString name = QStringLiteral("GitHub · ") + it.key();
-        QString col;
-        for (const QVariant &cv : m_core->collectionsList()) {
-            const QVariantMap c = cv.toMap();
-            if (c.value("name").toString().compare(name, Qt::CaseInsensitive) == 0) {
-                col = c.value("id").toString();
-                break;
-            }
-        }
-        if (col.isEmpty())
-            col = m_core->createCollection(name);
-        if (col.isEmpty())
-            continue;
-        m_core->addToCollection(col, it.value());
-        moved += it.value().size();
-    }
-    if (moved)
-        m_core->message(QStringLiteral("Organized %1 repo(s) by owner.").arg(moved));
-    return moved;
-}
-
 int Connectors::addEntriesToNewCollection(const QVariantList &entries, const QString &name)
 {
     QStringList ids;
+    m_core->setAutoFile(false); // the user picked the group, so a site's own grouping stays out of it
     for (const QVariant &v : entries) {
         const QVariantMap m = v.toMap();
         const QString id = m_core->addItem(LH::Web, m.value("name").toString(), m.value("target").toString());
         if (!id.isEmpty())
             ids << id;
     }
+    m_core->setAutoFile(true);
     if (ids.isEmpty())
         return 0;
     // a category with this name already exists: add to it instead of making a twin

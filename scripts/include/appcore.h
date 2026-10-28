@@ -4,6 +4,7 @@
 #include "connectors.h"
 #include "database.h"
 #include "item.h"
+#include "sites.h"
 #include "softwarescanner.h"
 #include "theme.h"
 
@@ -34,6 +35,7 @@ class AppCore : public QObject
     Q_PROPERTY(QString selectedId READ selectedId NOTIFY selectionChanged)
     Q_PROPERTY(int catalogCount READ catalogCount NOTIFY catalogChanged)
     Q_PROPERTY(Connectors *connectors READ connectors CONSTANT)
+    Q_PROPERTY(Sites *sites READ sites CONSTANT)
 
 public:
     static AppCore *instance();
@@ -45,6 +47,9 @@ public:
     AppSettings *settings() const { return m_settings; }
     Theme *theme() const { return m_theme; }
     Connectors *connectors() const { return m_connectors; }
+    Sites *sites() const { return m_sites; }
+    // new web shortcuts are filed into their site's group; importers that pick their own group switch it off
+    void setAutoFile(bool on) { m_autoFile = on; }
     int iconVersion() const { return m_iconVersion; }
     bool scanning() const { return m_scanning; }
     QString version() const;
@@ -148,6 +153,8 @@ private:
     AppSettings *m_settings;
     Theme *m_theme;
     Connectors *m_connectors = nullptr;
+    Sites *m_sites = nullptr;
+    bool m_autoFile = true;
     Database m_db;
     mutable QHash<QString, Item> m_cache;
     QString m_selectedId;
