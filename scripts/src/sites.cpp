@@ -3,7 +3,11 @@
 #include "appcore.h"
 #include "lhtypes.h"
 
+#include <QDateTime>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
+#include <QImageReader>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -15,6 +19,11 @@
 
 namespace {
 constexpr int kSuggestMin = 5; // loose links on one host before we offer to make it a site
+
+QString fileUrl(const QString &path)
+{
+    return path.isEmpty() ? QString() : QUrl::fromLocalFile(path).toString();
+}
 
 struct Preset
 {
@@ -75,6 +84,7 @@ void Sites::seedPresets(bool onlyMissing)
 
 void Sites::load(const QString &dir)
 {
+    m_dir = dir;
     m_path = dir + QStringLiteral("/sites.json");
     m_sites.clear();
     m_dismissed.clear();
@@ -92,6 +102,9 @@ void Sites::load(const QString &dir)
             s.icon = o["icon"].toString(QStringLiteral("web"));
             s.color = o["color"].toString(QStringLiteral("#4C8DFF"));
             s.autoFile = o["autoFile"].toBool(true);
+            s.image = o["image"].toString();
+            if (!s.image.isEmpty() && !QFile::exists(s.image))
+                s.image.clear();
             for (const QJsonValue &h : o["hosts"].toArray())
                 s.hosts << normalizeHost(h.toString());
             s.hosts.removeAll(QString());
@@ -121,6 +134,7 @@ void Sites::save() const
         o["icon"] = s.icon;
         o["color"] = s.color;
         o["autoFile"] = s.autoFile;
+        o["image"] = s.image;
         arr.append(o);
     }
     QJsonObject root;
@@ -293,7 +307,7 @@ QVariantList Sites::list() const
         out.append(QVariantMap{{"index", i}, {"id", s.id}, {"name", s.name}, {"hosts", s.hosts},
                                {"hostsText", s.hosts.join(QStringLiteral(", "))}, {"groupBy", s.groupBy},
                                {"autoFile", s.autoFile}, {"icon", s.icon}, {"color", s.color},
-                               {"groups", groupCount[i]}, {"links", linkCount[i]}});
+                               {"image", fileUrl(s.image)}, {"groups", groupCount[i]}, {"links", linkCount[i]}});
     }
     return out;
 }
@@ -342,8 +356,28 @@ QVariantList Sites::dockEntries() const
     for (int i = 0; i < m_sites.size(); ++i)
         if (!groups(i).isEmpty())
             out.append(QVariantMap{{"name", m_sites[i].name}, {"cat", LH::SiteViewBase + i},
-                                   {"icon", m_sites[i].icon}, {"col", m_sites[i].color}});
+                                   {"icon", m_sites[i].icon}, {"col", m_sites[i].color},
+                                   {"image", fileUrl(m_sites[i].image)}});
     return out;
+}
+
+// Copies a picked image into <data>/siteicons under a fresh name (so icon caches never show the old
+// one), or drops the picture when removeImage is set.
+void Sites::applyImage(Site &s, const QVariantMap &in) const
+{
+    if (in.value("removeImage").toBool())
+        s.image.clear();
+    const QString picked = in.value("pickedImage").toString();
+    if (picked.isEmpty() || !QImageReader(picked).canRead())
+        return;
+    const QString dir = m_dir + QStringLiteral("/siteicons");
+    QDir().mkpath(dir);
+    const QString dest = QStringLiteral("%1/%2_%3.%4")
+                             .arg(dir, s.id.isEmpty() ? QStringLiteral("new") : s.id)
+                             .arg(QDateTime::currentMSecsSinceEpoch())
+                             .arg(QFileInfo(picked).suffix().toLower());
+    if (QFile::copy(picked, dest))
+        s.image = dest;
 }
 
 bool Sites::saveSite(const QVariantMap &in)
@@ -372,11 +406,16 @@ bool Sites::saveSite(const QVariantMap &in)
     bool replaced = false;
     for (Site &old : m_sites)
         if (!s.id.isEmpty() && old.id == s.id) {
-            old = s;
+            s.image = old.image; // keeps the current picture unless changed below
             replaced = true;
+            applyImage(s, in);
+            if (s.image != old.image && !old.image.isEmpty())
+                QFile::remove(old.image);
+            old = s;
         }
     if (!replaced) {
         s.id = QUuid::createUuid().toString(QUuid::WithoutBraces).left(8);
+        applyImage(s, in);
         m_sites.append(s);
     }
     save();
@@ -388,6 +427,8 @@ void Sites::removeSite(const QString &id)
 {
     for (int i = 0; i < m_sites.size(); ++i)
         if (m_sites[i].id == id) {
+            if (!m_sites[i].image.isEmpty())
+                QFile::remove(m_sites[i].image);
             m_sites.removeAt(i);
             break;
         }

@@ -34,7 +34,8 @@ public:
     Q_INVOKABLE QVariantList groups(int siteIndex) const; // [{id, name, links: [{id, name, path}]}]
     Q_INVOKABLE QVariantList dockEntries() const;         // sites that have groups: [{name, cat, icon, col}]
 
-    Q_INVOKABLE bool saveSite(const QVariantMap &site);   // {id?, name, hosts, groupBy, autoFile, icon, color}
+    // {id?, name, hosts, groupBy, autoFile, icon, color, pickedImage? (file to copy in), removeImage?}
+    Q_INVOKABLE bool saveSite(const QVariantMap &site);
     Q_INVOKABLE void removeSite(const QString &id);
     Q_INVOKABLE void resetPresets();                      // adds back any missing preset
 
@@ -54,11 +55,13 @@ private:
     struct Site
     {
         QString id, name, groupBy, icon, color;
+        QString image; // optional picture of the user's own, shown instead of the icon
         QStringList hosts;
         bool autoFile = true;
     };
 
     void save() const;
+    void applyImage(Site &s, const QVariantMap &in) const;
     void seedPresets(bool onlyMissing);
     int siteForUrl(const QString &url, QString *matchedHost = nullptr) const;
     QString groupNameFor(const Site &s, const QString &url, const QString &matchedHost) const;
@@ -68,6 +71,7 @@ private:
 
     AppCore *m_core;
     QString m_path;
+    QString m_dir;
     QVector<Site> m_sites;
     QSet<QString> m_dismissed;
 };

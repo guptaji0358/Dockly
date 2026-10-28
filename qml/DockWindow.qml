@@ -285,8 +285,9 @@ Window {
                         color: Qt.alpha(stripSlot.modelData.col, dock.flyCat === stripSlot.modelData.cat ? 0.4 : 0.22)
                         scale: stripSlot.pressed ? 0.88 : (stripSlot.hovered ? 1.08 : 1)
                         Behavior on scale { NumberAnimation { duration: 90 } }
-                        Icon {
+                        SiteIcon {
                             anchors.centerIn: parent
+                            image: stripSlot.modelData.image ?? ""
                             name: stripSlot.modelData.icon
                             size: 24
                             color: stripSlot.modelData.col
@@ -326,8 +327,9 @@ Window {
                         color: Qt.alpha(catSlot.modelData.col, 0.22)
                         scale: catSlot.pressed ? 0.88 : (catSlot.hovered ? 1.08 : 1)
                         Behavior on scale { NumberAnimation { duration: 90 } }
-                        Icon {
+                        SiteIcon {
                             anchors.centerIn: parent
+                            image: catSlot.modelData.image ?? ""
                             name: catSlot.modelData.icon
                             size: 24
                             color: catSlot.modelData.col
@@ -532,7 +534,7 @@ Window {
                     height: 26
                     radius: 8
                     color: Qt.alpha(fly.cat.col, 0.25)
-                    Icon { anchors.centerIn: parent; name: fly.cat.icon; size: 16; color: fly.cat.col }
+                    SiteIcon { anchors.centerIn: parent; image: fly.cat.image ?? ""; name: fly.cat.icon; size: 16; color: fly.cat.col }
                 }
                 Text {
                     height: 26

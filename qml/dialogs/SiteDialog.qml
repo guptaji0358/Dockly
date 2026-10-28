@@ -10,6 +10,11 @@ AppDialog {
     property string color: "#4C8DFF"
     property string icon: "web"
     property int groupIndex: 0
+    property string image: ""        // file URL of the picture the site has now
+    property string pickedImage: ""  // newly chosen file, copied in on Save
+    property bool removeImage: false
+    readonly property string shownImage: pickedImage !== "" ? "file:///" + pickedImage.replace(/\\/g, "/")
+                                                            : (removeImage ? "" : image)
     readonly property var groupOptions: [
         {text: "One group for the whole site", value: "none"},
         {text: "By first folder in the link (e.g. GitHub owner)", value: "path"},
@@ -27,6 +32,9 @@ AppDialog {
         autoBox.checked = true
         color = palette[Math.floor(Math.random() * 8)]
         icon = "web"
+        image = ""
+        pickedImage = ""
+        removeImage = false
         open()
         nameField.forceActiveFocus()
     }
@@ -38,6 +46,9 @@ AppDialog {
         autoBox.checked = site.autoFile
         color = site.color
         icon = site.icon
+        image = site.image
+        pickedImage = ""
+        removeImage = false
         open()
     }
 
@@ -168,6 +179,40 @@ AppDialog {
         }
     }
 
+    Text { text: "Icon"; color: dlg.th.subtext }
+    RowLayout {
+        Layout.fillWidth: true
+        spacing: 12
+        Rectangle {
+            width: 52
+            height: 52
+            radius: 12
+            color: Qt.alpha(dlg.color, 0.22)
+            SiteIcon {
+                anchors.centerIn: parent
+                image: dlg.shownImage
+                name: dlg.icon
+                size: 34
+                color: dlg.color
+            }
+        }
+        AppButton {
+            text: dlg.shownImage === "" ? "Use own image..." : "Change image..."
+            onClicked: iconPrompt.openFor(nameField.text, hostsField.text.split(/[,;\s]+/)[0], dlg.color)
+        }
+        AppButton {
+            visible: dlg.shownImage !== ""
+            text: "Use default icon"
+            onClicked: { dlg.pickedImage = ""; dlg.removeImage = true }
+        }
+        Item { Layout.fillWidth: true }
+    }
+
+    SiteIconPromptDialog {
+        id: iconPrompt
+        onPicked: path => { dlg.pickedImage = path; dlg.removeImage = false }
+    }
+
     RowLayout {
         Layout.fillWidth: true
         Layout.topMargin: 6
@@ -188,7 +233,8 @@ AppDialog {
                 const ok = core.sites.saveSite({
                     id: dlg.siteId, name: nameField.text, hosts: hostsField.text,
                     groupBy: dlg.groupOptions[dlg.groupIndex].value, autoFile: autoBox.checked,
-                    icon: dlg.icon, color: dlg.color
+                    icon: dlg.icon, color: dlg.color,
+                    pickedImage: dlg.pickedImage, removeImage: dlg.removeImage
                 })
                 if (ok)
                     dlg.close()

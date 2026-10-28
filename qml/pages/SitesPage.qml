@@ -138,7 +138,7 @@ Item {
                         id: chipRow
                         anchors.centerIn: parent
                         spacing: 8
-                        Icon { anchors.verticalCenter: parent.verticalCenter; name: chip.modelData.icon; size: 16; color: chip.modelData.color }
+                        SiteIcon { anchors.verticalCenter: parent.verticalCenter; image: chip.modelData.image; name: chip.modelData.icon; size: 16; color: chip.modelData.color }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             text: chip.modelData.name
@@ -253,7 +253,8 @@ Item {
                                     radius: page.asGrid ? 16 : (page.style === "compact" ? 8 : 12)
                                     tint: 0.5
                                     border.color: tm.containsMouse ? page.th.accent : edge
-                                    Icon { x: 16; anchors.verticalCenter: parent.verticalCenter
+                                    SiteIcon { x: 16; anchors.verticalCenter: parent.verticalCenter
+                                           image: page.cur ? page.cur.image : ""
                                            name: page.cur ? page.cur.icon : "web"; size: page.style === "compact" ? 16 : 22
                                            color: page.cur ? page.cur.color : page.th.accent }
                                     Column {

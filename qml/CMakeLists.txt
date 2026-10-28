@@ -31,6 +31,7 @@ qt_add_qml_module(DocklyApp
         dialogs/ChoiceDialog.qml
         components/Card.qml
         components/Icon.qml
+        components/SiteIcon.qml
         components/ViewToolbar.qml
         components/DetailPanel.qml
         dialogs/PickSoftwareDialog.qml
@@ -40,6 +41,7 @@ qt_add_qml_module(DocklyApp
         pages/CollectionsPage.qml
         pages/SitesPage.qml
         dialogs/SiteDialog.qml
+        dialogs/SiteIconPromptDialog.qml
         pages/ConnectorsPage.qml
         dialogs/ConnectorPicker.qml
         pages/SettingsPage.qml
