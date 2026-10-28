@@ -61,7 +61,7 @@ function fillTree(sites) {
   const root = $("siteTree");
   root.textContent = "";
   const shown = sites.filter((s) => s.groups.length);
-  $("mySites").hidden = !shown.length;
+  $("noSites").hidden = !!shown.length;
   for (const site of shown) {
     const d = document.createElement("details");
     const sm = document.createElement("summary");
@@ -249,4 +249,10 @@ $("addSelected").onclick = async () => {
     show();
   } catch (e) { status(e.message, "err"); }
 };
+for (const t of document.querySelectorAll(".tab")) {
+  t.onclick = () => {
+    for (const o of document.querySelectorAll(".tab")) o.classList.toggle("on", o === t);
+    for (const p of document.querySelectorAll(".pane")) p.hidden = p.id !== t.dataset.pane;
+  };
+}
 show();

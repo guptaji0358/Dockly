@@ -5,58 +5,74 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <header><span class="logo">&#11041;</span><b>DOCKLY</b></header>
+  <header><span class="logo">&#11041;</span><b>DOCKLY</b><a id="unpair" href="#" hidden>Change pairing</a></header>
 
   <section id="main" hidden>
-    <label>Title
-      <input id="title" maxlength="120">
-    </label>
-    <div id="url" class="url"></div>
-    <div id="site" class="site" hidden></div>
-    <div id="newSite" hidden>
-      <a id="makeSite" href="#"></a>
-      <div id="siteForm" hidden>
-        <input id="siteName" maxlength="40" placeholder="Site name">
-        <select id="siteGroupBy">
-          <option value="none">All links in one group</option>
-          <option value="path">Group by first folder (owner)</option>
-          <option value="subdomain">Group by subdomain</option>
-        </select>
-        <button id="createSite" class="primary">Create site</button>
+    <nav class="tabbar">
+      <button class="tab on" data-pane="paneAdd">Add</button>
+      <button class="tab" data-pane="paneTabs">Tabs</button>
+      <button class="tab" data-pane="paneSites">Sites</button>
+    </nav>
+
+    <div id="paneAdd" class="pane">
+      <div class="page">
+        <input id="title" maxlength="120" placeholder="Title">
+        <div id="url" class="url"></div>
+        <div id="site" class="site" hidden></div>
+      </div>
+      <div id="newSite" hidden>
+        <a id="makeSite" href="#"></a>
+        <div id="siteForm" hidden>
+          <input id="siteName" maxlength="40" placeholder="Site name">
+          <select id="siteGroupBy">
+            <option value="none">All links in one group</option>
+            <option value="path">Group by first folder (owner)</option>
+            <option value="subdomain">Group by subdomain</option>
+          </select>
+          <button id="createSite" class="primary">Create site</button>
+        </div>
+      </div>
+      <div class="row2">
+        <label>File under
+          <select id="placement">
+            <option value="">Automatic</option>
+            <option value="__none__">No group</option>
+          </select>
+        </label>
+        <label>Collection
+          <select id="collection"><option value="">None</option></select>
+        </label>
+      </div>
+      <div class="iconrow">
+        <canvas id="preview" width="48" height="48"></canvas>
+        <label>Icon
+          <select id="iconMode">
+            <option value="auto">Automatic (site icon)</option>
+            <option value="tile">Colored letter tile</option>
+            <option value="upload">Upload image&hellip;</option>
+          </select>
+        </label>
+        <input id="color" type="color" value="#0891b2" title="Tile color" hidden>
+        <input id="file" type="file" accept="image/*" hidden>
+      </div>
+      <button id="addPage" class="primary">Add this page</button>
+    </div>
+
+    <div id="paneTabs" class="pane" hidden>
+      <button id="addTabs">Add all tabs in this window</button>
+      <button id="pickTabs">Choose tabs&hellip;</button>
+      <div id="tabList" hidden>
+        <div id="tabs"></div>
+        <button id="addSelected" class="primary">Add selected</button>
       </div>
     </div>
-    <label>File under
-      <select id="placement">
-        <option value="">Automatic (site rules)</option>
-        <option value="__none__">No group</option>
-      </select>
-    </label>
-    <label>Collection (optional)
-      <select id="collection"><option value="">None</option></select>
-    </label>
-    <label>Icon
-      <select id="iconMode">
-        <option value="auto">Automatic (site icon)</option>
-        <option value="tile">Colored letter tile</option>
-        <option value="upload">Upload image&hellip;</option>
-      </select>
-    </label>
-    <div id="iconRow" class="iconrow">
-      <canvas id="preview" width="48" height="48"></canvas>
-      <input id="color" type="color" value="#0891b2" title="Tile color" hidden>
-      <input id="file" type="file" accept="image/*" hidden>
+
+    <div id="paneSites" class="pane" hidden>
+      <div id="mySites">
+        <div id="siteTree"></div>
+        <p id="noSites" class="empty" hidden>No sites yet. Make one from the Add tab.</p>
+      </div>
     </div>
-    <button id="addPage" class="primary">Add this page</button>
-    <button id="addTabs">Add all tabs in this window</button>
-    <button id="pickTabs">Choose tabs&hellip;</button>
-    <div id="tabList" hidden>
-      <div id="tabs"></div>
-      <button id="addSelected" class="primary">Add selected</button>
-    </div>
-    <details id="mySites">
-      <summary>Your sites</summary>
-      <div id="siteTree"></div>
-    </details>
   </section>
 
   <section id="pair" hidden>
@@ -66,7 +82,6 @@
   </section>
 
   <div id="status"></div>
-  <a id="unpair" href="#" hidden>Change pairing</a>
   <script src="dockly.js"></script>
   <script src="popup.js"></script>
 </body>
