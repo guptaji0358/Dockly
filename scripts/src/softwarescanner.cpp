@@ -4,6 +4,7 @@
 #include <QDirIterator>
 #include <QFileInfo>
 #include <QSet>
+#include <QSettings>
 #include <QStandardPaths>
 
 namespace {
@@ -45,6 +46,54 @@ QVector<ScannedApp> scanInstalledSoftware()
                 continue;
             seen.insert(key);
             result.append({name, QDir::toNativeSeparators(QDir::cleanPath(target))});
+        }
+    }
+
+    // Programs without a Start Menu shortcut: registry "Uninstall" entries and "App Paths".
+    auto addExe = [&](QString name, QString exe) {
+        exe = exe.trimmed();
+        if (exe.startsWith('"'))
+            exe = exe.section('"', 1, 1);
+        const int comma = exe.lastIndexOf(',');
+        if (comma > 0 && !exe.endsWith(".exe", Qt::CaseInsensitive))
+            exe = exe.left(comma);
+        exe = QDir::cleanPath(exe);
+        if (name.isEmpty() || !exe.endsWith(".exe", Qt::CaseInsensitive) || !QFileInfo::exists(exe))
+            return;
+        if (looksLikeNoise(name, exe))
+            return;
+        const QString key = exe.toLower();
+        if (seen.contains(key))
+            return;
+        seen.insert(key);
+        result.append({name, QDir::toNativeSeparators(exe)});
+    };
+
+    const QStringList uninstallRoots = {
+        "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+        "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+        "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+    };
+    for (const QString &root : uninstallRoots) {
+        QSettings reg(root, QSettings::NativeFormat);
+        for (const QString &sub : reg.childGroups()) {
+            reg.beginGroup(sub);
+            if (reg.value("SystemComponent").toInt() != 1)
+                addExe(reg.value("DisplayName").toString(), reg.value("DisplayIcon").toString());
+            reg.endGroup();
+        }
+    }
+
+    const QStringList appPathRoots = {
+        "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths",
+        "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths",
+    };
+    for (const QString &root : appPathRoots) {
+        QSettings reg(root, QSettings::NativeFormat);
+        for (const QString &sub : reg.childGroups()) {
+            reg.beginGroup(sub);
+            addExe(QFileInfo(sub).completeBaseName(), reg.value("Default").toString());
+            reg.endGroup();
         }
     }
     return result;
