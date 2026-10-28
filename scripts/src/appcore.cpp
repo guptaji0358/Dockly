@@ -353,6 +353,11 @@ QString AppCore::addItem(int category, const QString &nameIn, const QString &tar
     return it.id;
 }
 
+QString AppCore::findWeb(const QString &url) const
+{
+    return m_db.findByNorm(LH::Web, Item::normalizedTarget(normalizeUrl(url)));
+}
+
 QStringList AppCore::addFiles(int category, const QStringList &paths)
 {
     QStringList ids;

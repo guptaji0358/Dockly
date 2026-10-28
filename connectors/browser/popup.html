@@ -12,6 +12,25 @@
       <input id="title" maxlength="120">
     </label>
     <div id="url" class="url"></div>
+    <div id="site" class="site" hidden></div>
+    <div id="newSite" hidden>
+      <a id="makeSite" href="#"></a>
+      <div id="siteForm" hidden>
+        <input id="siteName" maxlength="40" placeholder="Site name">
+        <select id="siteGroupBy">
+          <option value="none">All links in one group</option>
+          <option value="path">Group by first folder (owner)</option>
+          <option value="subdomain">Group by subdomain</option>
+        </select>
+        <button id="createSite" class="primary">Create site</button>
+      </div>
+    </div>
+    <label>File under
+      <select id="placement">
+        <option value="">Automatic (site rules)</option>
+        <option value="__none__">No group</option>
+      </select>
+    </label>
     <label>Collection (optional)
       <select id="collection"><option value="">None</option></select>
     </label>
@@ -29,6 +48,15 @@
     </div>
     <button id="addPage" class="primary">Add this page</button>
     <button id="addTabs">Add all tabs in this window</button>
+    <button id="pickTabs">Choose tabs&hellip;</button>
+    <div id="tabList" hidden>
+      <div id="tabs"></div>
+      <button id="addSelected" class="primary">Add selected</button>
+    </div>
+    <details id="mySites">
+      <summary>Your sites</summary>
+      <div id="siteTree"></div>
+    </details>
   </section>
 
   <section id="pair" hidden>

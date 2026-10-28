@@ -27,10 +27,22 @@ const Dockly = {
   },
 
   ping() { return this.call("/ping"); },
-  add(items, collection) {
+  // For each url: {exists, host, site?, group?} (already saved? which site would take it?)
+  async match(urls) {
+    const list = urls.filter((u) => /^https?:\/\//i.test(u));
+    if (!list.length) return [];
+    return (await this.call("/match", { urls: list })).results;
+  },
+  addSite(site) { return this.call("/site", site); },
+  // placement: "" = follow the site rules, "__none__" = leave loose, otherwise a group name
+  add(items, collection, placement) {
     const list = items
       .filter((t) => /^https?:\/\//i.test(t.url))
-      .map((t) => ({ url: t.url, title: t.title || "", collection, icon: t.icon }));
+      .map((t) => ({
+        url: t.url, title: t.title || "", collection, icon: t.icon,
+        group: placement && placement !== "__none__" ? placement : undefined,
+        noAuto: placement === "__none__" ? true : undefined,
+      }));
     return this.call("/add", { items: list });
   },
 };

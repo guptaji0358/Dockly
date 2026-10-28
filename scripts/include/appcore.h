@@ -50,6 +50,8 @@ public:
     Sites *sites() const { return m_sites; }
     // new web shortcuts are filed into their site's group; importers that pick their own group switch it off
     void setAutoFile(bool on) { m_autoFile = on; }
+    bool autoFile() const { return m_autoFile; }
+    QString findWeb(const QString &url) const; // id of an existing web shortcut for this link, or empty
     int iconVersion() const { return m_iconVersion; }
     bool scanning() const { return m_scanning; }
     QString version() const;

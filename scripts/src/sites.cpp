@@ -298,6 +298,44 @@ QVariantList Sites::list() const
     return out;
 }
 
+QVariantMap Sites::match(const QString &url) const
+{
+    QVariantMap out{{"exists", !m_core->findWeb(url).isEmpty()}, {"host", normalizeHost(QUrl(url).host())}};
+    QString host;
+    const int idx = siteForUrl(url, &host);
+    if (idx >= 0) {
+        out["site"] = m_sites[idx].name;
+        out["autoFile"] = m_sites[idx].autoFile;
+        out["group"] = m_sites[idx].autoFile ? groupNameFor(m_sites[idx], url, host) : QString();
+    }
+    return out;
+}
+
+QVariantList Sites::overview() const
+{
+    constexpr int kMaxLinks = 300; // per site, keeps /ping small
+    QVariantList out;
+    for (int i = 0; i < m_sites.size(); ++i) {
+        const Site &s = m_sites[i];
+        int budget = kMaxLinks;
+        QVariantList groups;
+        for (const QVariant &gv : this->groups(i)) {
+            const QVariantMap g = gv.toMap();
+            QVariantList links;
+            for (const QVariant &lv : g.value("links").toList()) {
+                if (budget-- <= 0)
+                    break;
+                const QString id = lv.toMap().value("id").toString();
+                links.append(QVariantMap{{"name", lv.toMap().value("name").toString()}, {"url", m_core->item(id).target}});
+            }
+            groups.append(QVariantMap{{"id", g.value("id")}, {"name", g.value("name")}, {"links", links}});
+        }
+        out.append(QVariantMap{{"id", s.id}, {"name", s.name}, {"hosts", s.hosts}, {"groupBy", s.groupBy},
+                               {"autoFile", s.autoFile}, {"groups", groups}});
+    }
+    return out;
+}
+
 QVariantList Sites::dockEntries() const
 {
     QVariantList out;

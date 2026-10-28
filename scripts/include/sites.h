@@ -28,6 +28,9 @@ public:
     bool isSiteGroup(const QString &collectionId) const; // a collection holding only links of one site
 
     QVariantList list() const;
+    QString findOrCreateGroup(const QString &name);
+    QVariantMap match(const QString &url) const;   // {exists, host, site?, group?, autoFile?} for the browser extension
+    QVariantList overview() const;                 // [{id, name, hosts, groupBy, autoFile, groups: [{id, name, links: [{name, url}]}]}]
     Q_INVOKABLE QVariantList groups(int siteIndex) const; // [{id, name, links: [{id, name, path}]}]
     Q_INVOKABLE QVariantList dockEntries() const;         // sites that have groups: [{name, cat, icon, col}]
 
@@ -59,7 +62,6 @@ private:
     void seedPresets(bool onlyMissing);
     int siteForUrl(const QString &url, QString *matchedHost = nullptr) const;
     QString groupNameFor(const Site &s, const QString &url, const QString &matchedHost) const;
-    QString findOrCreateGroup(const QString &name);
     int siteOfCollection(const QString &collectionId) const;
     QMultiMap<QString, QString> looseByGroup() const; // group name -> item ids
     static QString normalizeHost(const QString &s);

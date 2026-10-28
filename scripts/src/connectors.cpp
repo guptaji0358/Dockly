@@ -240,9 +240,33 @@ void Connectors::handle(QTcpSocket *sock, const QByteArray &method, const QByteA
             const QVariantMap m = v.toMap();
             cols.append(QJsonObject{{"id", m["id"].toString()}, {"name", m["name"].toString()}});
         }
+        const QJsonArray sites = QJsonValue::fromVariant(m_core->sites()->overview()).toArray();
         respond(sock, 200,
                 QJsonDocument(QJsonObject{{"ok", true}, {"app", "Dockly"}, {"version", m_core->version()},
-                                          {"collections", cols}}).toJson(QJsonDocument::Compact), origin);
+                                          {"collections", cols}, {"sites", sites}}).toJson(QJsonDocument::Compact), origin);
+        return;
+    }
+    if (method == "POST" && path == "/match") {
+        // which site/group a link would be filed into, and whether it is already saved
+        const QJsonObject o = QJsonDocument::fromJson(body).object();
+        QJsonArray results;
+        for (const QJsonValue &v : o.value("urls").toArray()) {
+            QJsonObject r = QJsonObject::fromVariantMap(m_core->sites()->match(v.toString()));
+            r["url"] = v.toString();
+            results.append(r);
+        }
+        respond(sock, 200, QJsonDocument(QJsonObject{{"ok", true}, {"results", results}}).toJson(QJsonDocument::Compact), origin);
+        return;
+    }
+    if (method == "POST" && path == "/site") {
+        // create a site rule from the extension, then file the links that already match it
+        const QJsonObject o = QJsonDocument::fromJson(body).object();
+        if (!m_core->sites()->saveSite(o.toVariantMap())) {
+            respond(sock, 400, R"({"ok":false,"error":"a site needs a name and a host"})", origin);
+            return;
+        }
+        const int organized = m_core->sites()->organizeAll();
+        respond(sock, 200, QJsonDocument(QJsonObject{{"ok", true}, {"organized", organized}}).toJson(QJsonDocument::Compact), origin);
         return;
     }
     if (method == "POST" && path == "/add") {
@@ -274,9 +298,21 @@ int Connectors::addFromJson(const QVariantMap &o)
     if (!isHttpUrl(url))
         return 0;
     const QString title = o.value("title").toString().trimmed().left(120);
+    // "group" files it into that group (created if needed); "noAuto" skips the site rules.
+    const QString group = o.value("group").toString().trimmed();
+    const bool manual = o.value("noAuto").toBool() || !group.isEmpty();
+    const bool prevAuto = m_core->autoFile();
+    if (manual)
+        m_core->setAutoFile(false);
     const QString id = m_core->addItem(LH::Web, title, url);
+    m_core->setAutoFile(prevAuto);
     if (id.isEmpty())
         return 0;
+    if (!group.isEmpty()) {
+        const QString gid = m_core->sites()->findOrCreateGroup(group);
+        if (!gid.isEmpty())
+            m_core->addToCollection(gid, {id});
+    }
     const QString col = o.value("collection").toString();
     if (!col.isEmpty() && m_core->exists(col))
         m_core->addToCollection(col, {id});

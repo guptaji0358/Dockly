@@ -16,3 +16,18 @@ button:hover { filter: brightness(1.15); }
 .iconrow { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
 #preview { width: 48px; height: 48px; border-radius: 10px; background: #101a30; }
 #color { width: 44px; height: 32px; padding: 0; margin: 0; }
+.site { color: #22d3ee; font-size: 11px; margin: -4px 0 10px; }
+#newSite { margin: -2px 0 10px; font-size: 11px; }
+#newSite a, #unpair { color: #22d3ee; }
+#siteForm { margin-top: 6px; }
+#tabs { max-height: 180px; overflow: auto; margin-top: 8px; border: 1px solid #28406a; border-radius: 10px; padding: 4px 8px; }
+#tabs label { display: flex; gap: 8px; align-items: center; margin: 0; padding: 4px 0; color: #e8f0ff; }
+#tabs input { width: auto; margin: 0; }
+#tabs span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+#tabs em { color: #3ddc97; font-style: normal; font-size: 10px; }
+details { margin-top: 12px; color: #8aa0c0; font-size: 12px; }
+summary { cursor: pointer; }
+#siteTree { max-height: 220px; overflow: auto; margin-top: 6px; }
+#siteTree details { margin: 4px 0 4px 10px; }
+#siteTree a { display: block; margin-left: 12px; padding: 2px 0; color: #e8f0ff; text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#siteTree a:hover { color: #22d3ee; }

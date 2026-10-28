@@ -21,7 +21,7 @@ The **Connectors** tab links Dockly with other apps:
 
 | Connector | What it does |
 |---|---|
-| Chrome / Edge / Brave | Browser extension (`connectors/browser`): add the current page, a link or all tabs as web shortcuts. Dockly listens on `127.0.0.1` only, requires a pairing code (secret token), accepts only `http(s)` links and answers cross-origin requests only for browser extensions. Load it via `chrome://extensions` > Developer mode > Load unpacked. |
+| Chrome / Edge / Brave | Browser extension (`connectors/browser`): add the current page, a link or all tabs as web shortcuts. Dockly listens on `127.0.0.1` only, requires a pairing code (secret token), accepts only `http(s)` links and answers cross-origin requests only for browser extensions. Load it via `chrome://extensions` > Developer mode > Load unpacked. The popup shows the site a page will be filed under (and "Already in Dockly"), lets you pick the group, make a new site from the current host, choose individual tabs, and browse your sites; the toolbar badge shows a check for saved pages and `+` for pages one of your sites covers. Shortcuts: `Alt+Shift+D` adds the page, `Alt+Shift+T` adds all tabs. |
 | Browser bookmarks | Pick bookmarks from Chrome, Edge or Brave and pin them. |
 | GitHub | Pin any user's public repositories (no sign-in). |
 | Visual Studio Code | Pin recent folders / workspaces; they open in VS Code (`vscode://`). |
