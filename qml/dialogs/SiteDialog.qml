@@ -198,7 +198,7 @@ AppDialog {
         }
         AppButton {
             text: dlg.shownImage === "" ? "Use own image..." : "Change image..."
-            onClicked: iconPrompt.openFor(nameField.text, hostsField.text.split(/[,;\s]+/)[0], dlg.color)
+            onClicked: iconPrompt.openFor()
         }
         AppButton {
             visible: dlg.shownImage !== ""

@@ -6,29 +6,22 @@ import QtQuick.Layouts
 // (with the site's logo attached as reference), then the file picker.
 AppDialog {
     id: dlg
-    property string siteName: ""
-    property string siteHost: ""
-    property string tone: ""
     signal picked(string path)
 
     title: "Make a site icon"
     width: Math.min(560, (Overlay.overlay ? Overlay.overlay.width : 560) - 40)
 
+    // One common prompt for every site: the attached logo is only converted, never redrawn.
     readonly property string prompt:
-        "Create a square app icon for \"" + (siteName.trim() || "my website") + "\""
-        + (siteHost !== "" ? " (" + siteHost + ")" : "") + ".\n"
-        + "Use the attached image as the reference for the logo or symbol and keep it recognisable.\n"
-        + "Requirements:\n"
-        + "- one simple, bold, centred symbol; flat or softly shaded, no tiny details\n"
-        + "- transparent background, PNG, 1024 x 1024 px, square canvas with even padding\n"
-        + "- no text, no watermark, no border, no mockup, no device frame\n"
-        + (tone !== "" ? "- main colour close to " + tone + "\n" : "")
-        + "- must stay clear and readable when shrunk to 48 x 48 px"
+        "Convert the attached logo into a clean app icon image.\n"
+        + "Keep the logo exactly as it is - same shape, colours and proportions. Do not redesign, rewrite or replace anything in it.\n"
+        + "Only prepare it for use as an icon:\n"
+        + "- remove the background so it is transparent\n"
+        + "- centre it on a square canvas with even padding\n"
+        + "- output a PNG, 1024 x 1024 px\n"
+        + "- no extra text, watermark, border, mockup or frame"
 
-    function openFor(name, host, colour) {
-        siteName = name
-        siteHost = host
-        tone = colour
+    function openFor() {
         copied.visible = false
         open()
     }
@@ -37,7 +30,7 @@ AppDialog {
         Layout.fillWidth: true
         wrapMode: Text.Wrap
         color: dlg.th.subtext
-        text: "1. Copy the prompt   2. Open ChatGPT, paste it and attach the site's logo (or a screenshot of it)   "
+        text: "1. Copy the prompt   2. Open ChatGPT, paste it and attach the site's logo (a screenshot works)   "
               + "3. Save the image ChatGPT makes   4. Choose that image here"
     }
 
