@@ -1,8 +1,11 @@
 #include "dockguard.h"
 
 #include <QCursor>
+#include <QLineF>
 #include <QGuiApplication>
 #include <QScreen>
+
+#include <cmath>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -12,13 +15,27 @@
 namespace {
 constexpr int kTickMs = 100;   // pointer polling: fast enough for the dwell to feel immediate
 constexpr int kFullEvery = 3;  // the (costlier) full-screen check runs on every 3rd tick while nothing is full-screen
-constexpr int kDwellMs = 400;  // how long the pointer must rest on the edge
-constexpr int kAwayMs = 500;   // how long it may stay off the dock before it hides again
+constexpr double kOpenScore = 300;    // "evidence" (ms of calm resting on the edge) needed to open
+constexpr double kSweepSpeed = 900;   // px/s: faster than this along the edge is a pass-by, not a visit
+constexpr double kBrowseSpeed = 250;  // px/s: between this and a sweep the pointer is working along the edge
+constexpr double kLeaveSpeed = 700;   // px/s: leaving the dock at this speed means "I'm done"
+constexpr int kAwayMs = 500;          // how long a hesitant pointer may stay off the dock before it hides
+constexpr int kLeaveMs = 150;         // ... and a pointer that is clearly heading away
+constexpr double kWall = 1.5;         // px from the screen boundary that counts as pushing against it
+
+double distanceTo(const QRectF &r, const QPointF &p)
+{
+    const double dx = qMax(qMax(r.left() - p.x(), 0.0), p.x() - r.right());
+    const double dy = qMax(qMax(r.top() - p.y(), 0.0), p.y() - r.bottom());
+    return std::hypot(dx, dy);
+}
 }
 
 DockGuard::DockGuard(QObject *parent)
     : QObject(parent)
 {
+    m_clock.start();
+    m_last = QCursor::pos();
     m_timer.setInterval(kTickMs);
     connect(&m_timer, &QTimer::timeout, this, &DockGuard::tick);
     m_timer.start();
@@ -75,54 +92,92 @@ void DockGuard::update(bool fullscreen, bool revealed)
         emit dockVisibleChanged();
 }
 
+// Pointer speed and heading, smoothed over a couple of ticks.
+void DockGuard::track(const QPointF &p)
+{
+    const qint64 now = m_clock.elapsed();
+    const double dt = qMax<qint64>(now - m_lastMs, 1) / 1000.0;
+    m_speed = m_speed * 0.5 + QLineF(m_last, p).length() / dt * 0.5;
+    const double d = distanceTo(m_dock, p);
+    m_approaching = d < m_lastDist - 1;
+    m_lastDist = d;
+    m_last = p;
+    m_lastMs = now;
+}
+
+// Pushing against the screen boundary the dock lives on (the pointer cannot go further).
+bool DockGuard::atWall(const QPointF &p) const
+{
+    const QScreen *s = QGuiApplication::screenAt(m_edge.center().toPoint());
+    if (!s)
+        return false;
+    const QRectF g = s->geometry();
+    const QPointF c = m_edge.center();
+    const double l = std::abs(c.x() - g.left()), r = std::abs(g.right() - c.x());
+    const double t = std::abs(c.y() - g.top()), b = std::abs(g.bottom() - c.y());
+    const double m = qMin(qMin(l, r), qMin(t, b));
+    if (m == l) return p.x() <= g.left() + kWall;
+    if (m == r) return p.x() >= g.right() - kWall;
+    if (m == t) return p.y() <= g.top() + kWall;
+    return p.y() >= g.bottom() - kWall;
+}
+
+// Does the pointer's behaviour on the edge say "I want the dock"? Every tick adds or removes evidence:
+//  - resting on the edge builds it steadily; pushing against the screen boundary builds it twice as fast;
+//  - working along the edge (slow scroll-bar or tab-strip use) builds it slowly;
+//  - sweeping past, or holding a mouse button (dragging a scroll bar or window), builds none and drains it;
+//  - leaving the edge drains it quickly rather than wiping it, so a jittery hand does not lose its progress.
+bool DockGuard::wantsOpen(const QPointF &p)
+{
+    if (!m_edge.contains(p) || QGuiApplication::mouseButtons() != Qt::NoButton) {
+        m_score = qMax(0.0, m_score - 2 * kTickMs);
+        return false;
+    }
+    double gain = kTickMs;
+    if (m_speed > kSweepSpeed)
+        gain = -kTickMs;
+    else if (m_speed > kBrowseSpeed)
+        gain = kTickMs / 3.0;
+    else if (atWall(p))
+        gain = 2.0 * kTickMs;
+    m_score = qMax(0.0, m_score + gain);
+    if (m_score < kOpenScore)
+        return false;
+    m_score = 0;
+    return true;
+}
+
 void DockGuard::tick()
 {
     applyClickThrough();
+    const QPointF p = QCursor::pos();
+    track(p);
+    const bool intent = wantsOpen(p);
     // while the dock is collapsed it is click-through, so the pointer resting on it is what opens it
-    if (m_clickThrough && !m_fullscreen) {
-        if (m_edge.contains(QPointF(QCursor::pos()))) {
-            if (!m_dwell.isValid())
-                m_dwell.start();
-            else if (m_dwell.elapsed() >= kDwellMs) {
-                m_dwell.invalidate();
-                emit edgeDwelled();
-            }
-        } else {
-            m_dwell.invalidate();
-        }
-    }
+    if (m_clickThrough && !m_fullscreen && intent)
+        emit edgeDwelled();
     if (!m_enabled)
         return;
     const bool full = (m_fullscreen || ++m_ticks % kFullEvery == 0) ? foregroundIsFullscreen() : m_fullscreen;
     bool revealed = m_revealed;
     if (full) {
-        const QPointF p = QCursor::pos();
         if (!revealed) {
-            // resting on the edge for a moment opens the dock; passing over it does nothing
-            if (m_edge.contains(p)) {
-                if (!m_dwell.isValid())
-                    m_dwell.start();
-                else if (m_dwell.elapsed() >= kDwellMs)
-                    revealed = true;
-            } else {
-                m_dwell.invalidate();
-            }
+            if (intent)
+                revealed = true;
             m_away.invalidate();
         } else {
-            // revealed: stay until the pointer has really left the dock (and the edge it came from)
-            if (m_dock.contains(p) || m_edge.contains(p)) {
+            // revealed: stay while the pointer is on the dock, or heading for it; go sooner when it clearly left
+            m_score = 0;
+            if (m_dock.contains(p) || m_edge.contains(p) || m_approaching) {
                 m_away.invalidate();
             } else {
                 if (!m_away.isValid())
                     m_away.start();
-                else if (m_away.elapsed() >= kAwayMs) {
+                else if (m_away.elapsed() >= (m_speed > kLeaveSpeed ? kLeaveMs : kAwayMs))
                     revealed = false;
-                    m_dwell.invalidate();
-                }
             }
         }
     } else {
-        m_dwell.invalidate();
         m_away.invalidate();
     }
     update(full, revealed);
@@ -182,7 +237,7 @@ void DockGuard::setClickThrough(bool on)
     if (m_clickThrough == on)
         return;
     m_clickThrough = on;
-    m_dwell.invalidate();
+    m_score = 0;
     applyClickThrough();
     emit clickThroughChanged();
 }

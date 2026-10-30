@@ -2,6 +2,7 @@
 
 #include <QElapsedTimer>
 #include <QObject>
+#include <QPointF>
 #include <QPointer>
 #include <QRectF>
 #include <QTimer>
@@ -10,8 +11,8 @@
 // Keeps the edge dock out of the way of heavy software, the way the macOS dock behaves:
 //  - while a full-screen app (game, video, presentation, F11 browser) is in front, the dock is gone
 //    completely - no edge line to block scroll bars or buttons;
-//  - pushing the pointer against the dock edge for a moment ("dwell") slides it over the app,
-//    and it goes away again once the pointer leaves it;
+//  - the pointer's behaviour on the edge (resting, pushing, sweeping past, dragging, heading away) decides
+//    whether the dock slides over the app and how soon it goes away again;
 //  - the dock window is lifted back above other top-most windows whenever the foreground app changes.
 class DockGuard : public QObject
 {
@@ -56,6 +57,9 @@ signals:
 
 private:
     void tick();
+    void track(const QPointF &p);
+    bool wantsOpen(const QPointF &p);
+    bool atWall(const QPointF &p) const;
     bool foregroundIsFullscreen();
     void liftWindow();
     void applyClickThrough();
@@ -69,7 +73,13 @@ private:
     bool m_fullscreen = false;
     bool m_revealed = false;
     QTimer m_timer;
-    QElapsedTimer m_dwell;     // how long the pointer has rested on the edge
+    QElapsedTimer m_clock;
+    QPointF m_last;            // pointer intent: where it was, how fast it moves, whether it nears the dock
+    qint64 m_lastMs = 0;
+    double m_speed = 0;
+    double m_lastDist = 0;
+    bool m_approaching = false;
+    double m_score = 0;        // accumulated evidence that the pointer wants the dock open
     QElapsedTimer m_away;      // how long the pointer has been off the open dock
     quintptr m_lastForeground = 0;
 };
