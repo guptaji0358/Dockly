@@ -113,11 +113,20 @@ Window {
     // never takes keyboard focus, so using the dock can't pull focus away from the program you are in
     flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
 
-    // where the pointer must rest to bring the dock back: a thin band along the whole edge
+    // where the pointer must rest to open the collapsed dock: exactly the visible line
     readonly property rect edgeZone: {
-        const t = 6
-        return vertical ? Qt.rect(edge === "right" ? area.x + area.width - t : area.x, area.y, t, area.height)
-                        : Qt.rect(area.x, edge === "bottom" ? area.y + area.height - t : area.y, area.width, t)
+        const px = area.x + (area.width - length) / 2
+        const py = area.y + (area.height - length) / 2
+        return vertical ? Qt.rect(edge === "right" ? area.x + area.width - handle : area.x, py, handle, length)
+                        : Qt.rect(px, edge === "bottom" ? area.y + area.height - handle : area.y, length, handle)
+    }
+    // The collapsed line is only a marker: every click and hover goes through it to the program below
+    // (browser tabs, Explorer tabs, scroll bars). Resting the pointer on it for a moment opens the dock.
+    readonly property bool collapsed: !shown && openness < 0.02 && !dockPinned
+    Binding { target: dockGuard; property: "clickThrough"; value: dock.collapsed }
+    Connections {
+        target: dockGuard
+        function onEdgeDwelled() { dock.reveal() }
     }
     // the dock fully open; while a flyout or menu is open the whole screen counts so it doesn't vanish under them
     readonly property rect dockZone: {

@@ -10,16 +10,16 @@
 #endif
 
 namespace {
-constexpr int kIdleMs = 300;   // polling while nothing is full-screen
-constexpr int kFullMs = 80;    // polling while full-screen, so the edge reacts quickly
-constexpr int kDwellMs = 350;  // how long the pointer must rest on the edge
+constexpr int kTickMs = 100;   // pointer polling: fast enough for the dwell to feel immediate
+constexpr int kFullEvery = 3;  // the (costlier) full-screen check runs on every 3rd tick while nothing is full-screen
+constexpr int kDwellMs = 400;  // how long the pointer must rest on the edge
 constexpr int kAwayMs = 500;   // how long it may stay off the dock before it hides again
 }
 
 DockGuard::DockGuard(QObject *parent)
     : QObject(parent)
 {
-    m_timer.setInterval(kIdleMs);
+    m_timer.setInterval(kTickMs);
     connect(&m_timer, &QTimer::timeout, this, &DockGuard::tick);
     m_timer.start();
 }
@@ -65,7 +65,6 @@ void DockGuard::update(bool fullscreen, bool revealed)
     const bool before = dockVisible();
     if (m_fullscreen != fullscreen) {
         m_fullscreen = fullscreen;
-        m_timer.setInterval(fullscreen ? kFullMs : kIdleMs);
         emit fullscreenChanged();
     }
     if (m_revealed != revealed) {
@@ -78,9 +77,23 @@ void DockGuard::update(bool fullscreen, bool revealed)
 
 void DockGuard::tick()
 {
+    applyClickThrough();
+    // while the dock is collapsed it is click-through, so the pointer resting on it is what opens it
+    if (m_clickThrough && !m_fullscreen) {
+        if (m_edge.contains(QPointF(QCursor::pos()))) {
+            if (!m_dwell.isValid())
+                m_dwell.start();
+            else if (m_dwell.elapsed() >= kDwellMs) {
+                m_dwell.invalidate();
+                emit edgeDwelled();
+            }
+        } else {
+            m_dwell.invalidate();
+        }
+    }
     if (!m_enabled)
         return;
-    const bool full = foregroundIsFullscreen();
+    const bool full = (m_fullscreen || ++m_ticks % kFullEvery == 0) ? foregroundIsFullscreen() : m_fullscreen;
     bool revealed = m_revealed;
     if (full) {
         const QPointF p = QCursor::pos();
@@ -161,6 +174,30 @@ bool DockGuard::foregroundIsFullscreen()
     return (style & WS_CAPTION) != WS_CAPTION;
 #else
     return false;
+#endif
+}
+
+void DockGuard::setClickThrough(bool on)
+{
+    if (m_clickThrough == on)
+        return;
+    m_clickThrough = on;
+    m_dwell.invalidate();
+    applyClickThrough();
+    emit clickThroughChanged();
+}
+
+// WS_EX_TRANSPARENT makes Windows route mouse input to whatever is beneath the window.
+void DockGuard::applyClickThrough()
+{
+#ifdef Q_OS_WIN
+    if (!m_window || !m_window->isVisible())
+        return;
+    const HWND h = reinterpret_cast<HWND>(m_window->winId());
+    const LONG_PTR ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
+    const LONG_PTR want = m_clickThrough ? (ex | WS_EX_TRANSPARENT | WS_EX_LAYERED) : (ex & ~LONG_PTR(WS_EX_TRANSPARENT));
+    if (want != ex)
+        SetWindowLongPtrW(h, GWL_EXSTYLE, want);
 #endif
 }
 
