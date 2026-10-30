@@ -228,9 +228,11 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
         hotkey.setSequence(core->settings()->boolean("dockEnabled") ? core->settings()->text("dockHotkey") : QString());
     };
     QObject::connect(&hotkey, &GlobalHotkey::triggered, dockWin, [dockWin] { QMetaObject::invokeMethod(dockWin, "toggle"); });
-    QObject::connect(core->settings(), &AppSettings::changed, &app, [applyHotkey](const QString &k) {
+    QObject::connect(core->settings(), &AppSettings::changed, &app, [applyHotkey, revealDock, core](const QString &k) {
         if (k == QLatin1String("dockHotkey") || k == QLatin1String("dockEnabled"))
             applyHotkey();
+        if (k == QLatin1String("dockEnabled") && core->settings()->boolean("dockEnabled"))
+            revealDock(); // switched ON: dock it right away
     });
     applyHotkey();
     QObject::connect(&tray, &TrayController::openMainRequested, win, [win](const QString &id) {
@@ -246,9 +248,7 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
             c->disconnectFromServer();
             c->deleteLater();
             if (core->settings()->boolean("dockEnabled"))
-                revealDock();
-            else
-                bringToFront(win);
+                revealDock(); // OFF: do nothing
         }
     });
 
@@ -261,6 +261,8 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
         });
     } else if (dockWanted && !diagnostics)
         ; // slim dock only; the tray icon or the dock's gear opens the full window
+    else if (!dockWanted && !diagnostics && tray.isActive())
+        ; // "Run it" is OFF: do nothing; the tray icon opens the full window
     else if (cli.isSet(minimized) && tray.isActive())
         ; // stay hidden; the tray icon brings the window back
     else if (cli.isSet(shot))

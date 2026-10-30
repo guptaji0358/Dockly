@@ -29,8 +29,8 @@ TrayController::TrayController(AppCore *core, QObject *parent)
 
     auto sync = [this] {
         // the dock has no window of its own to find again, so the tray icon must exist while it is on
-        const bool on = (m_core->settings()->boolean("minimizeToTray") || m_core->settings()->boolean("dockEnabled"))
-                        && QSystemTrayIcon::isSystemTrayAvailable();
+        // always present: with "Run it" OFF nothing else shows, so the tray icon is the way back in
+        const bool on = QSystemTrayIcon::isSystemTrayAvailable();
         m_icon->setVisible(on);
         emit activeChanged();
     };

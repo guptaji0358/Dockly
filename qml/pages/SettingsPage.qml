@@ -31,36 +31,54 @@ Item {
                 spacing: 14
 
                 SettingGroup {
-                    title: "Startup"
+                    title: "General"
                     SettingCheck { key: "startWithWindows"; text: "Start with Windows" }
                     SettingCheck { key: "minimizeToTray"; text: "Minimize to system tray" }
-                    SettingCheck { key: "dockEnabled"; text: "Open as a slim edge dock (the full window opens from the tray icon or the dock's gear)" }
                     SettingCombo {
-                        key: "dockMode"; label: "Dock mode"
-                        options: [{text: "Categories (hover one to see its apps)", value: "categories"},
-                                  {text: "Favourites (a strip of pinned icons)", value: "favorites"}]
+                        key: "defaultTab"; label: "Default tab"
+                        options: [{text: "Home", value: "home"}, {text: "Software", value: "software"},
+                                  {text: "Custom (Collections)", value: "custom"}]
                     }
                     SettingCombo {
-                        key: "dockEdge"; label: "Dock position"
+                        key: "defaultBrowser"; label: "Default browser"
+                        options: [{text: "System default", value: ""}].concat(core.browsers())
+                    }
+                    SettingCombo {
+                        key: "language"; label: "Language"
+                        options: [{text: "English", value: "English"}]
+                    }
+                }
+
+                SettingGroup {
+                    title: "Dock"
+                    SettingCheck { key: "dockEnabled"; text: "Dock Dockly to the screen edge on launch" }
+                    SettingCombo {
+                        key: "dockMode"; label: "Mode"
+                        options: [{text: "Categories", value: "categories"}, {text: "Favourites", value: "favorites"}]
+                    }
+                    SettingCombo {
+                        key: "dockEdge"; label: "Position"
                         options: [{text: "Right", value: "right"}, {text: "Left", value: "left"},
                                   {text: "Top", value: "top"}, {text: "Bottom", value: "bottom"}]
                     }
                     SettingCombo {
-                        key: "dockHotkey"; label: "Dock shortcut"
+                        key: "dockHotkey"; label: "Shortcut"
                         options: [{text: "Ctrl + Alt + D", value: "Ctrl+Alt+D"}, {text: "Ctrl + Alt + Space", value: "Ctrl+Alt+Space"},
                                   {text: "Ctrl + Shift + Space", value: "Ctrl+Shift+Space"}, {text: "Win + Shift + D", value: "Meta+Shift+D"},
                                   {text: "None", value: ""}]
                     }
                     SettingCombo {
-                        key: "dockOpacity"; label: "Dock background"
+                        key: "dockOpacity"; label: "Background"
                         options: [{text: "Transparent", value: 0}, {text: "Very light", value: 20}, {text: "Light", value: 40},
                                   {text: "Medium", value: 70}, {text: "Solid", value: 100}]
                     }
-                    SettingCheck { key: "dockAutoHide"; text: "Auto-hide the dock (slides away after launching; hover the screen edge to bring it back)" }
-                    SettingCombo {
-                        key: "defaultTab"; label: "Default tab on startup"
-                        options: [{text: "Home", value: "home"}, {text: "Software", value: "software"},
-                                  {text: "Custom (Collections)", value: "custom"}]
+                    SettingCheck { key: "dockAutoHide"; text: "Auto-hide after launching an app" }
+                    Text {
+                        text: "With the dock off, open the full window from the tray icon."
+                        color: page.th.subtext
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
                     }
                 }
 
@@ -103,31 +121,6 @@ Item {
                 }
 
                 SettingGroup {
-                    title: "Performance  (GPU)"
-                    SettingCombo {
-                        key: "gpuLevel"; label: "Effects level"
-                        options: [{text: "Low - flat, no effects", value: "low"},
-                                  {text: "Balanced - aurora, tilt, float", value: "balanced"},
-                                  {text: "High - aurora, stars, parallax", value: "high"}]
-                    }
-                    SettingCombo {
-                        key: "graphicsApi"; label: "Graphics backend"
-                        options: [{text: "OpenGL", value: "opengl"}, {text: "Direct3D 11", value: "d3d11"},
-                                  {text: "Software (no GPU)", value: "software"}]
-                    }
-                    Text {
-                        text: "Graphics backend applies after restarting Dockly. Software mode turns the shader background off."
-                        color: page.th.subtext
-                        font.pixelSize: 12
-                        wrapMode: Text.Wrap
-                        Layout.fillWidth: true
-                    }
-                    SettingCheck { key: "animations"; text: "Animations" }
-                    SettingCheck { key: "floatingTiles"; text: "Floating tiles (idle drift + tilt toward the pointer)" }
-                    SettingCheck { key: "pauseWhenInactive"; text: "Pause effects while Dockly is in the background" }
-                }
-
-                SettingGroup {
                     title: "Items"
                     SettingCheck { key: "recentEnabled"; text: "Recent items" }
                     RowLayout {
@@ -151,30 +144,32 @@ Item {
                 }
 
                 SettingGroup {
-                    title: "General"
+                    title: "Performance"
                     SettingCombo {
-                        key: "language"; label: "Language"
-                        options: [{text: "English", value: "English"}]
+                        key: "gpuLevel"; label: "Effects level"
+                        options: [{text: "Low", value: "low"},
+                                  {text: "Balanced", value: "balanced"},
+                                  {text: "High", value: "high"}]
                     }
-                }
-
-                SettingGroup {
-                    title: "Browser"
                     SettingCombo {
-                        key: "defaultBrowser"; label: "Default browser"
-                        options: [{text: "System default", value: ""}].concat(core.browsers())
+                        key: "graphicsApi"; label: "Graphics backend"
+                        options: [{text: "OpenGL", value: "opengl"}, {text: "Direct3D 11", value: "d3d11"},
+                                  {text: "Software (no GPU)", value: "software"}]
                     }
                     Text {
-                        text: "Website tiles open in this browser instead of the one set in Windows."
+                        text: "Graphics backend applies after a restart."
                         color: page.th.subtext
                         font.pixelSize: 12
                         wrapMode: Text.Wrap
                         Layout.fillWidth: true
                     }
+                    SettingCheck { key: "animations"; text: "Animations" }
+                    SettingCheck { key: "floatingTiles"; text: "Floating tiles" }
+                    SettingCheck { key: "pauseWhenInactive"; text: "Pause effects in the background" }
                 }
 
                 SettingGroup {
-                    title: "Data"
+                    title: "Data & About"
                     Flow {
                         Layout.fillWidth: true
                         spacing: 8
@@ -205,19 +200,10 @@ Item {
                             onClicked: page.host.ask("Reset settings", "Restore every setting to its default?",
                                                      ["Reset", "Cancel"], i => { if (i === 0) core.resetSettings() }, 0)
                         }
-                    }
-                }
-
-                SettingGroup {
-                    title: "About"
-                    Flow {
-                        Layout.fillWidth: true
-                        spacing: 8
                         AppButton { text: "About"; onClicked: page.host.ask("About Dockly", core.aboutText(), ["OK"]) }
                         AppButton { text: "Check for Updates"; onClicked: page.host.ask("Check for Updates", core.checkForUpdates(), ["OK"]) }
                     }
                 }
-                Item { Layout.preferredHeight: 8 }
             }
         }
     }
