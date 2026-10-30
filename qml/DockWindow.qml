@@ -106,8 +106,32 @@ Window {
     }
     readonly property real current: handle + (thickness - handle) * openness
 
-    visible: (core.settings.values.dockEnabled && dockAllowed) || dockPinned
-    flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
+    // Full-screen apps: the dock leaves the screen entirely (no edge line over a game's or editor's UI) and
+    // only slides back when the pointer rests on its edge. See DockGuard.
+    readonly property bool guarded: core.settings.values.dockHideFullscreen && !dockPinned
+    visible: (core.settings.values.dockEnabled && dockAllowed && (!guarded || dockGuard.dockVisible)) || dockPinned
+    // never takes keyboard focus, so using the dock can't pull focus away from the program you are in
+    flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus
+
+    // where the pointer must rest to bring the dock back: a thin band along the whole edge
+    readonly property rect edgeZone: {
+        const t = 6
+        return vertical ? Qt.rect(edge === "right" ? area.x + area.width - t : area.x, area.y, t, area.height)
+                        : Qt.rect(area.x, edge === "bottom" ? area.y + area.height - t : area.y, area.width, t)
+    }
+    // the dock fully open; while a flyout or menu is open the whole screen counts so it doesn't vanish under them
+    readonly property rect dockZone: {
+        if (flyCat >= 0 || menuOpen)
+            return area
+        const px = area.x + (area.width - length) / 2
+        const py = area.y + (area.height - length) / 2
+        return vertical ? Qt.rect(edge === "right" ? area.x + area.width - thickness : area.x, py, thickness, length)
+                        : Qt.rect(px, edge === "bottom" ? area.y + area.height - thickness : area.y, length, thickness)
+    }
+    Binding { target: dockGuard; property: "enabled"; value: dock.guarded }
+    Binding { target: dockGuard; property: "window"; value: dock }
+    Binding { target: dockGuard; property: "edgeZone"; value: dock.edgeZone }
+    Binding { target: dockGuard; property: "dockZone"; value: dock.dockZone }
     color: "transparent"
     title: "Dockly dock"
 

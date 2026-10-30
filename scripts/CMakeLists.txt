@@ -20,6 +20,7 @@ add_library(lhcore STATIC
     ${LH_INCLUDE}/itemmodel.h ${LH_SRC}/itemmodel.cpp
     ${LH_INCLUDE}/tray.h ${LH_SRC}/tray.cpp
     ${LH_INCLUDE}/hotkey.h ${LH_SRC}/hotkey.cpp
+    ${LH_INCLUDE}/dockguard.h ${LH_SRC}/dockguard.cpp
     ${LH_INCLUDE}/connectors.h ${LH_SRC}/connectors.cpp
     ${LH_INCLUDE}/sites.h ${LH_SRC}/sites.cpp
 )

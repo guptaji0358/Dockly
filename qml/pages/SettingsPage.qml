@@ -19,6 +19,40 @@ Item {
             font.weight: Font.DemiBold
         }
 
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 18
+
+        ColumnLayout {
+            Layout.preferredWidth: 170
+            Layout.alignment: Qt.AlignTop
+            spacing: 4
+            Repeater {
+                model: ["General", "Dock", "Appearance", "Items", "Performance", "Data & About"]
+                delegate: Rectangle {
+                    required property int index
+                    required property string modelData
+                    readonly property bool current: stack.currentIndex === index
+                    Layout.fillWidth: true
+                    implicitHeight: 38
+                    radius: 8
+                    color: current ? page.th.accent : (hover.hovered ? page.th.surface : "transparent")
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.left: parent.left
+                        anchors.leftMargin: 14
+                        text: parent.modelData
+                        color: parent.current ? "white" : page.th.text
+                        font.pixelSize: 14
+                        font.weight: parent.current ? Font.DemiBold : Font.Normal
+                    }
+                    HoverHandler { id: hover }
+                    TapHandler { onTapped: stack.currentIndex = parent.index }
+                }
+            }
+        }
+
         ScrollView {
             id: scroll
             Layout.fillWidth: true
@@ -26,9 +60,9 @@ Item {
             clip: true
             contentWidth: availableWidth
 
-            ColumnLayout {
+            StackLayout {
+                id: stack
                 width: scroll.availableWidth - 14
-                spacing: 14
 
                 SettingGroup {
                     title: "General"
@@ -73,6 +107,7 @@ Item {
                                   {text: "Medium", value: 70}, {text: "Solid", value: 100}]
                     }
                     SettingCheck { key: "dockAutoHide"; text: "Auto-hide after launching an app" }
+                    SettingCheck { key: "dockHideFullscreen"; text: "Hide in full-screen apps (rest the pointer on the edge to show)" }
                     Text {
                         text: "With the dock off, open the full window from the tray icon."
                         color: page.th.subtext
@@ -170,7 +205,7 @@ Item {
 
                 SettingGroup {
                     title: "Data & About"
-                    Flow {
+                    ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 8
                         AppButton {
@@ -205,6 +240,7 @@ Item {
                     }
                 }
             }
+        }
         }
     }
 }

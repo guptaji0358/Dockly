@@ -1,4 +1,5 @@
 #include "appcore.h"
+#include "dockguard.h"
 #include "iconimageprovider.h"
 #include "itemimageprovider.h"
 #include "hotkey.h"
@@ -199,6 +200,8 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     QObject::connect(primary, &QScreen::availableGeometryChanged, &engine, [&engine](const QRect &r) {
         engine.rootContext()->setContextProperty("workArea", QRectF(r));
     });
+    DockGuard dockGuard;
+    engine.rootContext()->setContextProperty("dockGuard", &dockGuard);
     engine.rootContext()->setContextProperty("dockAllowed", !cli.isSet(shot));
     engine.rootContext()->setContextProperty("dockPinned", cli.isSet(dockShot));
     engine.loadFromModule("DocklyUI", "Main");
