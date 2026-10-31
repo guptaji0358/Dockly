@@ -615,12 +615,12 @@ ApplicationWindow {
         }
         MenuItem {
             readonly property bool applies: win.ctx.category === LH.Collection
-            text: "Open at startup"
-            checkable: true
-            checked: core.settings.values.startupWorkspace === win.ctx.id
+            readonly property bool on: core.settings.values.startupWorkspace === win.ctx.id
+            // not checkable: a checkable item stops following the setting after its first click
+            text: on ? "✓  Open at startup" : "Open at startup"
             visible: applies
             height: applies ? implicitHeight : 0
-            onTriggered: core.settings.set("startupWorkspace", checked ? win.ctx.id : "")
+            onTriggered: core.settings.set("startupWorkspace", on ? "" : win.ctx.id)
         }
         MenuSeparator {}
         MenuItem {
