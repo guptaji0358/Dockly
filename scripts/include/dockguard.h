@@ -26,6 +26,8 @@ class DockGuard : public QObject
     // ms the pointer must stay untouched before `idle` turns true; 0 = never
     Q_PROPERTY(int idleAfter READ idleAfter WRITE setIdleAfter NOTIFY idleAfterChanged)
     Q_PROPERTY(bool idle READ idle NOTIFY idleChanged)
+    // 0..1: how far a hidden line should peek out because the pointer is approaching it
+    Q_PROPERTY(double proximity READ proximity NOTIFY proximityChanged)
     Q_PROPERTY(bool fullscreen READ fullscreen NOTIFY fullscreenChanged)
     Q_PROPERTY(bool revealed READ revealed NOTIFY revealedChanged)
     // true while the dock should be on screen: no full-screen app, or the pointer asked for it
@@ -46,6 +48,7 @@ public:
     int idleAfter() const { return m_idleAfter; }
     void setIdleAfter(int ms);
     bool idle() const { return m_idle; }
+    double proximity() const { return m_proximity; }
     bool fullscreen() const { return m_fullscreen; }
     bool revealed() const { return m_revealed; }
     bool dockVisible() const { return !m_fullscreen || m_revealed; }
@@ -59,6 +62,7 @@ signals:
     void edgeDwelled();
     void idleAfterChanged();
     void idleChanged();
+    void proximityChanged();
     void fullscreenChanged();
     void revealedChanged();
     void dockVisibleChanged();
@@ -93,6 +97,8 @@ private:
     quintptr m_lastForeground = 0;
     int m_idleAfter = 0;
     bool m_idle = false;
+    double m_proximity = 0;
     QPointF m_idlePos;         // where the pointer last was when it counted as "touched"
     qint64 m_touchedMs = 0;
+    qint64 m_farSince = -1;    // when the pointer left the line's area (-1 = it is there)
 };

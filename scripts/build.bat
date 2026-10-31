@@ -23,3 +23,16 @@ if errorlevel 1 (
 
 echo.
 echo BUILD OK
+
+rem Auto-launch: the deployed copy in .\dist, or the raw build output with "nodeploy".
+if /i "%~1"=="nodeploy" (
+    set "DOCKLY_EXE=build\Dockly.exe"
+) else (
+    set "DOCKLY_EXE=dist\Dockly.exe"
+)
+if exist "%DOCKLY_EXE%" (
+    echo Launching %DOCKLY_EXE%
+    start "" "%DOCKLY_EXE%"
+) else (
+    echo %DOCKLY_EXE% not found - not launching.
+)

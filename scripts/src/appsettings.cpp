@@ -36,11 +36,12 @@ QVariantMap AppSettings::defaults()
         {"language", "English"},
         {"dockEnabled", true},    // launch from a slim edge dock instead of opening the main window
         {"dockMode", "categories"}, // categories (hover a category for a grid of its apps) | favorites (a strip of pinned icons)
-        {"dockEdge", "right"},    // left | right | top | bottom
+        {"dockEdge", "right"},    // left | right | top
         {"dockHotkey", "Ctrl+Alt+D"}, // system-wide shortcut that opens the dock; empty = none
         {"dockAutoHide", true},   // slide away after launching / when the pointer leaves; hover the edge to bring it back
         {"dockHideFullscreen", true}, // get out of the way of full-screen apps; rest the pointer on the edge to bring it back
-        {"dockIdleHide", 10},    // seconds without touching the mouse or trackpad before the collapsed line hides; 0 = never
+        {"dockCollapseDelay", 100}, // ms the pointer may stay off the open dock before it collapses
+        {"dockIdleHide", 30},   // seconds (min 2) without touching the mouse or trackpad before the collapsed line hides; 0 = never
         {"dockOpacity", 40},    // dock background opacity in percent; 0 = fully see-through
         {"defaultBrowser", ""},  // empty = the system default; otherwise the browser's exe path
     };

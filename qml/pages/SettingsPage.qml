@@ -93,7 +93,7 @@ Item {
                     SettingCombo {
                         key: "dockEdge"; label: "Position"
                         options: [{text: "Right", value: "right"}, {text: "Left", value: "left"},
-                                  {text: "Top", value: "top"}, {text: "Bottom", value: "bottom"}]
+                                  {text: "Top", value: "top"}]
                     }
                     SettingCombo {
                         key: "dockHotkey"; label: "Shortcut"
@@ -107,9 +107,18 @@ Item {
                                   {text: "Medium", value: 70}, {text: "Solid", value: 100}]
                     }
                     SettingCombo {
+                        key: "dockCollapseDelay"; label: "Collapse delay"
+                        customMin: 300; customMax: 10000; customDefault: 1000; customSuffix: " ms"
+                        options: [{text: "Instant", value: 0}, {text: "Quick (0.1 s)", value: 100}, {text: "Normal (0.2 s)", value: 200},
+                                  {text: "Relaxed (0.4 s)", value: 400}, {text: "Slow (0.8 s)", value: 800},
+                                  {text: "Custom…", value: -1}]
+                    }
+                    SettingCombo {
                         key: "dockIdleHide"; label: "Hide the line when idle"
-                        options: [{text: "Never", value: 0}, {text: "After 5 seconds", value: 5}, {text: "After 10 seconds", value: 10},
-                                  {text: "After 30 seconds", value: 30}, {text: "After 1 minute", value: 60}]
+                        customMin: 2; customDefault: 120; customSuffix: " seconds"
+                        options: [{text: "Never", value: 0}, {text: "After 3 seconds", value: 3}, {text: "After 10 seconds", value: 10},
+                                  {text: "After 30 seconds", value: 30}, {text: "After 1 minute", value: 60},
+                                  {text: "After 5 minutes", value: 300}, {text: "Custom…", value: -1}]
                     }
                     SettingCheck { key: "dockAutoHide"; text: "Auto-hide after launching an app" }
                     SettingCheck { key: "dockHideFullscreen"; text: "Hide in full-screen apps (rest the pointer on the edge to show)" }

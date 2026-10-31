@@ -10,7 +10,7 @@ Window {
     id: dock
 
     readonly property var th: core.theme
-    readonly property string edge: core.settings.values.dockEdge
+    readonly property string edge: core.settings.values.dockEdge === "bottom" ? "right" : core.settings.values.dockEdge
     readonly property bool vertical: edge === "left" || edge === "right"
     readonly property bool autoHide: core.settings.values.dockAutoHide && !dockPinned
     readonly property rect area: workArea
@@ -139,9 +139,16 @@ Window {
     }
     // Idle pointer: the collapsed line hides itself (setting dockIdleHide, in seconds; 0 = never).
     readonly property bool lineIdle: dock.collapsed && dockGuard.idle
-    property real lineGone: lineIdle ? 1 : 0
-    Behavior on lineGone { NumberAnimation { duration: core.settings.values.animations ? (lineIdle ? 600 : 180) : 0; easing.type: Easing.InOutCubic } }
-    Binding { target: dockGuard; property: "idleAfter"; value: core.settings.values.dockIdleHide * 1000 }
+    // 1 = tucked into the edge; the line peeks out gradually as the pointer approaches, then springs back fully
+    property real lineGone: lineIdle ? 1 - dockGuard.proximity * 0.85 : 0
+    Behavior on lineGone {
+        NumberAnimation {
+            duration: core.settings.values.animations ? (!lineIdle ? 260 : dockGuard.proximity > 0 ? 160 : 650) : 0
+            easing.type: lineIdle && dockGuard.proximity <= 0 ? Easing.InOutCubic : Easing.OutBack
+            easing.overshoot: 1.4
+        }
+    }
+    Binding { target: dockGuard; property: "idleAfter"; value: core.settings.values.dockIdleHide > 0 ? Math.max(2, core.settings.values.dockIdleHide) * 1000 : 0 }
     Binding { target: dockGuard; property: "enabled"; value: dock.guarded }
     Binding { target: dockGuard; property: "window"; value: dock }
     Binding { target: dockGuard; property: "edgeZone"; value: dock.edgeZone }
@@ -158,6 +165,9 @@ Window {
        : edge === "top" ? area.y
        : area.y + (area.height - height) / 2
 
+    // how long the pointer may be off the open dock before it slides away (setting dockCollapseDelay, ms)
+    readonly property int collapseDelay: core.settings.values.dockCollapseDelay
+
     onAutoHideChanged: {
         if (!autoHide)
             shown = true
@@ -169,11 +179,11 @@ Window {
 
     Timer {
         id: hideTimer
-        interval: 700
+        interval: dock.collapseDelay
         onTriggered: {
             if (dock.autoHide && !hover.hovered && !dock.menuOpen && !drops.containsDrag && dock.flyCat < 0)
                 dock.shown = false
-            interval = 700
+            interval = dock.collapseDelay
         }
     }
 
@@ -190,7 +200,7 @@ Window {
                     hideTimer.stop()
                 } else {
                     tip.label = ""
-                    hideTimer.interval = 700
+                    hideTimer.interval = dock.collapseDelay
                     hideTimer.restart()
                     flyTimer.restart()
                 }
@@ -206,7 +216,7 @@ Window {
                 dock.shown = true
                 hideTimer.stop()
             }
-            onExited: { hideTimer.interval = 700; hideTimer.restart() }
+            onExited: { hideTimer.interval = dock.collapseDelay; hideTimer.restart() }
             onDropped: drop => {
                 const items = []
                 if (drop.hasUrls)
@@ -225,12 +235,21 @@ Window {
             anchors.fill: parent
             radius: 3
             color: dock.th.accent
-            opacity: 0.95 * (1 - dock.openness) * (1 - dock.lineGone)
+            opacity: 0.95 * (1 - dock.openness) * Math.min(1, Math.max(0, 1 - dock.lineGone))
             visible: opacity > 0.01
-            transform: Translate {
-                x: dock.lineGone * dock.handle * (dock.edge === "right" ? 1 : dock.edge === "left" ? -1 : 0)
-                y: dock.lineGone * dock.handle * (dock.edge === "bottom" ? 1 : dock.edge === "top" ? -1 : 0)
-            }
+            // slides into the edge and shrinks toward its middle; the reverse when the pointer comes near
+            transform: [
+                Scale {
+                    origin.x: width / 2
+                    origin.y: height / 2
+                    xScale: dock.vertical ? 1 : 1 - 0.5 * Math.min(1, dock.lineGone)
+                    yScale: dock.vertical ? 1 - 0.5 * Math.min(1, dock.lineGone) : 1
+                },
+                Translate {
+                    x: dock.lineGone * dock.handle * (dock.edge === "right" ? 1 : dock.edge === "left" ? -1 : 0)
+                    y: dock.lineGone * dock.handle * (dock.edge === "bottom" ? 1 : dock.edge === "top" ? -1 : 0)
+                }
+            ]
         }
 
         // the strip itself, pinned to the screen edge so it slides in and out with the window
@@ -477,7 +496,7 @@ Window {
         palette.highlight: dock.th.cardHover
         palette.highlightedText: dock.th.text
         palette.mid: dock.th.border
-        onVisibleChanged: if (!visible) { hideTimer.interval = 700; hideTimer.restart() }
+        onVisibleChanged: if (!visible) { hideTimer.interval = dock.collapseDelay; hideTimer.restart() }
     }
 
     DockMenu {
@@ -498,7 +517,7 @@ Window {
         Menu {
             title: "Position"
             Repeater {
-                model: [{t: "Right", v: "right"}, {t: "Left", v: "left"}, {t: "Top", v: "top"}, {t: "Bottom", v: "bottom"}]
+                model: [{t: "Right", v: "right"}, {t: "Left", v: "left"}, {t: "Top", v: "top"}]
                 MenuItem {
                     required property var modelData
                     text: modelData.t
