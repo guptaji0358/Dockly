@@ -106,6 +106,11 @@ Item {
                         options: [{text: "Transparent", value: 0}, {text: "Very light", value: 20}, {text: "Light", value: 40},
                                   {text: "Medium", value: 70}, {text: "Solid", value: 100}]
                     }
+                    SettingCombo {
+                        key: "dockIdleHide"; label: "Hide the line when idle"
+                        options: [{text: "Never", value: 0}, {text: "After 5 seconds", value: 5}, {text: "After 10 seconds", value: 10},
+                                  {text: "After 30 seconds", value: 30}, {text: "After 1 minute", value: 60}]
+                    }
                     SettingCheck { key: "dockAutoHide"; text: "Auto-hide after launching an app" }
                     SettingCheck { key: "dockHideFullscreen"; text: "Hide in full-screen apps (rest the pointer on the edge to show)" }
                     Text {

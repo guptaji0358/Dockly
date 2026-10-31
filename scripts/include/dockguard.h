@@ -23,6 +23,9 @@ class DockGuard : public QObject
     Q_PROPERTY(QRectF dockZone READ dockZone WRITE setDockZone NOTIFY zonesChanged)
     // while true the dock window lets every click and hover through to the program underneath
     Q_PROPERTY(bool clickThrough READ clickThrough WRITE setClickThrough NOTIFY clickThroughChanged)
+    // ms the pointer must stay untouched before `idle` turns true; 0 = never
+    Q_PROPERTY(int idleAfter READ idleAfter WRITE setIdleAfter NOTIFY idleAfterChanged)
+    Q_PROPERTY(bool idle READ idle NOTIFY idleChanged)
     Q_PROPERTY(bool fullscreen READ fullscreen NOTIFY fullscreenChanged)
     Q_PROPERTY(bool revealed READ revealed NOTIFY revealedChanged)
     // true while the dock should be on screen: no full-screen app, or the pointer asked for it
@@ -40,6 +43,9 @@ public:
     void setDockZone(const QRectF &r);
     bool clickThrough() const { return m_clickThrough; }
     void setClickThrough(bool on);
+    int idleAfter() const { return m_idleAfter; }
+    void setIdleAfter(int ms);
+    bool idle() const { return m_idle; }
     bool fullscreen() const { return m_fullscreen; }
     bool revealed() const { return m_revealed; }
     bool dockVisible() const { return !m_fullscreen || m_revealed; }
@@ -51,6 +57,8 @@ signals:
     void clickThroughChanged();
     // the pointer rested on the collapsed dock long enough: open it
     void edgeDwelled();
+    void idleAfterChanged();
+    void idleChanged();
     void fullscreenChanged();
     void revealedChanged();
     void dockVisibleChanged();
@@ -58,6 +66,7 @@ signals:
 private:
     void tick();
     void track(const QPointF &p);
+    void trackIdle(const QPointF &p);
     bool wantsOpen(const QPointF &p);
     bool atWall(const QPointF &p) const;
     bool foregroundIsFullscreen();
@@ -82,4 +91,8 @@ private:
     double m_score = 0;        // accumulated evidence that the pointer wants the dock open
     QElapsedTimer m_away;      // how long the pointer has been off the open dock
     quintptr m_lastForeground = 0;
+    int m_idleAfter = 0;
+    bool m_idle = false;
+    QPointF m_idlePos;         // where the pointer last was when it counted as "touched"
+    qint64 m_touchedMs = 0;
 };

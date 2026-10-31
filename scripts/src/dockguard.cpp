@@ -22,6 +22,7 @@ constexpr double kLeaveSpeed = 700;   // px/s: leaving the dock at this speed me
 constexpr int kAwayMs = 500;          // how long a hesitant pointer may stay off the dock before it hides
 constexpr int kLeaveMs = 150;         // ... and a pointer that is clearly heading away
 constexpr double kWall = 1.5;         // px from the screen boundary that counts as pushing against it
+constexpr double kTouchPx = 3;        // pointer movement that counts as touching the mouse or trackpad
 
 double distanceTo(const QRectF &r, const QPointF &p)
 {
@@ -36,6 +37,7 @@ DockGuard::DockGuard(QObject *parent)
 {
     m_clock.start();
     m_last = QCursor::pos();
+    m_idlePos = m_last;
     m_timer.setInterval(kTickMs);
     connect(&m_timer, &QTimer::timeout, this, &DockGuard::tick);
     m_timer.start();
@@ -90,6 +92,30 @@ void DockGuard::update(bool fullscreen, bool revealed)
     }
     if (before != dockVisible())
         emit dockVisibleChanged();
+}
+
+void DockGuard::setIdleAfter(int ms)
+{
+    ms = qMax(ms, 0);
+    if (m_idleAfter == ms)
+        return;
+    m_idleAfter = ms;
+    emit idleAfterChanged();
+}
+
+// Idle = the pointer has not moved (or been clicked) for idleAfter ms. Any touch ends it at once.
+void DockGuard::trackIdle(const QPointF &p)
+{
+    const qint64 now = m_clock.elapsed();
+    if (QLineF(m_idlePos, p).length() > kTouchPx || QGuiApplication::mouseButtons() != Qt::NoButton) {
+        m_idlePos = p;
+        m_touchedMs = now;
+    }
+    const bool idle = m_idleAfter > 0 && now - m_touchedMs >= m_idleAfter;
+    if (m_idle != idle) {
+        m_idle = idle;
+        emit idleChanged();
+    }
 }
 
 // Pointer speed and heading, smoothed over a couple of ticks.
@@ -152,6 +178,7 @@ void DockGuard::tick()
     applyClickThrough();
     const QPointF p = QCursor::pos();
     track(p);
+    trackIdle(p);
     const bool intent = wantsOpen(p);
     // while the dock is collapsed it is click-through, so the pointer resting on it is what opens it
     if (m_clickThrough && !m_fullscreen && intent)

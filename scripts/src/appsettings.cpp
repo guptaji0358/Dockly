@@ -40,7 +40,8 @@ QVariantMap AppSettings::defaults()
         {"dockHotkey", "Ctrl+Alt+D"}, // system-wide shortcut that opens the dock; empty = none
         {"dockAutoHide", true},   // slide away after launching / when the pointer leaves; hover the edge to bring it back
         {"dockHideFullscreen", true}, // get out of the way of full-screen apps; rest the pointer on the edge to bring it back
-        {"dockOpacity", 40},     // dock background opacity in percent; 0 = fully see-through
+        {"dockIdleHide", 10},    // seconds without touching the mouse or trackpad before the collapsed line hides; 0 = never
+        {"dockOpacity", 40},    // dock background opacity in percent; 0 = fully see-through
         {"defaultBrowser", ""},  // empty = the system default; otherwise the browser's exe path
     };
 }

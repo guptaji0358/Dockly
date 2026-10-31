@@ -137,6 +137,11 @@ Window {
         return vertical ? Qt.rect(edge === "right" ? area.x + area.width - thickness : area.x, py, thickness, length)
                         : Qt.rect(px, edge === "bottom" ? area.y + area.height - thickness : area.y, length, thickness)
     }
+    // Idle pointer: the collapsed line hides itself (setting dockIdleHide, in seconds; 0 = never).
+    readonly property bool lineIdle: dock.collapsed && dockGuard.idle
+    property real lineGone: lineIdle ? 1 : 0
+    Behavior on lineGone { NumberAnimation { duration: core.settings.values.animations ? (lineIdle ? 600 : 180) : 0; easing.type: Easing.InOutCubic } }
+    Binding { target: dockGuard; property: "idleAfter"; value: core.settings.values.dockIdleHide * 1000 }
     Binding { target: dockGuard; property: "enabled"; value: dock.guarded }
     Binding { target: dockGuard; property: "window"; value: dock }
     Binding { target: dockGuard; property: "edgeZone"; value: dock.edgeZone }
@@ -214,13 +219,18 @@ Window {
             }
         }
 
-        // collapsed: a thin line so you can see (and hit) the edge
+        // collapsed: a thin line so you can see (and hit) the edge; after a while without touching the
+        // mouse or trackpad it slips into the screen edge, and comes straight back when the pointer moves
         Rectangle {
             anchors.fill: parent
             radius: 3
             color: dock.th.accent
-            opacity: 0.95 * (1 - dock.openness)
+            opacity: 0.95 * (1 - dock.openness) * (1 - dock.lineGone)
             visible: opacity > 0.01
+            transform: Translate {
+                x: dock.lineGone * dock.handle * (dock.edge === "right" ? 1 : dock.edge === "left" ? -1 : 0)
+                y: dock.lineGone * dock.handle * (dock.edge === "bottom" ? 1 : dock.edge === "top" ? -1 : 0)
+            }
         }
 
         // the strip itself, pinned to the screen edge so it slides in and out with the window
