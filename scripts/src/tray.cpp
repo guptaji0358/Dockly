@@ -10,6 +10,7 @@ TrayController::TrayController(AppCore *core, QObject *parent)
     m_icon->setToolTip(QStringLiteral("Dockly"));
 
     auto *menu = new QMenu();
+    menu->addAction(QStringLiteral("Quick launcher"), m_core, &AppCore::showLauncher);
     menu->addAction(QStringLiteral("Show dock"), this, &TrayController::dockRequested);
     menu->addAction(QStringLiteral("Manage Dockly..."), this, &TrayController::showRequested);
     menu->addSeparator();

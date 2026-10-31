@@ -93,6 +93,7 @@ public:
     // Best matches first (name prefix, word prefix, name contains, path contains; favourites win ties).
     // An empty query lists recents, then favourites. Each row: {id, name, subtitle, category, categoryName, iconSource}.
     Q_INVOKABLE QVariantList quickSearch(const QString &query, int limit = 8) const;
+    Q_INVOKABLE void showLauncher() { emit launcherRequested(); } // for menus, buttons and the tray (no shortcut needed)
     Q_INVOKABLE QVariantList browsers() const; // installed browsers: [{text, value = exe path}]
 
     // --- drag & drop ------------------------------------------------------
@@ -146,6 +147,7 @@ signals:
     void scanningChanged();
     void catalogChanged();
     void selectionChanged();
+    void launcherRequested();
     void message(const QString &text);
 
 private:

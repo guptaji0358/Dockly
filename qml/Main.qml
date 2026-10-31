@@ -320,7 +320,8 @@ ApplicationWindow {
         Glass {
             id: searchBox
             anchors.centerIn: parent
-            width: Math.max(180, Math.min(560, parent.width - brand.width - tools.width - 70))
+            // centred, so keep the same room on both sides: the brand on the left and the tools on the right
+            width: Math.max(180, Math.min(560, parent.width - 2 * (Math.max(brand.width, tools.width) + 24)))
             height: 42
             radius: 21
             border.color: search.activeFocus ? win.th.accent : edge
@@ -595,7 +596,34 @@ ApplicationWindow {
 
     // ---- context menu -----------------------------------------------------
 
+    // menu rows drawn by hand so the text is always readable in every skin (the stock rows follow the OS palette)
+    component Entry: MenuItem {
+        id: e
+        implicitWidth: 250
+        implicitHeight: 36
+        leftPadding: 16
+        rightPadding: 16
+        contentItem: Text {
+            text: e.text
+            color: e.enabled ? win.th.text : win.th.subtext
+            font.pixelSize: 14
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+        background: Rectangle {
+            color: e.highlighted ? win.th.cardHover : "transparent"
+            radius: win.th.radius === 0 ? 0 : 6
+        }
+    }
+    component Sep: MenuSeparator {
+        contentItem: Rectangle {
+            implicitHeight: 1
+            color: win.th.border
+        }
+    }
+
     component Styled: Menu {
+        padding: 6
         background: Rectangle {
             color: win.th.surface
             border.color: win.th.border
@@ -605,15 +633,15 @@ ApplicationWindow {
 
     Styled {
         id: ctxMenu
-        MenuItem {
+        Entry {
             text: win.ctx.category === LH.Collection ? "Launch All" : "Open"
             onTriggered: win.launch(win.ctx.id)
         }
-        MenuItem {
+        Entry {
             text: win.ctx.favorite ? "Remove from Favorites" : "Add to Favorites"
             onTriggered: core.setFavorite(win.ctx.id, !win.ctx.favorite)
         }
-        MenuItem {
+        Entry {
             readonly property bool applies: win.ctx.category === LH.Collection
             readonly property bool on: core.settings.values.startupWorkspace === win.ctx.id
             // not checkable: a checkable item stops following the setting after its first click
@@ -622,38 +650,38 @@ ApplicationWindow {
             height: applies ? implicitHeight : 0
             onTriggered: core.settings.set("startupWorkspace", on ? "" : win.ctx.id)
         }
-        MenuSeparator {}
-        MenuItem {
+        Sep {}
+        Entry {
             readonly property bool applies: win.ctx.category === LH.Software
             text: "Run as Administrator"
             visible: applies
             height: applies ? implicitHeight : 0
             onTriggered: core.launchAsAdmin(win.ctx.id)
         }
-        MenuItem {
+        Entry {
             readonly property bool applies: win.ctx.category === LH.Software
             text: "Run with Arguments..."
             visible: applies
             height: applies ? implicitHeight : 0
             onTriggered: argsDialog.openFor(win.ctx.id, win.ctx.name)
         }
-        MenuItem {
+        Entry {
             readonly property bool applies: win.ctx.category !== LH.Collection
             text: win.ctx.category === LH.Web ? "Copy Link" : "Copy Path"
             visible: applies
             height: applies ? implicitHeight : 0
             onTriggered: core.copyPath(win.ctx.id)
         }
-        MenuSeparator {}
-        MenuItem {
+        Sep {}
+        Entry {
             text: win.ctx.category === LH.Collection ? "Rename..." : "Edit..."
             onTriggered: win.edit(win.ctx.id)
         }
-        MenuItem {
+        Entry {
             text: "Change Icon..."
             onTriggered: win.edit(win.ctx.id)
         }
-        MenuItem {
+        Entry {
             readonly property bool applies: win.ctx.status !== 0 && win.ctx.category !== LH.Web
                                             && win.ctx.category !== LH.Collection
             text: "Locate Again..."
@@ -665,7 +693,7 @@ ApplicationWindow {
                     core.updateItem(win.ctx.id, win.ctx.name, f[0])
             }
         }
-        MenuItem {
+        Entry {
             readonly property bool applies: win.ctx.category !== LH.Web && win.ctx.category !== LH.Collection
             text: "Show in Folder"
             visible: applies
@@ -678,7 +706,7 @@ ApplicationWindow {
             enabled: win.ctx.category !== LH.Collection
             Instantiator {
                 model: win.ctxCollections
-                delegate: MenuItem {
+                delegate: Entry {
                     required property var modelData
                     text: modelData.name
                     onTriggered: core.addToCollection(modelData.id, [win.ctx.id])
@@ -686,7 +714,7 @@ ApplicationWindow {
                 onObjectAdded: (index, object) => colMenu.insertItem(index, object)
                 onObjectRemoved: (index, object) => colMenu.removeItem(object)
             }
-            MenuItem {
+            Entry {
                 text: "New Collection..."
                 onTriggered: {
                     win.pendingAddItem = win.ctx.id
@@ -694,15 +722,15 @@ ApplicationWindow {
                 }
             }
         }
-        MenuItem {
+        Entry {
             readonly property bool applies: win.ctxCollection !== ""
             text: "Remove from this Collection"
             visible: applies
             height: applies ? implicitHeight : 0
             onTriggered: core.removeFromCollection(win.ctxCollection, win.ctx.id)
         }
-        MenuSeparator {}
-        MenuItem {
+        Sep {}
+        Entry {
             text: "Delete"
             onTriggered: win.remove(win.ctx.id)
         }

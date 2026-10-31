@@ -193,6 +193,7 @@ Item {
         y: root.grid ? 14 : (root.height - height) / 2
         Repeater {
             model: [
+                {icon: "open", kind: "launch"},
                 {icon: "edit", kind: "edit"},
                 {icon: root.favorite ? "star-fill" : "star", kind: "fav"},
                 {icon: "trash", kind: "del"}
@@ -200,7 +201,9 @@ Item {
             delegate: Rectangle {
                 id: btn
                 required property var modelData
-                readonly property bool shown: root.hovered || (modelData.kind === "fav" && root.favorite)
+                // "launch" is only for collections: it opens everything inside
+                readonly property bool shown: modelData.kind === "launch" ? root.hovered && root.category === LH.Collection
+                                                                          : root.hovered || (modelData.kind === "fav" && root.favorite)
                 width: 28
                 height: 28
                 visible: shown
@@ -221,7 +224,9 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        if (btn.modelData.kind === "edit")
+                        if (btn.modelData.kind === "launch")
+                            root.opened()
+                        else if (btn.modelData.kind === "edit")
                             root.editRequested()
                         else if (btn.modelData.kind === "fav")
                             root.favoriteRequested()
@@ -231,7 +236,7 @@ Item {
                 }
                 ToolTip.visible: btnMouse.containsMouse
                 ToolTip.delay: 400
-                ToolTip.text: modelData.kind === "edit" ? "Edit" : (modelData.kind === "fav" ? "Favorite" : "Delete")
+                ToolTip.text: modelData.kind === "launch" ? "Launch All" : (modelData.kind === "edit" ? "Edit" : (modelData.kind === "fav" ? "Favorite" : "Delete"))
             }
         }
     }

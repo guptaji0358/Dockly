@@ -536,6 +536,8 @@ Window {
 
     DockMenu {
         id: dockMenu
+        MenuItem { text: "Quick launcher (search)"; onTriggered: core.showLauncher() }
+        MenuSeparator {}
         Menu {
             title: "Position"
             Repeater {

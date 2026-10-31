@@ -256,9 +256,12 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     };
     GlobalHotkey launcherHotkey(0x514C); // "QL"
     auto applyLauncherHotkey = [&launcherHotkey, core] {
-        launcherHotkey.setSequence(core->settings()->boolean("launcherEnabled") ? core->settings()->text("launcherHotkey") : QString());
+        const QString seq = core->settings()->boolean("launcherEnabled") ? core->settings()->text("launcherHotkey") : QString();
+        if (!launcherHotkey.setSequence(seq))
+            core->message(QStringLiteral("The quick launcher shortcut %1 is taken by another program. Change it in Settings.").arg(seq));
     };
     QObject::connect(&launcherHotkey, &GlobalHotkey::triggered, launcherWin, showLauncher);
+    QObject::connect(core, &AppCore::launcherRequested, launcherWin, showLauncher);
     QObject::connect(core->settings(), &AppSettings::changed, &app, [applyLauncherHotkey](const QString &k) {
         if (k == QLatin1String("launcherHotkey") || k == QLatin1String("launcherEnabled"))
             applyLauncherHotkey();
