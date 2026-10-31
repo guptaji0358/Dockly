@@ -48,7 +48,11 @@ QVariantMap AppSettings::defaults()
         {"dockHideFullscreen", true}, // get out of the way of full-screen apps; rest the pointer on the edge to bring it back
         {"dockCollapseDelay", 100}, // ms the pointer may stay off the open dock before it collapses
         {"dockIdleHide", 30},   // seconds (min 2) without touching the mouse or trackpad before the collapsed line hides; 0 = never
-        {"dockOpacity", 40},    // dock background opacity in percent; 0 = fully see-through
+        {"dockCalmApps", "blender.exe, filmora.exe, wondershare filmora.exe, premiere pro.exe, afterfx.exe, resolve.exe, "
+                         "photoshop.exe, illustrator.exe, capcut.exe, unity.exe, unrealeditor.exe, maya.exe, 3dsmax.exe, "
+                         "chrome.exe, msedge.exe, firefox.exe, brave.exe, opera.exe, vivaldi.exe, arc.exe"},
+                                  // maximised programs where the dock stays away and needs a longer rest on the edge; comma-separated exe names
+        {"dockOpacity", 40},   // dock background opacity in percent; 0 = fully see-through
         {"defaultBrowser", ""},  // empty = the system default; otherwise the browser's exe path
     };
 }

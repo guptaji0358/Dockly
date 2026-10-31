@@ -5,6 +5,7 @@
 #include <QPointF>
 #include <QPointer>
 #include <QRectF>
+#include <QStringList>
 #include <QTimer>
 #include <QWindow>
 
@@ -28,6 +29,9 @@ class DockGuard : public QObject
     Q_PROPERTY(bool idle READ idle NOTIFY idleChanged)
     // 0..1: how far a hidden line should peek out because the pointer is approaching it
     Q_PROPERTY(double proximity READ proximity NOTIFY proximityChanged)
+    // program names (e.g. "blender.exe") that get the calm treatment when maximised: the dock stays away
+    // and needs a longer, deliberate rest on the edge, since their timelines and panels sit at the screen edge
+    Q_PROPERTY(QStringList calmApps READ calmApps WRITE setCalmApps NOTIFY calmAppsChanged)
     Q_PROPERTY(bool fullscreen READ fullscreen NOTIFY fullscreenChanged)
     Q_PROPERTY(bool revealed READ revealed NOTIFY revealedChanged)
     // true while the dock should be on screen: no full-screen app, or the pointer asked for it
@@ -49,6 +53,8 @@ public:
     void setIdleAfter(int ms);
     bool idle() const { return m_idle; }
     double proximity() const { return m_proximity; }
+    QStringList calmApps() const { return m_calmApps; }
+    void setCalmApps(const QStringList &names);
     bool fullscreen() const { return m_fullscreen; }
     bool revealed() const { return m_revealed; }
     bool dockVisible() const { return !m_fullscreen || m_revealed; }
@@ -63,6 +69,7 @@ signals:
     void idleAfterChanged();
     void idleChanged();
     void proximityChanged();
+    void calmAppsChanged();
     void fullscreenChanged();
     void revealedChanged();
     void dockVisibleChanged();
@@ -74,6 +81,7 @@ private:
     bool wantsOpen(const QPointF &p);
     bool atWall(const QPointF &p) const;
     bool foregroundIsFullscreen();
+    bool isCalmApp(quintptr hwnd) const;
     void liftWindow();
     void applyClickThrough();
     void update(bool fullscreen, bool revealed);
@@ -83,6 +91,8 @@ private:
     QRectF m_edge, m_dock;
     bool m_clickThrough = false;
     int m_ticks = 0;
+    QStringList m_calmApps;
+    bool m_calm = false;       // the app in front is one of the calm apps
     bool m_fullscreen = false;
     bool m_revealed = false;
     QTimer m_timer;

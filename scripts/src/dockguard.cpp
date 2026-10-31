@@ -16,6 +16,7 @@ namespace {
 constexpr int kTickMs = 100;   // pointer polling: fast enough for the dwell to feel immediate
 constexpr int kFullEvery = 3;  // the (costlier) full-screen check runs on every 3rd tick while nothing is full-screen
 constexpr double kOpenScore = 300;    // "evidence" (ms of calm resting on the edge) needed to open
+constexpr double kCalmOpenScore = 700; // calm apps (Blender, Filmora...): a longer, deliberate rest before the dock appears
 constexpr double kSweepSpeed = 900;   // px/s: faster than this along the edge is a pass-by, not a visit
 constexpr double kBrowseSpeed = 250;  // px/s: between this and a sweep the pointer is working along the edge
 constexpr double kLeaveSpeed = 700;   // px/s: leaving the dock at this speed means "I'm done"
@@ -51,6 +52,11 @@ double distanceTo(const QRectF &r, const QPointF &p)
 DockGuard::DockGuard(QObject *parent)
     : QObject(parent)
 {
+    // editors and creative suites whose timelines, tool shelves and tab strips live on the screen edge
+    m_calmApps = {"blender.exe", "filmora.exe", "wondershare filmora.exe", "premiere pro.exe",
+                  "afterfx.exe", "resolve.exe", "photoshop.exe", "illustrator.exe", "capcut.exe",
+                  "ableton live 12 suite.exe", "unity.exe", "unrealeditor.exe", "maya.exe", "3dsmax.exe",
+                  "chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe", "vivaldi.exe", "arc.exe"};
     m_clock.start();
     m_last = QCursor::pos();
     m_idlePos = m_last;
@@ -108,6 +114,40 @@ void DockGuard::update(bool fullscreen, bool revealed)
     }
     if (before != dockVisible())
         emit dockVisibleChanged();
+}
+
+void DockGuard::setCalmApps(const QStringList &names)
+{
+    QStringList lower;
+    for (const QString &n : names)
+        lower << n.trimmed().toLower();
+    if (m_calmApps == lower)
+        return;
+    m_calmApps = lower;
+    emit calmAppsChanged();
+}
+
+// Is the window a program from the calm list? Matches the executable's file name, case-insensitively.
+bool DockGuard::isCalmApp(quintptr hwnd) const
+{
+#ifdef Q_OS_WIN
+    DWORD pid = 0;
+    GetWindowThreadProcessId(reinterpret_cast<HWND>(hwnd), &pid);
+    const HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!h)
+        return false;
+    wchar_t buf[MAX_PATH] = {};
+    DWORD len = MAX_PATH;
+    const bool ok = QueryFullProcessImageNameW(h, 0, buf, &len);
+    CloseHandle(h);
+    if (!ok)
+        return false;
+    const QString exe = QString::fromWCharArray(buf, int(len)).section(QLatin1Char('\\'), -1).toLower();
+    return m_calmApps.contains(exe);
+#else
+    Q_UNUSED(hwnd)
+    return false;
+#endif
 }
 
 void DockGuard::setIdleAfter(int ms)
@@ -203,7 +243,7 @@ bool DockGuard::wantsOpen(const QPointF &p)
     else if (atWall(p))
         gain = 2.0 * kTickMs;
     m_score = qMax(0.0, m_score + gain);
-    if (m_score < kOpenScore)
+    if (m_score < (m_calm ? kCalmOpenScore : kOpenScore))
         return false;
     m_score = 0;
     return true;
@@ -256,6 +296,7 @@ void DockGuard::tick()
 bool DockGuard::foregroundIsFullscreen()
 {
 #ifdef Q_OS_WIN
+    m_calm = false;
     const HWND fg = GetForegroundWindow();
     if (!fg)
         return false;
@@ -292,6 +333,11 @@ bool DockGuard::foregroundIsFullscreen()
                         && r.right >= mi.rcMonitor.right && r.bottom >= mi.rcMonitor.bottom;
     if (!covers)
         return false;
+    // a maximised calm app (title bar or not) is treated like full screen: no edge line over its panels
+    if (isCalmApp(reinterpret_cast<quintptr>(fg))) {
+        m_calm = true;
+        return true;
+    }
     // an ordinary maximised window (with a title bar) is not full screen, even with an auto-hidden taskbar
     const LONG style = GetWindowLongW(fg, GWL_STYLE);
     return (style & WS_CAPTION) != WS_CAPTION;

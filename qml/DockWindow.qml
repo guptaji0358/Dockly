@@ -149,6 +149,7 @@ Window {
         }
     }
     Binding { target: dockGuard; property: "idleAfter"; value: core.settings.values.dockIdleHide > 0 ? Math.max(2, core.settings.values.dockIdleHide) * 1000 : 0 }
+    Binding { target: dockGuard; property: "calmApps"; value: String(core.settings.values.dockCalmApps).split(",") }
     Binding { target: dockGuard; property: "enabled"; value: dock.guarded }
     Binding { target: dockGuard; property: "window"; value: dock }
     Binding { target: dockGuard; property: "edgeZone"; value: dock.edgeZone }

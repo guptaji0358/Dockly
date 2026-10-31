@@ -130,6 +130,27 @@ Item {
                     SettingCheck { key: "dockAutoHide"; text: "Auto-hide after launching an app" }
                     SettingCheck { key: "dockHideFullscreen"; text: "Hide in full-screen apps (rest the pointer on the edge to show)" }
                     Text {
+                        text: "Calm apps: maximised programs (editors, creative suites) where the dock stays hidden and needs a longer rest on the edge. Comma-separated program names."
+                        color: page.th.subtext
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                    HudField {
+                        id: calmField
+                        Layout.fillWidth: true
+                        text: core.settings.values.dockCalmApps
+                        placeholderText: "blender.exe, filmora.exe"
+                        onEditingFinished: core.settings.set("dockCalmApps", text)
+                        Connections {
+                            target: core.settings
+                            function onValuesChanged() {
+                                if (!calmField.activeFocus)
+                                    calmField.text = core.settings.values.dockCalmApps
+                            }
+                        }
+                    }
+                    Text {
                         text: "With the dock off, open the full window from the tray icon."
                         color: page.th.subtext
                         font.pixelSize: 12
