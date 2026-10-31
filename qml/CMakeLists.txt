@@ -5,6 +5,7 @@ qt_add_library(DocklyApp SHARED
     ${LH_MAIN}/app_main.cpp
     ${LH_INCLUDE}/itemimageprovider.h ${LH_SRC}/itemimageprovider.cpp
     ${LH_INCLUDE}/iconimageprovider.h ${LH_SRC}/iconimageprovider.cpp
+    ${LH_INCLUDE}/screenimageprovider.h ${LH_SRC}/screenimageprovider.cpp
 )
 
 set_source_files_properties(components/Fx.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)

@@ -3,6 +3,7 @@
 #include "iconimageprovider.h"
 #include "itemimageprovider.h"
 #include "hotkey.h"
+#include "screenimageprovider.h"
 #include "itemmodel.h"
 #include "tray.h"
 
@@ -193,6 +194,7 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     engine.addImageProvider("item", new ItemImageProvider);
     engine.addImageProvider("icon", new IconImageProvider);
+    engine.addImageProvider("screen", new ScreenImageProvider);
     engine.rootContext()->setContextProperty("core", core);
     engine.rootContext()->setContextProperty("tray", &tray);
     engine.rootContext()->setContextProperty("startRing", cli.isSet(ring));
@@ -203,6 +205,7 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     // the dock lives on the primary screen, inside the area the taskbar leaves free
     QScreen *primary = QGuiApplication::primaryScreen();
     engine.rootContext()->setContextProperty("workArea", QRectF(primary->availableGeometry()));
+    engine.rootContext()->setContextProperty("screenRect", QRectF(primary->geometry()));
     QObject::connect(primary, &QScreen::availableGeometryChanged, &engine, [&engine](const QRect &r) {
         engine.rootContext()->setContextProperty("workArea", QRectF(r));
     });

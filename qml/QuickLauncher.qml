@@ -15,6 +15,7 @@ Window {
     property int current: 0
     property bool armed: false // set once the window really has focus, so losing it later closes the box
 
+    readonly property bool expanded: field.text !== ""
     readonly property rect area: workArea
 
     flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
@@ -23,8 +24,25 @@ Window {
     visible: false
     width: 640
     height: panel.height
-    x: area.x + (area.width - width) / 2
-    y: area.y + area.height * 0.2
+    // where the box opens: the spot the user dragged it to (fractions of the work area), else top centre
+    readonly property var savedPos: String(core.settings.values.launcherPos).split(",").map(Number)
+    readonly property bool hasPos: savedPos.length === 2 && !isNaN(savedPos[0]) && !isNaN(savedPos[1])
+    readonly property real fx: hasPos ? savedPos[0] : 0.5
+    readonly property real fy: hasPos ? savedPos[1] : 0.2
+    x: Math.max(area.x, Math.min(area.x + area.width * fx - width / 2, area.x + area.width - width))
+    y: Math.max(area.y, Math.min(area.y + area.height * fy, area.y + area.height - height))
+
+    // drag-to-place: while the box is dragged it is swapped for a ghost over a snapshot of the desktop
+    property bool placing: false
+    property point pressAt // cursor (screen) when the drag began
+    property point startAt // box top-left (screen) when the drag began
+    property real ghostX: 0
+    property real ghostY: 0
+    property bool snapped: false
+    property url ghostSrc
+    property var ghostGrab
+    property string shotSrc
+    property int shotN: 0
 
     function toggle() {
         if (visible)
@@ -38,6 +56,38 @@ Window {
         armed = false
         show()
         raise()
+        requestActivate()
+        field.forceActiveFocus()
+    }
+    function dragMove(g) {
+        const cx = area.x + (area.width - width) / 2
+        let nx = startAt.x + g.x - pressAt.x
+        const ny = startAt.y + g.y - pressAt.y
+        snapped = Math.abs(nx - cx) < 14 // magnet to the horizontal centre
+        if (snapped)
+            nx = cx
+        ghostX = Math.max(area.x, Math.min(nx, area.x + area.width - width))
+        ghostY = Math.max(area.y, Math.min(ny, area.y + area.height - height))
+    }
+    function beginPlacing(g) {
+        placing = true
+        shotSrc = ""
+        ghostSrc = ""
+        panel.grabToImage(r => { ghostGrab = r; ghostSrc = r.url })
+        opacity = 0 // keeps receiving the held mouse, but is out of the snapshot
+        shotTimer.restart()
+        dragMove(g)
+    }
+    function endPlacing(commit) {
+        shotTimer.stop()
+        placer.hide()
+        placing = false
+        opacity = 1
+        if (commit) {
+            const px = (ghostX + width / 2 - area.x) / area.width
+            const py = (ghostY - area.y) / area.height
+            core.settings.set("launcherPos", px.toFixed(4) + "," + py.toFixed(4))
+        }
         requestActivate()
         field.forceActiveFocus()
     }
@@ -57,10 +107,103 @@ Window {
     onActiveChanged: {
         if (active)
             armed = true
-        else if (armed && visible)
+        else if (armed && visible && !placing)
             hide()
     }
-    onVisibleChanged: if (!visible) armed = false
+    onVisibleChanged: if (!visible) {
+        armed = false
+        if (placing)
+            endPlacing(false)
+    }
+
+    Timer {
+        id: shotTimer
+        interval: 100 // let the box fade out of the compositor before the desktop is photographed
+        onTriggered: {
+            ql.shotN++
+            ql.shotSrc = "image://screen/" + ql.shotN
+            placer.show()
+        }
+    }
+
+    // press-and-drag on any bare part of the bar or hint moves the box; double-click puts it back top-centre
+    component DragZone: MouseArea {
+        cursorShape: ql.placing ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+        acceptedButtons: Qt.LeftButton
+        property point downAt
+        function globalAt(m) { return mapToGlobal(m.x, m.y) }
+        onPressed: m => {
+            downAt = globalAt(m)
+            ql.pressAt = downAt
+            ql.startAt = Qt.point(ql.x, ql.y)
+        }
+        onPositionChanged: m => {
+            if (!pressed)
+                return
+            const g = globalAt(m)
+            if (ql.placing)
+                ql.dragMove(g)
+            else if (Math.abs(g.x - downAt.x) + Math.abs(g.y - downAt.y) > 8)
+                ql.beginPlacing(g)
+        }
+        onReleased: if (ql.placing) ql.endPlacing(true)
+        onCanceled: if (ql.placing) ql.endPlacing(false)
+        onDoubleClicked: core.settings.set("launcherPos", "")
+    }
+
+    // full-screen stand-in shown while dragging: the real desktop, dimmed, with the box riding on top
+    Window {
+        id: placer
+        flags: Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowTransparentForInput | Qt.WindowDoesNotAcceptFocus
+        color: "black"
+        visible: false
+        x: screenRect.x
+        y: screenRect.y
+        width: screenRect.width
+        height: screenRect.height
+
+        Image {
+            anchors.fill: parent
+            source: ql.shotSrc
+            cache: false
+            fillMode: Image.Stretch
+        }
+        Rectangle {
+            anchors.fill: parent
+            color: Qt.rgba(0, 0, 0, 0.35)
+        }
+        // vertical guide that appears when the box magnets to the centre
+        Rectangle {
+            visible: ql.snapped
+            x: ql.area.x - screenRect.x + ql.area.width / 2
+            width: 1
+            height: parent.height
+            color: Qt.alpha(ql.th.accent, 0.8)
+        }
+        Rectangle {
+            x: ql.ghostX - screenRect.x
+            y: ql.ghostY - screenRect.y
+            width: ql.width
+            height: ql.height
+            radius: ql.th.radius === 0 ? 0 : 18
+            color: Qt.alpha(ql.th.surface, 0.97)
+            border.width: 2
+            border.color: ql.th.accent
+            Image {
+                anchors.fill: parent
+                source: ql.ghostSrc
+                fillMode: Image.Stretch
+            }
+        }
+        Text {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 48
+            text: "Release to open the search box here   \u00b7   Esc to cancel"
+            color: "white"
+            font.pixelSize: 15
+        }
+    }
 
     Connections {
         target: core
@@ -71,7 +214,8 @@ Window {
     Rectangle {
         id: panel
         width: parent.width
-        height: bar.height + (list.count > 0 || field.text !== "" ? list.height + hint.height + 18 : 0)
+        // just the input until something is typed, then grows to fit the results
+        height: bar.height + (ql.expanded ? list.height + hint.height + 18 : 0)
         radius: th.radius === 0 ? 0 : 18
         color: Qt.alpha(ql.th.surface, 0.97)
         border.width: 1
@@ -90,11 +234,16 @@ Window {
                 size: 22
                 color: ql.th.accent
             }
+            DragZone { anchors.fill: parent }
             TextField {
                 id: field
                 anchors.fill: parent
-                leftPadding: 60
-                rightPadding: 22
+                anchors.leftMargin: 52
+                anchors.rightMargin: 12
+                anchors.topMargin: 9
+                anchors.bottomMargin: 9
+                leftPadding: 8
+                rightPadding: 10
                 placeholderText: "Open an app, file, site or workspace…"
                 placeholderTextColor: ql.th.subtext
                 color: ql.th.text
@@ -120,14 +269,17 @@ Window {
                         }
                         event.accepted = true
                     } else if (event.key === Qt.Key_Escape) {
-                        ql.hide()
+                        if (ql.placing)
+                            ql.endPlacing(false)
+                        else
+                            ql.hide()
                         event.accepted = true
                     }
                 }
             }
         }
         Rectangle {
-            visible: list.count > 0
+            visible: ql.expanded
             anchors.top: bar.bottom
             width: parent.width
             height: 1
@@ -235,10 +387,16 @@ Window {
             anchors.topMargin: 6
             anchors.horizontalCenter: parent.horizontalCenter
             height: 24
-            visible: list.count > 0 || field.text !== ""
-            text: field.text === "" ? "Recent and favourites   ·   type to search" : "↑↓ select   ·   Enter open   ·   Ctrl+Enter show in folder   ·   Esc close"
+            visible: ql.expanded
+            text: "↑↓ select   ·   Enter open   ·   Ctrl+Enter show in folder   ·   Esc close"
             color: ql.th.subtext
             font.pixelSize: 11
+        }
+        DragZone {
+            visible: ql.expanded
+            anchors.top: list.bottom
+            anchors.bottom: parent.bottom
+            width: parent.width
         }
     }
 }
