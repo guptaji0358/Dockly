@@ -84,6 +84,15 @@ public:
     Q_INVOKABLE int launch(const QString &id); // returns LH::LaunchResult
     Q_INVOKABLE int launchAll(const QString &collectionId);
     Q_INVOKABLE void showInFolder(const QString &id);
+    // quick actions on one item
+    Q_INVOKABLE bool launchAsAdmin(const QString &id);                      // programs only (UAC prompt)
+    Q_INVOKABLE bool launchWithArgs(const QString &id, const QString &args); // programs only, one-off arguments
+    Q_INVOKABLE void copyPath(const QString &id);                           // path or URL to the clipboard
+
+    // --- quick launcher -----------------------------------------------------
+    // Best matches first (name prefix, word prefix, name contains, path contains; favourites win ties).
+    // An empty query lists recents, then favourites. Each row: {id, name, subtitle, category, categoryName, iconSource}.
+    Q_INVOKABLE QVariantList quickSearch(const QString &query, int limit = 8) const;
     Q_INVOKABLE QVariantList browsers() const; // installed browsers: [{text, value = exe path}]
 
     // --- drag & drop ------------------------------------------------------
@@ -91,6 +100,8 @@ public:
     // matching hub. hintCategory is used for files with an unknown type (-1 = documents).
     Q_INVOKABLE int addDropped(const QStringList &items, int hintCategory = -1, bool favorite = false);
     Q_INVOKABLE void moveMember(const QString &collectionId, const QString &itemId, int toRow);
+    // Same, but everything dropped is also put into that collection (even when it was already in the library).
+    Q_INVOKABLE int addDroppedTo(const QString &collectionId, const QStringList &items);
 
     // --- collections -----------------------------------------------------
     Q_INVOKABLE QString createCollection(const QString &name);
@@ -142,6 +153,8 @@ private:
 
     QString settingsPath() const;
     void changed();
+    // id of the library item for one dropped path / link (empty when it isn't usable); *isNew tells if it was just created
+    QString addDroppedItem(const QString &raw, int hintCategory, bool *isNew);
     void migrateLegacyJson();
     void applyStartWithWindows();
     void requestFavicon(const QString &host);

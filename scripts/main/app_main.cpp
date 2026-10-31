@@ -54,9 +54,8 @@ void logHandler(QtMsgType, const QMessageLogContext &, const QString &msg)
 // Show the window and really put it in front. Windows refuses to let a freshly started (or tray-hidden)
 // program steal focus from the app you are working in, so a plain show() can leave Dockly behind a
 // maximised window with only a blinking taskbar button - which looks like "nothing happened".
-void bringToFront(QQuickWindow *win)
+void grabForeground(QQuickWindow *win)
 {
-    win->showNormal();
     win->raise();
     win->requestActivate();
 #ifdef Q_OS_WIN
@@ -76,6 +75,11 @@ void bringToFront(QQuickWindow *win)
     if (fg && fg != me)
         AttachThreadInput(me, fg, FALSE);
 #endif
+}
+void bringToFront(QQuickWindow *win)
+{
+    win->showNormal();
+    grabForeground(win);
     qInfo() << "window brought to front, visible =" << win->isVisible();
 }
 } // namespace
@@ -123,7 +127,9 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     QCommandLineOption dbl("dblclick", "Send a double-click at x,y (window coordinates) after startup (diagnostics).", "x,y");
     QCommandLineOption window("window", "Open the main window even when the edge dock is enabled.");
     QCommandLineOption dockShot("dockshot", "Save a screenshot of the opened dock and exit (diagnostics).", "file");
-    cli.addOptions({minimized, shot, page, ring, demo, dialog, dbl, window, dockShot});
+    QCommandLineOption launcherShot("launchershot", "Save a screenshot of the quick launcher (searching for the given text) and exit (diagnostics).", "file");
+    QCommandLineOption launcherQuery("launcherquery", "Text typed into the quick launcher for --launchershot (diagnostics).", "text");
+    cli.addOptions({minimized, shot, page, ring, demo, dialog, dbl, window, dockShot, launcherShot, launcherQuery});
     cli.process(app);
 
     // One Dockly per data folder: starting it again brings the running one to the front instead of
@@ -207,7 +213,9 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     engine.loadFromModule("DocklyUI", "Main");
     if (!engine.rootObjects().isEmpty())
         engine.loadFromModule("DocklyUI", "DockWindow");
-    if (engine.rootObjects().size() < 2) {
+    if (engine.rootObjects().size() == 2)
+        engine.loadFromModule("DocklyUI", "QuickLauncher");
+    if (engine.rootObjects().size() < 3) {
         qCritical() << "The interface failed to load.";
         QMessageBox::critical(nullptr, "Dockly",
                               "Dockly couldn't load its interface.\n\nDetails were written to:\n"
@@ -238,6 +246,24 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
             revealDock(); // switched ON: dock it right away
     });
     applyHotkey();
+
+    // the quick launcher: a type-to-launch box over whatever you are doing, opened by its own system-wide shortcut
+    auto *launcherWin = qobject_cast<QQuickWindow *>(engine.rootObjects().at(2));
+    auto showLauncher = [launcherWin] {
+        QMetaObject::invokeMethod(launcherWin, "toggle");
+        if (launcherWin->isVisible())
+            grabForeground(launcherWin);
+    };
+    GlobalHotkey launcherHotkey(0x514C); // "QL"
+    auto applyLauncherHotkey = [&launcherHotkey, core] {
+        launcherHotkey.setSequence(core->settings()->boolean("launcherEnabled") ? core->settings()->text("launcherHotkey") : QString());
+    };
+    QObject::connect(&launcherHotkey, &GlobalHotkey::triggered, launcherWin, showLauncher);
+    QObject::connect(core->settings(), &AppSettings::changed, &app, [applyLauncherHotkey](const QString &k) {
+        if (k == QLatin1String("launcherHotkey") || k == QLatin1String("launcherEnabled"))
+            applyLauncherHotkey();
+    });
+    applyLauncherHotkey();
     QObject::connect(&tray, &TrayController::openMainRequested, win, [win](const QString &id) {
         bringToFront(win);
         if (!id.isEmpty())
@@ -272,6 +298,15 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
         win->show();
     else
         bringToFront(win);
+
+    if (cli.isSet(launcherShot)) {
+        const QString path = cli.value(launcherShot);
+        QMetaObject::invokeMethod(launcherWin, "openWith", Q_ARG(QVariant, cli.value(launcherQuery)));
+        QTimer::singleShot(2000, &app, [launcherWin, path, &app] {
+            launcherWin->grabWindow().save(path);
+            app.quit();
+        });
+    }
 
     if (cli.isSet(dbl)) {
         const QStringList xy = cli.value(dbl).split(',');

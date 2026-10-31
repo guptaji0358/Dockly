@@ -5,11 +5,45 @@
 #include <QRegularExpression>
 #include <QStyleHints>
 
+namespace {
+struct Preset {
+    const char *key;
+    const char *label;
+    int hue;       // 0..359, the tint of backgrounds and cards
+    qreal sat;     // 0..1, how strongly they are tinted
+    const char *accent;
+};
+const Preset kPresets[] = {
+    {"ocean", "Ocean", 205, 0.80, "#1fa2ff"},
+    {"forest", "Forest", 150, 0.55, "#2fbf71"},
+    {"sunset", "Sunset", 18, 0.70, "#ff7a45"},
+    {"rose", "Rose", 335, 0.60, "#ff4d94"},
+    {"violet", "Violet", 265, 0.60, "#8b5cf6"},
+    {"graphite", "Graphite", 220, 0.08, "#9aa7b8"},
+};
+const Preset *findPreset(const QString &key)
+{
+    for (const Preset &p : kPresets)
+        if (key == QLatin1String(p.key))
+            return &p;
+    return nullptr;
+}
+} // namespace
+
+QVariantList Theme::palettes() const
+{
+    QVariantList out;
+    out.append(QVariantMap{{"key", "default"}, {"label", "Skin default"}, {"accent", QString()}});
+    for (const Preset &p : kPresets)
+        out.append(QVariantMap{{"key", p.key}, {"label", p.label}, {"accent", QString::fromLatin1(p.accent)}});
+    return out;
+}
+
 Theme::Theme(AppSettings *settings, QObject *parent)
     : QObject(parent), m_settings(settings)
 {
     connect(settings, &AppSettings::changed, this, [this](const QString &key) {
-        if (key == "theme" || key == "accent" || key == "style" || key == "navigation")
+        if (key == "theme" || key == "accent" || key == "style" || key == "navigation" || key == "palette")
             update();
     });
     if (auto *hints = QGuiApplication::styleHints())
@@ -72,6 +106,25 @@ void Theme::update()
             m_sidebar = "#111111"; m_sidebarText = "#f2efe6";
         }
         defaultAccent = "#ff3b1f";
+    }
+
+    // A colour theme re-tints the surfaces and sets the accent; the skin keeps its shapes, fonts and text colours.
+    const Preset *preset = findPreset(m_settings->text("palette"));
+    if (preset) {
+        const qreal h = preset->hue / 360.0, s = preset->sat;
+        auto hsl = [h](qreal sat, qreal l) { return QColor::fromHslF(h, qBound(0.0, sat, 1.0), l); };
+        if (m_dark) {
+            m_bg = hsl(s * 0.55, 0.065); m_surface = hsl(s * 0.50, 0.105); m_card = hsl(s * 0.50, 0.125);
+            m_cardHover = hsl(s * 0.55, 0.19); m_sidebar = hsl(s * 0.55, 0.045); m_sidebarText = hsl(s * 0.8, 0.78);
+            if (m_style != "editorial")
+                m_border = hsl(s * 0.55, 0.26);
+        } else {
+            m_bg = hsl(s * 0.9, 0.95); m_surface = hsl(s * 0.5, 0.995); m_card = m_surface;
+            m_cardHover = hsl(s * 0.9, 0.89); m_sidebar = hsl(s * 0.6, 0.16); m_sidebarText = hsl(s * 0.9, 0.86);
+            if (m_style != "editorial")
+                m_border = hsl(s * 0.6, 0.8);
+        }
+        defaultAccent = preset->accent;
     }
 
     const QColor chosen(m_settings->text("accent"));

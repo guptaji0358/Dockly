@@ -14,6 +14,11 @@ qml/      Qt Quick frontend: honeycomb / orbit / grid layouts, radial ring, GLSL
 - **Honeycomb / Orbit / Classic grid** - switch from the top bar. Honeycomb and orbit are pan (drag) and zoom (wheel) maps of floating glass hexagons that tilt toward the pointer.
 - **Radial ring** - the glowing orb (or `Ctrl+Space`, `F2`, middle click) opens a ring: sections on the inner ring, favourites on the outer one.
 - **Search** - `/` or `Ctrl+F`; `Ctrl+1..7` jump between hubs.
+- **Quick launcher** - `Alt+Space` (system-wide, changeable in Settings > General) opens a type-to-launch box over whatever you are doing. Best matches first, favourites win ties; empty box shows recents and favourites. `Enter` opens, `Ctrl+Enter` shows in folder, `Esc` closes.
+- **Workspaces** - a collection opens everything in it, one item after another (spacing in Settings > Items). Right-click a collection > *Open at startup* to launch it when Dockly starts.
+- **Quick actions** - right-click a program: *Run as Administrator*, *Run with Arguments...*; any item: *Copy Path / Link*.
+- **Drag and drop** - drop files, folders or links on the window to add them; on a collection card to add them into it; on the dock to pin them. Drag a card from the window onto the dock to pin it.
+- **Colour themes** - Settings > Appearance: Ocean, Forest, Sunset, Rose, Violet, Graphite re-tint the active skin; a custom accent still wins.
 
 ## Connectors
 

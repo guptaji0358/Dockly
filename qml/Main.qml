@@ -613,6 +613,37 @@ ApplicationWindow {
             text: win.ctx.favorite ? "Remove from Favorites" : "Add to Favorites"
             onTriggered: core.setFavorite(win.ctx.id, !win.ctx.favorite)
         }
+        MenuItem {
+            readonly property bool applies: win.ctx.category === LH.Collection
+            text: "Open at startup"
+            checkable: true
+            checked: core.settings.values.startupWorkspace === win.ctx.id
+            visible: applies
+            height: applies ? implicitHeight : 0
+            onTriggered: core.settings.set("startupWorkspace", checked ? win.ctx.id : "")
+        }
+        MenuSeparator {}
+        MenuItem {
+            readonly property bool applies: win.ctx.category === LH.Software
+            text: "Run as Administrator"
+            visible: applies
+            height: applies ? implicitHeight : 0
+            onTriggered: core.launchAsAdmin(win.ctx.id)
+        }
+        MenuItem {
+            readonly property bool applies: win.ctx.category === LH.Software
+            text: "Run with Arguments..."
+            visible: applies
+            height: applies ? implicitHeight : 0
+            onTriggered: argsDialog.openFor(win.ctx.id, win.ctx.name)
+        }
+        MenuItem {
+            readonly property bool applies: win.ctx.category !== LH.Collection
+            text: win.ctx.category === LH.Web ? "Copy Link" : "Copy Path"
+            visible: applies
+            height: applies ? implicitHeight : 0
+            onTriggered: core.copyPath(win.ctx.id)
+        }
         MenuSeparator {}
         MenuItem {
             text: win.ctx.category === LH.Collection ? "Rename..." : "Edit..."
@@ -697,4 +728,5 @@ ApplicationWindow {
         onCustomize: (target, name) => itemDialog.openAddTarget(LH.Software, target, name)
     }
     ChoiceDialog { id: choice }
+    ArgsDialog { id: argsDialog }
 }

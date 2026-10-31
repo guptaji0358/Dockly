@@ -8,7 +8,8 @@ class GlobalHotkey : public QObject, public QAbstractNativeEventFilter
 {
     Q_OBJECT
 public:
-    explicit GlobalHotkey(QObject *parent = nullptr);
+    // id: each shortcut Dockly registers needs its own (the dock and the quick launcher)
+    explicit GlobalHotkey(int id = 0x444B, QObject *parent = nullptr); // 0x444B = "DK"
     ~GlobalHotkey() override;
 
     // Replaces the current shortcut; an empty text just unregisters. False when the text isn't
@@ -22,5 +23,6 @@ signals:
 
 private:
     void unregisterKey();
+    int m_id;
     bool m_registered = false;
 };

@@ -18,6 +18,11 @@ QVariantMap AppSettings::defaults()
         {"style", "neon"},        // neon | playful | editorial
         {"navigation", "sidebar"}, // sidebar | dock
         {"accent", ""},           // empty = the skin's own accent
+        {"palette", "default"},   // default | ocean | forest | sunset | rose | violet | graphite : colour theme layered on the skin
+        {"launcherEnabled", true}, // quick launcher: a type-to-launch box opened from anywhere
+        {"launcherHotkey", "Alt+Space"}, // system-wide shortcut that opens it; empty = none
+        {"workspaceDelay", 400},  // ms between the items of a collection launched together; 0 = all at once
+        {"startupWorkspace", ""}, // id of a collection launched when Dockly starts; empty = none
         {"recentEnabled", true},
         {"maxRecent", 12},
         {"confirmDelete", true},

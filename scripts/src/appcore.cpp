@@ -25,6 +25,15 @@
 #include <QUuid>
 #include <QtConcurrent>
 
+#include <QClipboard>
+#include <QGuiApplication>
+#include <algorithm>
+
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <shellapi.h>
+#endif
+
 namespace {
 constexpr int kBackupFormatVersion = 2;
 constexpr int kCacheCap = 400;
@@ -200,6 +209,14 @@ void AppCore::init()
         checkItems();
     m_checkTimer.start();
     changed();
+
+    // a workspace the user asked for opens a few seconds after start, once the desktop has settled
+    const QString startup = m_settings->text("startupWorkspace");
+    if (!startup.isEmpty() && exists(startup))
+        QTimer::singleShot(4000, this, [this, startup] {
+            if (!m_closed)
+                launchAll(startup);
+        });
 }
 
 // Older builds kept everything in data.json and showed every detected program as a card.
@@ -602,26 +619,136 @@ int AppCore::launch(const QString &id)
     return LH::Launched;
 }
 
+// A collection works as a workspace: everything in it opens in order, spaced by the "workspaceDelay"
+// setting so a dozen programs don't fight for the disk and the foreground at once.
+// Returns how many items were queued (the first one opens right away).
 int AppCore::launchAll(const QString &collectionId)
 {
     const Item c = item(collectionId);
     if (c.category != LH::Collection || c.id.isEmpty())
         return 0;
-    int ok = 0, skipped = 0;
+    QStringList queue;
+    int skipped = 0;
     for (const QString &m : m_db.members(collectionId)) {
         const Item it = item(m);
-        if (it.id.isEmpty() || it.category == LH::Collection) {
+        if (it.id.isEmpty() || it.category == LH::Collection || computeStatus(it) != LH::Normal)
             ++skipped;
-            continue;
-        }
-        if (launch(m) == LH::Launched)
-            ++ok;
         else
-            ++skipped;
+            queue << m;
     }
-    emit message(skipped ? QStringLiteral("Launched %1 item(s), %2 couldn't be opened.").arg(ok).arg(skipped)
-                         : QStringLiteral("Launched %1 item(s).").arg(ok));
+    const int delay = qMax(0, m_settings->integer("workspaceDelay"));
+    int ok = 0;
+    for (int i = 0; i < queue.size(); ++i) {
+        const QString id = queue.at(i);
+        if (i == 0 || delay == 0) {
+            if (launch(id) == LH::Launched)
+                ++ok;
+            else
+                ++skipped;
+        } else {
+            QTimer::singleShot(i * delay, this, [this, id] {
+                if (!m_closed)
+                    launch(id);
+            });
+            ++ok;
+        }
+    }
+    emit message(skipped ? QStringLiteral("Opening \"%1\": %2 item(s), %3 couldn't be opened.").arg(c.name).arg(ok).arg(skipped)
+                         : QStringLiteral("Opening \"%1\": %2 item(s).").arg(c.name).arg(ok));
     return ok;
+}
+
+// ---------------------------------------------------------------------------
+// Quick actions
+// ---------------------------------------------------------------------------
+
+bool AppCore::launchAsAdmin(const QString &id)
+{
+    const Item it = item(id);
+    if (it.id.isEmpty() || it.category != LH::Software || computeStatus(it) != LH::Normal)
+        return false;
+#ifdef Q_OS_WIN
+    const QString path = QDir::toNativeSeparators(it.target);
+    const QString dir = QDir::toNativeSeparators(QFileInfo(it.target).absolutePath());
+    // "runas" shows the UAC prompt; a result above 32 means Windows accepted it (declining the prompt is an error)
+    const auto r = reinterpret_cast<quintptr>(ShellExecuteW(nullptr, L"runas", reinterpret_cast<LPCWSTR>(path.utf16()),
+                                                            nullptr, reinterpret_cast<LPCWSTR>(dir.utf16()), SW_SHOWNORMAL));
+    if (r <= 32) {
+        emit message(QStringLiteral("\"%1\" wasn't started as administrator.").arg(it.name));
+        return false;
+    }
+    m_db.setLastOpened(id);
+    changed();
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool AppCore::launchWithArgs(const QString &id, const QString &args)
+{
+    const Item it = item(id);
+    if (it.id.isEmpty() || it.category != LH::Software || computeStatus(it) != LH::Normal)
+        return false;
+    const bool ok = QProcess::startDetached(it.target, QProcess::splitCommand(args), QFileInfo(it.target).absolutePath());
+    if (!ok) {
+        emit message(QStringLiteral("Couldn't start \"%1\" with those arguments.").arg(it.name));
+        return false;
+    }
+    m_db.setLastOpened(id);
+    changed();
+    return true;
+}
+
+void AppCore::copyPath(const QString &id)
+{
+    const Item it = item(id);
+    if (it.id.isEmpty() || it.category == LH::Collection)
+        return;
+    QGuiApplication::clipboard()->setText(it.category == LH::Web ? it.target : QDir::toNativeSeparators(it.target));
+    emit message(it.category == LH::Web ? QStringLiteral("Link copied.") : QStringLiteral("Path copied."));
+}
+
+QVariantList AppCore::quickSearch(const QString &query, int limit) const
+{
+    if (m_closed)
+        return {};
+    const QString needle = query.trimmed();
+    QStringList ids;
+    if (needle.isEmpty()) {
+        ids = queryIds(LH::ModeRecent, LH::AllCategories, {}, {});
+        for (const QString &f : queryIds(LH::ModeFavorites, LH::AllCategories, {}, {}))
+            if (!ids.contains(f))
+                ids << f;
+    } else {
+        ids = queryIds(LH::ModeCategory, LH::AllCategories, needle, {});
+        auto rank = [&](const Item &it) {
+            const QString n = it.name.toLower(), q = needle.toLower();
+            int r = n == q ? 0 : n.startsWith(q) ? 1 : n.contains(' ' + q) ? 2 : n.contains(q) ? 3 : 4;
+            return r * 2 + (it.favorite ? 0 : 1);
+        };
+        QHash<QString, int> score;
+        for (const QString &id : ids)
+            score.insert(id, rank(item(id)));
+        std::stable_sort(ids.begin(), ids.end(), [&](const QString &a, const QString &b) { return score.value(a) < score.value(b); });
+    }
+    QVariantList out;
+    for (const QString &id : ids) {
+        const Item it = item(id);
+        if (it.id.isEmpty() || m_sites->isSiteGroup(id))
+            continue;
+        out.append(QVariantMap{
+            {"id", it.id},
+            {"name", it.name},
+            {"subtitle", subtitleFor(it)},
+            {"category", int(it.category)},
+            {"categoryName", it.category == LH::Collection ? QStringLiteral("Workspace") : Item::categoryLabel(it.category)},
+            {"iconSource", QStringLiteral("image://item/%1?v=%2").arg(it.id).arg(m_iconVersion)},
+        });
+        if (out.size() >= limit)
+            break;
+    }
+    return out;
 }
 
 void AppCore::showInFolder(const QString &id)
@@ -640,50 +767,71 @@ void AppCore::showInFolder(const QString &id)
 // Drag & drop
 // ---------------------------------------------------------------------------
 
-int AppCore::addDropped(const QStringList &dropped, int hintCategory, bool favorite)
+QString AppCore::addDroppedItem(const QString &raw, int hintCategory, bool *isNew)
 {
     static const QSet<QString> programs = {"exe", "lnk", "bat", "cmd"};
     static const QSet<QString> media = {"mp4", "mkv", "avi", "mov", "webm", "mp3", "wav", "flac", "ogg", "m4a",
                                         "png", "jpg", "jpeg", "gif", "bmp", "webp", "svg"};
+    *isNew = false;
+    const QString s = raw.trimmed();
+    if (s.isEmpty())
+        return {};
+    const QUrl url(s);
+    LH::Category cat = LH::Web;
+    QString norm;
+    if (url.scheme() == "http" || url.scheme() == "https") {
+        norm = Item::normalizedTarget(normalizeUrl(s));
+    } else {
+        const QString path = url.isLocalFile() ? url.toLocalFile() : s;
+        const QFileInfo fi(path);
+        if (!fi.exists())
+            return {};
+        const QString ext = fi.suffix().toLower();
+        cat = LH::Document;
+        if (programs.contains(ext))
+            cat = LH::Software;
+        else if (media.contains(ext))
+            cat = LH::Entertainment;
+        else if (hintCategory >= 0 && hintCategory != LH::Collection && hintCategory != LH::Web)
+            cat = LH::Category(hintCategory);
+        norm = Item::normalizedTarget(QDir::toNativeSeparators(path));
+    }
+    *isNew = m_db.findByNorm(cat, norm).isEmpty();
+    return addItem(cat, {}, url.isLocalFile() ? url.toLocalFile() : s); // an existing item comes back as itself
+}
+
+int AppCore::addDropped(const QStringList &dropped, int hintCategory, bool favorite)
+{
     int added = 0;
     for (const QString &raw : dropped) {
-        const QString s = raw.trimmed();
-        if (s.isEmpty())
+        bool isNew = false;
+        const QString id = addDroppedItem(raw, hintCategory, &isNew);
+        if (id.isEmpty() || !isNew)
             continue;
-        const QUrl url(s);
-        QString id;
-        if (url.scheme() == "http" || url.scheme() == "https") {
-            const bool had = !m_db.findByNorm(LH::Web, Item::normalizedTarget(normalizeUrl(s))).isEmpty();
-            id = addItem(LH::Web, {}, s);
-            if (had)
-                id.clear();
-        } else {
-            const QString path = url.isLocalFile() ? url.toLocalFile() : s;
-            const QFileInfo fi(path);
-            if (!fi.exists())
-                continue;
-            const QString ext = fi.suffix().toLower();
-            LH::Category cat = fi.isDir() ? LH::Document : LH::Document;
-            if (programs.contains(ext))
-                cat = LH::Software;
-            else if (media.contains(ext))
-                cat = LH::Entertainment;
-            else if (hintCategory >= 0 && hintCategory != LH::Collection && hintCategory != LH::Web)
-                cat = LH::Category(hintCategory);
-            const bool had = !m_db.findByNorm(cat, Item::normalizedTarget(QDir::toNativeSeparators(path))).isEmpty();
-            id = addItem(cat, {}, path);
-            if (had)
-                id.clear();
-        }
-        if (!id.isEmpty()) {
-            ++added;
-            if (favorite)
-                setFavorite(id, true); // dropped on the dock: it should show up there
-        }
+        ++added;
+        if (favorite)
+            setFavorite(id, true); // dropped on the dock: it should show up there
     }
     emit message(added ? QStringLiteral("Added %1 item(s) from drop.").arg(added)
                        : QStringLiteral("Nothing new to add from that drop."));
     return added;
+}
+
+int AppCore::addDroppedTo(const QString &collectionId, const QStringList &dropped)
+{
+    if (item(collectionId).category != LH::Collection)
+        return 0;
+    QStringList ids;
+    for (const QString &raw : dropped) {
+        bool isNew = false;
+        const QString id = addDroppedItem(raw, -1, &isNew);
+        if (!id.isEmpty())
+            ids << id;
+    }
+    addToCollection(collectionId, ids);
+    emit message(ids.isEmpty() ? QStringLiteral("Nothing usable in that drop.")
+                               : QStringLiteral("Put %1 item(s) into \"%2\".").arg(ids.size()).arg(item(collectionId).name));
+    return ids.size();
 }
 
 void AppCore::moveMember(const QString &collectionId, const QString &itemId, int toRow)

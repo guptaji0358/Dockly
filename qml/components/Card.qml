@@ -40,7 +40,7 @@ Item {
     property real t: hovered ? 1 : 0
     Behavior on t { enabled: root.animated; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
     readonly property real lit: Math.max(t, selected ? 1 : 0)
-    readonly property bool dropHover: dropArea.containsDrag
+    readonly property bool dropHover: dropArea.containsDrag || fileDrop.containsDrag
 
     // idle "floating": grid cards drift up and down; hover settles them back into place
     readonly property bool floating: animated && grid && core.settings.values.floatingTiles
@@ -277,6 +277,28 @@ Item {
             } else if (root.collectionId !== "" && src === root.collectionId) {
                 root.itemDropped(id)
             }
+        }
+    }
+
+    // Files, folders or links from Explorer / the browser dropped on a collection go into it (and into the library).
+    DropArea {
+        id: fileDrop
+        anchors.fill: parent
+        enabled: root.category === LH.Collection && root.collectionId === ""
+        onEntered: drag => {
+            if (!drag.hasUrls && !(drag.hasText && drag.text.indexOf("http") === 0))
+                drag.accepted = false
+        }
+        onDropped: drop => {
+            const items = []
+            if (drop.hasUrls) {
+                for (let i = 0; i < drop.urls.length; ++i)
+                    items.push(drop.urls[i].toString())
+            } else if (drop.hasText) {
+                items.push(drop.text.trim())
+            }
+            drop.accept()
+            core.addDroppedTo(root.itemId, items)
         }
     }
 

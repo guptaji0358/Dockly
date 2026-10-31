@@ -3,6 +3,7 @@
 #include "itemmodel.h"
 
 #include <QApplication>
+#include <QClipboard>
 #include <QFile>
 #include <QTcpSocket>
 #include <QJsonArray>
@@ -193,6 +194,85 @@ private slots:
         QCOMPARE(m.idAt(2), ids[1]);
         core->moveMember(col, ids[2], 99); // clamped to the end
         QCOMPARE(m.idAt(2), ids[2]);
+    }
+
+    void quickSearchRanksPrefixFirstAndFavouritesWin()
+    {
+        const QString contains = core->addItem(LH::Web, "myzqpad notes", "https://zq1.example");
+        const QString exact = core->addItem(LH::Web, "zqpad", "https://zq2.example");
+        const QString word = core->addItem(LH::Web, "the zqpad tool", "https://zq3.example");
+        const QString fav = core->addItem(LH::Web, "zqpad pro", "https://zq4.example");
+        const QString plain = core->addItem(LH::Web, "zqpad lite", "https://zq5.example");
+        core->setFavorite(fav, true);
+
+        const QVariantList hits = core->quickSearch("zqpad", 10);
+        QCOMPARE(hits.size(), 5);
+        QCOMPARE(hits[0].toMap()["id"].toString(), exact);    // exact name first
+        QCOMPARE(hits[1].toMap()["id"].toString(), fav);      // among prefix matches the favourite comes first ...
+        QCOMPARE(hits[2].toMap()["id"].toString(), plain);    // ... then the rest
+        QCOMPARE(hits[3].toMap()["id"].toString(), word);     // word prefix before plain "contains"
+        QCOMPARE(hits[4].toMap()["id"].toString(), contains);
+        QCOMPARE(core->quickSearch("zqpad", 2).size(), 2);    // limit
+        QVERIFY(core->quickSearch("no-such-thing-xyz", 5).isEmpty());
+        QVERIFY(core->quickSearch({}, 50).toList().size() >= 1); // empty query lists favourites
+    }
+
+    void droppedOnCollectionLandsInIt()
+    {
+        const QString col = core->createCollection("Drop target");
+        const QString f = m_dir.path() + "/dropped-in.txt";
+        QFile file(f);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("x");
+        file.close();
+        const QStringList drop = {QUrl::fromLocalFile(f).toString(), "https://into-collection.example", m_dir.path() + "/nope.bin"};
+        QCOMPARE(core->addDroppedTo(col, drop), 2); // the missing path is skipped
+        QCOMPARE(core->addDroppedTo(col, drop), 2); // already-known items are still (re)filed, no duplicates
+        QCOMPARE(core->queryIds(LH::ModeMembers, LH::AllCategories, {}, col).size(), 2);
+        QCOMPARE(core->addDroppedTo(m_realFile.fileName(), drop), 0); // not a collection
+    }
+
+    void workspaceLaunchSkipsMissingItems()
+    {
+        // (nothing launchable here on purpose: a test must not open real programs or browser tabs)
+        core->settings()->set("workspaceDelay", 400);
+        const QString col = core->createCollection("Workspace");
+        const QString bad = core->addItem(LH::Web, "ws bad", "https://");
+        const QString gone = core->addItem(LH::Document, "ws gone", m_dir.path() + "/ws-missing.pdf");
+        core->addToCollection(col, {bad, gone});
+        QSignalSpy msg(core, &AppCore::message);
+        QCOMPARE(core->launchAll(col), 0); // nothing that can open is queued
+        QVERIFY(!msg.isEmpty());
+        QVERIFY(msg.last().at(0).toString().contains("2 couldn't be opened"));
+        QCOMPARE(core->launchAll("not-a-collection"), 0);
+    }
+
+    void quickActionsOnlyApplyToPrograms()
+    {
+        const QString web = core->addItem(LH::Web, "qa web", "https://qa.example");
+        QVERIFY(!core->launchAsAdmin(web));
+        QVERIFY(!core->launchWithArgs(web, "--x"));
+        core->copyPath(web);
+        QCOMPARE(QGuiApplication::clipboard()->text(), QString("https://qa.example"));
+    }
+
+    void colourThemesRetintTheSkin()
+    {
+        auto *s = core->settings();
+        s->set("theme", "dark");
+        s->set("accent", "");
+        s->set("palette", "default");
+        const QColor base = core->theme()->bg();
+        s->set("palette", "forest");
+        QVERIFY(core->theme()->bg() != base);
+        QCOMPARE(core->theme()->accent(), QColor("#2fbf71"));
+        s->set("accent", "#123456"); // a custom accent still wins over the theme's
+        QCOMPARE(core->theme()->accent(), QColor("#123456"));
+        s->set("accent", "");
+        s->set("palette", "no-such-theme"); // unknown key behaves like "default"
+        QCOMPARE(core->theme()->bg(), base);
+        s->set("palette", "default");
+        QCOMPARE(core->theme()->palettes().size(), 7);
     }
 
     void iconPackAndLetterTile()

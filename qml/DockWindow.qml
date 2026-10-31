@@ -212,12 +212,20 @@ Window {
             id: drops
             anchors.fill: parent
             onEntered: drag => {
-                drag.accepted = drag.hasUrls || drag.hasText
+                drag.accepted = drag.hasUrls || drag.hasText || drag.formats.indexOf("application/x-dockly-item") >= 0
                 dock.shown = true
                 hideTimer.stop()
             }
             onExited: { hideTimer.interval = dock.collapseDelay; hideTimer.restart() }
             onDropped: drop => {
+                // a card dragged out of the main window: pin it to the dock
+                const cardId = drop.getDataAsString("application/x-dockly-item")
+                if (cardId !== "") {
+                    drop.accept()
+                    core.setFavorite(cardId, true)
+                    core.message("Pinned to the dock.")
+                    return
+                }
                 const items = []
                 if (drop.hasUrls)
                     for (const u of drop.urls)
@@ -504,6 +512,20 @@ Window {
         property string itemId
         property bool pinned
         MenuItem { text: "Open"; onTriggered: core.launch(tileMenu.itemId) }
+        MenuItem {
+            readonly property bool applies: core.itemInfo(tileMenu.itemId).category === LH.Software
+            text: "Run as Administrator"
+            visible: applies
+            height: applies ? implicitHeight : 0
+            onTriggered: core.launchAsAdmin(tileMenu.itemId)
+        }
+        MenuItem {
+            readonly property bool applies: core.itemInfo(tileMenu.itemId).category !== LH.Collection
+            text: "Copy path"
+            visible: applies
+            height: applies ? implicitHeight : 0
+            onTriggered: core.copyPath(tileMenu.itemId)
+        }
         MenuItem { text: "Edit..."; onTriggered: tray.editInMain(tileMenu.itemId) }
         MenuItem {
             text: "Remove from dock"

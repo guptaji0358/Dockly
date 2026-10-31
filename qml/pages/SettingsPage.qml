@@ -81,6 +81,13 @@ Item {
                         key: "language"; label: "Language"
                         options: [{text: "English", value: "English"}]
                     }
+                    SettingCheck { key: "launcherEnabled"; text: "Quick launcher: type-to-launch box from anywhere" }
+                    SettingCombo {
+                        key: "launcherHotkey"; label: "Quick launcher shortcut"
+                        options: [{text: "Alt + Space", value: "Alt+Space"}, {text: "Ctrl + Space", value: "Ctrl+Space"},
+                                  {text: "Ctrl + Alt + Space", value: "Ctrl+Alt+Space"}, {text: "Ctrl + Shift + Space", value: "Ctrl+Shift+Space"},
+                                  {text: "Win + Space", value: "Meta+Space"}, {text: "None", value: ""}]
+                    }
                 }
 
                 SettingGroup {
@@ -134,9 +141,50 @@ Item {
                 SettingGroup {
                     title: "Appearance"
                     SettingCombo {
-                        key: "style"; label: "Colour palette"
+                        key: "style"; label: "Skin"
                         options: [{text: "Neon", value: "neon"}, {text: "Playful", value: "playful"},
                                   {text: "Editorial", value: "editorial"}]
+                    }
+                    RowLayout {
+                        spacing: 16
+                        Text { text: "Colour theme"; color: page.th.text; Layout.preferredWidth: 170 }
+                        Repeater {
+                            model: page.th.palettes()
+                            delegate: Item {
+                                id: sw
+                                required property var modelData
+                                readonly property bool on: core.settings.values.palette === modelData.key
+                                implicitWidth: 52
+                                implicitHeight: 62
+                                Rectangle {
+                                    id: dot
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    width: 34; height: 34; radius: 17
+                                    // "Skin default" shows the skin's own accent
+                                    color: sw.modelData.accent !== "" ? sw.modelData.accent : page.th.accent
+                                    border.width: sw.on ? 3 : 1
+                                    border.color: sw.on ? page.th.text : page.th.border
+                                    scale: swMouse.containsMouse ? 1.1 : 1
+                                    Behavior on scale { NumberAnimation { duration: 90 } }
+                                }
+                                Text {
+                                    anchors.top: dot.bottom
+                                    anchors.topMargin: 4
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: sw.modelData.label
+                                    color: sw.on ? page.th.text : page.th.subtext
+                                    font.pixelSize: 11
+                                    font.weight: sw.on ? Font.DemiBold : Font.Normal
+                                }
+                                MouseArea {
+                                    id: swMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: core.settings.set("palette", sw.modelData.key)
+                                }
+                            }
+                        }
                     }
                     SettingCombo {
                         key: "layoutMode"; label: "Layout"
@@ -162,7 +210,7 @@ Item {
                             }
                         }
                         AppButton {
-                            text: "Skin default"
+                            text: "Theme default"
                             enabled: core.settings.values.accent !== ""
                             onClicked: core.settings.set("accent", "")
                         }
@@ -187,6 +235,12 @@ Item {
                                 function onValuesChanged() { maxRecent.value = core.settings.values.maxRecent }
                             }
                         }
+                    }
+                    SettingCombo {
+                        key: "workspaceDelay"; label: "Workspace launch spacing"
+                        customMin: 50; customMax: 10000; customDefault: 1000; customSuffix: " ms"
+                        options: [{text: "All at once", value: 0}, {text: "Quick (0.2 s)", value: 200}, {text: "Normal (0.4 s)", value: 400},
+                                  {text: "Relaxed (1 s)", value: 1000}, {text: "Slow (2 s)", value: 2000}, {text: "Custom…", value: -1}]
                     }
                     SettingCheck { key: "confirmDelete"; text: "Confirm before delete" }
                     SettingCheck { key: "checkMissingOnStartup"; text: "Check for missing items on startup" }

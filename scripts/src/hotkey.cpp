@@ -8,12 +8,8 @@
 #include <windows.h>
 #endif
 
-namespace {
-constexpr int kHotkeyId = 0x444B; // "DK"
-}
-
-GlobalHotkey::GlobalHotkey(QObject *parent)
-    : QObject(parent)
+GlobalHotkey::GlobalHotkey(int id, QObject *parent)
+    : QObject(parent), m_id(id)
 {
     QCoreApplication::instance()->installNativeEventFilter(this);
 }
@@ -28,7 +24,7 @@ void GlobalHotkey::unregisterKey()
 {
 #ifdef Q_OS_WIN
     if (m_registered)
-        UnregisterHotKey(nullptr, kHotkeyId);
+        UnregisterHotKey(nullptr, m_id);
 #endif
     m_registered = false;
 }
@@ -58,7 +54,7 @@ bool GlobalHotkey::setSequence(const QString &text)
     if (m & Qt::AltModifier) mods |= MOD_ALT;
     if (m & Qt::ShiftModifier) mods |= MOD_SHIFT;
     if (m & Qt::MetaModifier) mods |= MOD_WIN;
-    m_registered = RegisterHotKey(nullptr, kHotkeyId, mods, vk);
+    m_registered = RegisterHotKey(nullptr, m_id, mods, vk);
     if (!m_registered)
         qWarning() << "hotkey:" << text << "is already used by another program";
     return m_registered;
@@ -73,7 +69,7 @@ bool GlobalHotkey::nativeEventFilter(const QByteArray &eventType, void *message,
 #ifdef Q_OS_WIN
     if (eventType == "windows_generic_MSG") {
         const MSG *msg = static_cast<const MSG *>(message);
-        if (msg->message == WM_HOTKEY && int(msg->wParam) == kHotkeyId) {
+        if (msg->message == WM_HOTKEY && int(msg->wParam) == m_id) {
             emit triggered();
             return true;
         }
