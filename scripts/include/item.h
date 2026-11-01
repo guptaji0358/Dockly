@@ -14,6 +14,7 @@ struct Item {
     QString target; // file path, or URL for web shortcuts
     QString icon; // optional user-chosen icon image (a copy kept in the data folder); empty = automatic
     bool favorite = false;
+    QStringList tags; // user labels, lowercase, no spaces or commas
     LH::Status status = LH::Normal; // runtime only, recomputed by validation
     QDateTime lastOpened;
     QStringList members; // collections only; filled for backup export, otherwise queried from the DB
@@ -26,4 +27,6 @@ struct Item {
     static LH::Category categoryFromKey(const QString &key);
     static QString categoryLabel(LH::Category c);
     static QString normalizedTarget(const QString &target);
+    // "Work, #Design  side-project" -> {"work", "design", "side-project"} (unique, sorted, max 12)
+    static QStringList parseTags(const QString &text);
 };

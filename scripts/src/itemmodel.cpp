@@ -10,6 +10,10 @@ ItemModel::ItemModel(QObject *parent)
         if (!m_ids.isEmpty())
             emit dataChanged(index(0), index(m_ids.size() - 1));
     });
+    connect(m_core->running(), &RunningApps::changed, this, [this] {
+        if (!m_ids.isEmpty())
+            emit dataChanged(index(0), index(m_ids.size() - 1), {RunningRole});
+    });
     rebuild();
 }
 
@@ -30,6 +34,8 @@ QHash<int, QByteArray> ItemModel::roleNames() const
         {IconSourceRole, "iconSource"},
         {CategoryNameRole, "categoryName"},
         {SubtitleRole, "subtitle"},
+        {RunningRole, "running"},
+        {TagsRole, "tags"},
     };
 }
 
@@ -54,6 +60,8 @@ QVariant ItemModel::data(const QModelIndex &index, int role) const
         return QStringLiteral("image://item/%1?v=%2").arg(it->id).arg(m_core->iconVersion());
     case CategoryNameRole: return Item::categoryLabel(it->category);
     case SubtitleRole: return m_core->subtitleFor(*it);
+    case RunningRole: return it->category == LH::Software && m_core->running()->isRunning(it->id);
+    case TagsRole: return it->tags.join(QStringLiteral(", "));
     }
     return {};
 }
@@ -85,6 +93,15 @@ void ItemModel::setSearch(const QString &s)
     emit filterChanged();
 }
 
+void ItemModel::setTag(const QString &t)
+{
+    if (m_tag == t)
+        return;
+    m_tag = t;
+    rebuild();
+    emit filterChanged();
+}
+
 void ItemModel::setCollectionId(const QString &id)
 {
     if (m_collectionId == id)
@@ -97,7 +114,7 @@ void ItemModel::setCollectionId(const QString &id)
 void ItemModel::rebuild()
 {
     // Only ids are held in memory; each row is loaded from SQLite when a view asks for it.
-    const QStringList next = m_core->queryIds(m_mode, m_category, m_search, m_collectionId);
+    const QStringList next = m_core->queryIds(m_mode, m_category, m_search, m_collectionId, m_tag);
     if (next == m_ids) {
         if (!m_ids.isEmpty())
             emit dataChanged(index(0), index(m_ids.size() - 1));

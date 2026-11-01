@@ -23,6 +23,109 @@ Item {
     visible: shown > 0.01
     focus: opened
     Keys.onEscapePressed: opened = false
+    Keys.onPressed: event => {
+        if (!opened)
+            return
+        event.accepted = true
+        if (event.key === Qt.Key_Left || event.key === Qt.Key_Up)
+            step(-1)
+        else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down)
+            step(1)
+        else if (event.key === Qt.Key_Tab)
+            switchRing()
+        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space)
+            activateFocus()
+        else
+            event.accepted = false
+    }
+
+    // ---- focus: which node is aimed at (by keyboard, swipe / drag, or game controller) ----------------
+    // fRing 0 = sections (inner ring), 1 = favourites (outer ring), -1 = nothing
+    property int fRing: -1
+    property int fIdx: -1
+    readonly property int favCount: Math.min(favs.count, 14)
+    onOpenedChanged: {
+        if (opened) {
+            fRing = 0
+            fIdx = Math.max(0, current)
+        } else {
+            fRing = -1
+            fIdx = -1
+        }
+        syncHint()
+    }
+    function countOf(r) { return r === 0 ? tabs.length : favCount }
+    function syncHint() {
+        if (fRing < 0 || fIdx < 0)
+            hint = ""
+        else if (fRing === 0)
+            hint = tabs[fIdx] ? tabs[fIdx].full.toUpperCase() : ""
+        else
+            hint = favs.nameAt(fIdx).toUpperCase()
+    }
+    function focusAt(r, i) { fRing = r; fIdx = i; syncHint() }
+    function step(d) {
+        const r = fRing < 0 ? 0 : fRing
+        const n = countOf(r)
+        if (n === 0)
+            return
+        focusAt(r, fRing < 0 ? 0 : (fIdx + d + n) % n)
+    }
+    function switchRing() {
+        const r = fRing === 1 ? 0 : (favCount > 0 ? 1 : 0)
+        focusAt(r, Math.min(Math.max(fIdx, 0), countOf(r) - 1))
+    }
+    // the node whose direction from the centre is closest to the aimed direction (dx right, dy down)
+    function aim(r, dx, dy) {
+        const n = countOf(r)
+        if (n === 0)
+            return
+        const a = Math.atan2(dy, dx)
+        let best = 0, bestD = 10
+        for (let i = 0; i < n; ++i) {
+            const ang = r === 0 ? -Math.PI / 2 + 2 * Math.PI * i / n
+                                : -Math.PI / 2 + Math.PI / n + 2 * Math.PI * i / n
+            let d = Math.abs(a - ang) % (2 * Math.PI)
+            if (d > Math.PI)
+                d = 2 * Math.PI - d
+            if (d < bestD) { bestD = d; best = i }
+        }
+        focusAt(r, best)
+    }
+    function activateFocus() {
+        if (fRing < 0 || fIdx < 0)
+            return
+        const r = fRing, i = fIdx
+        close()
+        if (r === 0)
+            picked(i)
+        else if (host)
+            host.launch(favs.idAt(i))
+    }
+
+    // Game controller. XInput is global, so it only acts while Dockly's own window is in front -
+    // a pad used in a game must never open menus here.
+    readonly property bool padOn: core.settings.values.gamepadEnabled && host && host.active
+    Connections {
+        target: core.gamepad
+        enabled: ring.padOn
+        function onChord() { ring.opened = !ring.opened }
+        function onStick(x, y) {
+            if (!ring.opened || Math.hypot(x, y) < 0.5)
+                return
+            ring.aim(ring.fRing < 0 ? 0 : ring.fRing, x, y)
+        }
+        function onPressed(button) {
+            if (!ring.opened)
+                return
+            if (button === "left" || button === "up") ring.step(-1)
+            else if (button === "right" || button === "down") ring.step(1)
+            else if (button === "prev") ring.focusAt(0, Math.min(Math.max(ring.fIdx, 0), ring.countOf(0) - 1))
+            else if (button === "next" && ring.favCount > 0) ring.focusAt(1, Math.min(Math.max(ring.fIdx, 0), ring.countOf(1) - 1))
+            else if (button === "accept") ring.activateFocus()
+            else if (button === "back" || button === "menu") ring.close()
+        }
+    }
 
     readonly property real cx: width / 2
     readonly property real cy: height / 2
@@ -37,7 +140,27 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: Qt.rgba(ring.th.bg.r, ring.th.bg.g, ring.th.bg.b, 0.82 * ring.p)
-        MouseArea { anchors.fill: parent; onClicked: ring.close() }
+        // A plain click closes the ring. Press, drag and release is a pie-menu gesture, for mouse and touch alike:
+        // the node in the dragged direction lights up (a short drag = a section, a long one = a favourite)
+        // and is opened on release.
+        MouseArea {
+            anchors.fill: parent
+            property point start
+            property bool swiped: false
+            onPressed: m => { start = Qt.point(m.x, m.y); swiped = false }
+            onPositionChanged: m => {
+                if (!pressed)
+                    return
+                const dx = m.x - start.x, dy = m.y - start.y
+                const len = Math.hypot(dx, dy)
+                if (len < 36)
+                    return
+                swiped = true
+                ring.aim(len > 150 && ring.favCount > 0 ? 1 : 0, dx, dy)
+            }
+            onReleased: if (swiped) ring.activateFocus()
+            onClicked: if (!swiped) ring.close()
+        }
     }
 
     // guide circles
@@ -92,19 +215,20 @@ Item {
             required property var modelData
             readonly property real ang: -Math.PI / 2 + 2 * Math.PI * index / ring.tabs.length
             readonly property bool on: ring.current === index
+            readonly property bool aimed: ring.fRing === 0 && ring.fIdx === index
             width: 76; height: 76
             x: ring.cx + Math.cos(ang) * ring.r1 * ring.p - width / 2
             y: ring.cy + Math.sin(ang) * ring.r1 * ring.p - height / 2
             opacity: Math.min(1, ring.p * 1.4)
-            scale: (0.4 + 0.6 * ring.p) * (nm.containsMouse ? 1.14 : 1)
+            scale: (0.4 + 0.6 * ring.p) * (nm.containsMouse || aimed ? 1.14 : 1)
             Behavior on scale { enabled: Fx.animated; NumberAnimation { duration: 120 } }
 
             Rectangle {
                 anchors.fill: parent
                 radius: 38
                 color: node.on ? ring.th.accent : Qt.rgba(ring.th.surface.r, ring.th.surface.g, ring.th.surface.b, 0.92)
-                border.width: nm.containsMouse ? 2 : 1
-                border.color: nm.containsMouse || node.on ? ring.th.accent : ring.th.border
+                border.width: nm.containsMouse || node.aimed ? 3 : 1
+                border.color: nm.containsMouse || node.on || node.aimed ? ring.th.accent : ring.th.border
             }
             Icon {
                 anchors.centerIn: parent
@@ -117,7 +241,7 @@ Item {
                 anchors.top: parent.bottom
                 anchors.topMargin: 6
                 text: node.modelData.name
-                color: nm.containsMouse || node.on ? ring.th.accent : ring.th.subtext
+                color: nm.containsMouse || node.on || node.aimed ? ring.th.accent : ring.th.subtext
                 font.pixelSize: 12
                 font.weight: Font.DemiBold
             }
@@ -143,20 +267,21 @@ Item {
             required property string iconSource
             readonly property int total: Math.min(favs.count, 14)
             readonly property real ang: -Math.PI / 2 + Math.PI / total + 2 * Math.PI * index / Math.max(1, total)
+            readonly property bool aimed: ring.fRing === 1 && ring.fIdx === index
             visible: index < 14
             width: 54; height: 54
             x: ring.cx + Math.cos(ang) * ring.r2 * ring.p - width / 2
             y: ring.cy + Math.sin(ang) * ring.r2 * ring.p - height / 2
             opacity: Math.min(1, ring.p * 1.4)
-            scale: (0.4 + 0.6 * ring.p) * (fm.containsMouse ? 1.2 : 1)
+            scale: (0.4 + 0.6 * ring.p) * (fm.containsMouse || aimed ? 1.2 : 1)
             Behavior on scale { enabled: Fx.animated; NumberAnimation { duration: 120 } }
 
             Rectangle {
                 anchors.fill: parent
                 radius: 27
                 color: Qt.rgba(ring.th.surface.r, ring.th.surface.g, ring.th.surface.b, 0.92)
-                border.width: 1
-                border.color: fm.containsMouse ? ring.th.favorite : ring.th.border
+                border.width: fav.aimed ? 3 : 1
+                border.color: fm.containsMouse || fav.aimed ? ring.th.favorite : ring.th.border
             }
             Image {
                 anchors.centerIn: parent
@@ -182,7 +307,7 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 26
         opacity: ring.p
-        text: "Sections  ·  inner ring        Favourites  ·  outer ring        Esc to close"
+        text: "Sections  ·  inner ring        Favourites  ·  outer ring        drag or ← → + Enter to pick        Esc to close"
         color: ring.th.subtext
         font.pixelSize: 12
         font.letterSpacing: 1

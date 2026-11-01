@@ -12,7 +12,9 @@ ItemImageProvider::ItemImageProvider()
 QPixmap ItemImageProvider::requestPixmap(const QString &id, QSize *size, const QSize &requestedSize)
 {
     const QString itemId = id.left(id.indexOf(QLatin1Char('?')));
-    const int px = requestedSize.width() > 0 ? requestedSize.width() : 64;
+    int px = requestedSize.width() > 0 ? requestedSize.width() : 64;
+    if (AppCore::instance()->lite())
+        px = qMin(px, 40); // Lite mode: smaller icons are cheaper to load, cache and draw
     // "path:<percent-encoded file>" asks for the shell icon of a file that is not a card yet
     // "orig:<id>" is the automatic icon of a card, ignoring its custom icon
     // "new:<category>:<percent-encoded target>" previews a card that has not been saved yet

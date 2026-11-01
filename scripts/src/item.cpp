@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QJsonArray>
+#include <QRegularExpression>
 
 QString Item::categoryKey(LH::Category c)
 {
@@ -44,6 +45,21 @@ QString Item::normalizedTarget(const QString &target)
     return t.toLower();
 }
 
+QStringList Item::parseTags(const QString &text)
+{
+    QStringList out;
+    for (QString t : text.split(QRegularExpression("[,;\\s]+"), Qt::SkipEmptyParts)) {
+        t = t.toLower();
+        while (t.startsWith(QLatin1Char('#')))
+            t.remove(0, 1);
+        t.replace(QLatin1Char('_'), QLatin1Char('-'));
+        if (!t.isEmpty() && t.size() <= 24 && !out.contains(t))
+            out << t;
+    }
+    out.sort();
+    return out.mid(0, 12);
+}
+
 QJsonObject Item::toJson() const
 {
     QJsonObject o;
@@ -54,6 +70,8 @@ QJsonObject Item::toJson() const
     o["favorite"] = favorite;
     if (!icon.isEmpty())
         o["icon"] = icon;
+    if (!tags.isEmpty())
+        o["tags"] = QJsonArray::fromStringList(tags);
     if (lastOpened.isValid())
         o["lastOpened"] = lastOpened.toString(Qt::ISODate);
     if (category == LH::Collection)
@@ -70,6 +88,9 @@ Item Item::fromJson(const QJsonObject &o)
     it.target = o["target"].toString();
     it.favorite = o["favorite"].toBool();
     it.icon = o["icon"].toString();
+    for (const QJsonValue &v : o["tags"].toArray())
+        it.tags << v.toString();
+    it.tags = parseTags(it.tags.join(QLatin1Char(',')));
     it.lastOpened = QDateTime::fromString(o["lastOpened"].toString(), Qt::ISODate);
     for (const QJsonValue &v : o["members"].toArray())
         it.members << v.toString();

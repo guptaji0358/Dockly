@@ -15,7 +15,7 @@ Item {
     readonly property string viewStyle: styleOverride !== "" ? styleOverride : core.settings.values.viewStyle
     readonly property string cardSize: core.settings.values.cardSize
     readonly property int cardW: cardSize === "small" ? 128 : (cardSize === "large" ? 210 : 168)
-    readonly property bool animated: core.settings.values.animations
+    readonly property bool animated: Fx.animated
     signal itemClicked(string itemId)
 
     GridView {

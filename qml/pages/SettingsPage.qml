@@ -103,6 +103,19 @@ Item {
                                   {text: "Top", value: "top"}]
                     }
                     SettingCombo {
+                        key: "dockEdge2"; label: "Second edge"
+                        options: [{text: "None (one strip)", value: ""}, {text: "Left", value: "left"},
+                                  {text: "Right", value: "right"}, {text: "Top", value: "top"},
+                                  {text: "Bottom (above the taskbar)", value: "bottom"}]
+                    }
+                    Text {
+                        text: "With two edges, drag the dots to move the dock (into a corner to bend it) and the bars at the free end of a strip to decide how many icons sit on each edge. The bottom edge works only as one half of a two-edge dock."
+                        color: page.th.subtext
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                    SettingCombo {
                         key: "dockHotkey"; label: "Shortcut"
                         options: [{text: "Ctrl + Alt + D", value: "Ctrl+Alt+D"}, {text: "Ctrl + Alt + Space", value: "Ctrl+Alt+Space"},
                                   {text: "Ctrl + Shift + Space", value: "Ctrl+Shift+Space"}, {text: "Win + Shift + D", value: "Meta+Shift+D"},
@@ -263,8 +276,50 @@ Item {
                         options: [{text: "All at once", value: 0}, {text: "Quick (0.2 s)", value: 200}, {text: "Normal (0.4 s)", value: 400},
                                   {text: "Relaxed (1 s)", value: 1000}, {text: "Slow (2 s)", value: 2000}, {text: "Custom…", value: -1}]
                     }
+                    SettingCheck { key: "showRunning"; text: "Mark programs that are open with a dot" }
+                    SettingCheck { key: "focusRunning"; text: "Opening a program that is already open brings its window forward" }
+                    SettingCheck { key: "gamepadEnabled"; text: "Game controller can drive the ring (left stick / d-pad, A open, B back, LB + RB toggles it)" }
                     SettingCheck { key: "confirmDelete"; text: "Confirm before delete" }
                     SettingCheck { key: "checkMissingOnStartup"; text: "Check for missing items on startup" }
+                }
+
+                SettingGroup {
+                    title: "Lite mode"
+                    SettingCheck { key: "liteMode"; text: "Lite mode: no animations or glow, smaller icons, Dockly's background work slowed down" }
+                    SettingCheck { key: "liteAuto"; text: "Switch Lite mode on by itself when CPU, RAM or GPU is high" }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        enabled: core.settings.values.liteAuto
+                        opacity: enabled ? 1 : 0.5
+                        spacing: 12
+                        Text { text: "High usage means"; color: page.th.text }
+                        Slider {
+                            id: thr
+                            Layout.fillWidth: true
+                            from: 50; to: 100; stepSize: 5
+                            value: core.settings.values.liteThreshold
+                            onMoved: core.settings.set("liteThreshold", value)
+                        }
+                        Text { text: Math.round(thr.value) + "%"; color: page.th.text; Layout.preferredWidth: 40 }
+                    }
+                    Text {
+                        readonly property var p: core.perf
+                        text: (p.lite ? (p.autoTriggered ? "Lite mode is ON (usage was high)" : "Lite mode is ON") : "Lite mode is off")
+                              + (core.settings.values.liteAuto
+                                 ? "  -  CPU " + p.cpu + "%   RAM " + p.ram + "%   GPU " + (p.gpu < 0 ? "n/a" : p.gpu + "%")
+                                 : "")
+                        color: page.th.subtext
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
+                    Text {
+                        text: "Lite mode only lightens Dockly itself. It never closes or slows your other programs."
+                        color: page.th.subtext
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
                 }
 
                 SettingGroup {
@@ -290,6 +345,50 @@ Item {
                     SettingCheck { key: "animations"; text: "Animations" }
                     SettingCheck { key: "floatingTiles"; text: "Floating tiles" }
                     SettingCheck { key: "pauseWhenInactive"; text: "Pause effects in the background" }
+                }
+
+                SettingGroup {
+                    title: "Memory"
+                    SettingCombo {
+                        key: "memoryIdleTrim"; label: "Free memory when idle"
+                        customMin: 5; customDefault: 60; customSuffix: " seconds"
+                        options: [{text: "Never", value: 0}, {text: "After 15 seconds", value: 15}, {text: "After 30 seconds", value: 30},
+                                  {text: "After 1 minute", value: 60}, {text: "After 5 minutes", value: 300},
+                                  {text: "Custom…", value: -1}]
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 12
+                        Text {
+                            id: memText
+                            color: page.th.text
+                            font.pixelSize: 13
+                            text: "In use: " + core.memoryUsageMB().toFixed(0) + " MB"
+                            Timer {
+                                interval: 1500; repeat: true; running: page.visible
+                                onTriggered: memText.text = "In use: " + core.memoryUsageMB().toFixed(0) + " MB"
+                            }
+                        }
+                        AppButton {
+                            text: "Free memory now"
+                            onClicked: {
+                                core.trimMemory()
+                                memRefresh.restart()
+                            }
+                        }
+                        Timer {
+                            id: memRefresh
+                            interval: 1200
+                            onTriggered: memText.text = "In use: " + core.memoryUsageMB().toFixed(0) + " MB"
+                        }
+                    }
+                    Text {
+                        text: "Icons are kept on disk, so freeing memory does not slow anything down: pages and images reload the moment you use them."
+                        color: page.th.subtext
+                        font.pixelSize: 12
+                        wrapMode: Text.Wrap
+                        Layout.fillWidth: true
+                    }
                 }
 
                 SettingGroup {

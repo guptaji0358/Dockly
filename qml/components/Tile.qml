@@ -13,6 +13,7 @@ Item {
     required property int status
     required property int category
     required property bool favorite
+    required property bool running
     required property int index
 
     property real radius: 78            // hexagon circumradius
@@ -142,7 +143,7 @@ Item {
         Image {
             anchors.fill: parent
             source: root.iconSource
-            sourceSize: Qt.size(iconBox.sz * 3, iconBox.sz * 3)
+            sourceSize: Qt.size(iconBox.sz * 2, iconBox.sz * 2)
             fillMode: Image.PreserveAspectFit
             smooth: true
             mipmap: true
@@ -175,6 +176,17 @@ Item {
         height: root.radius * 0.42
         x: (root.hexW - width) / 2
         y: iconBox.y + iconBox.sz + root.labelGap
+    }
+
+    // open program: a glowing dot at the bottom point of the hexagon
+    Rectangle {
+        visible: root.running && core.settings.values.showRunning
+        width: 8; height: 8; radius: 4
+        x: root.hexW / 2 - 4
+        y: root.hexH - 13
+        color: root.accent
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, 0.7)
     }
 
     // favourite mark / toggle

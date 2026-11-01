@@ -34,18 +34,22 @@ QVector<ScannedApp> scanInstalledSoftware()
         while (it.hasNext()) {
             const QFileInfo link(it.next());
             const QString target = link.symLinkTarget();
-            if (target.isEmpty() || !target.endsWith(".exe", Qt::CaseInsensitive))
-                continue;
-            if (!QFileInfo::exists(target))
-                continue;
             const QString name = link.completeBaseName();
-            if (looksLikeNoise(name, target))
+            // Store apps and installer-advertised shortcuts have no resolvable .exe target;
+            // keep the shortcut itself so it still launches through the shell.
+            const bool exeTarget = target.endsWith(".exe", Qt::CaseInsensitive);
+            if (!target.isEmpty() && !exeTarget)
                 continue;
-            const QString key = QDir::cleanPath(target).toLower();
+            if (exeTarget && !QFileInfo::exists(target))
+                continue;
+            const QString launch = exeTarget ? target : link.absoluteFilePath();
+            if (looksLikeNoise(name, launch))
+                continue;
+            const QString key = QDir::cleanPath(exeTarget ? target : launch).toLower();
             if (seen.contains(key))
                 continue;
             seen.insert(key);
-            result.append({name, QDir::toNativeSeparators(QDir::cleanPath(target))});
+            result.append({name, QDir::toNativeSeparators(QDir::cleanPath(launch))});
         }
     }
 
@@ -78,8 +82,26 @@ QVector<ScannedApp> scanInstalledSoftware()
         QSettings reg(root, QSettings::NativeFormat);
         for (const QString &sub : reg.childGroups()) {
             reg.beginGroup(sub);
-            if (reg.value("SystemComponent").toInt() != 1)
-                addExe(reg.value("DisplayName").toString(), reg.value("DisplayIcon").toString());
+            if (reg.value("SystemComponent").toInt() != 1) {
+                const QString display = reg.value("DisplayName").toString();
+                QString icon = reg.value("DisplayIcon").toString();
+                if (!icon.contains(".exe", Qt::CaseInsensitive)) {
+                    // No usable DisplayIcon: look in InstallLocation for an exe named like the app.
+                    const QString dir = reg.value("InstallLocation").toString().trimmed().remove('"');
+                    if (!dir.isEmpty() && QDir(dir).exists()) {
+                        const QString squashed = QString(display).remove(' ').toLower();
+                        const QStringList exes = QDir(dir).entryList({"*.exe"}, QDir::Files);
+                        for (const QString &e : exes) {
+                            const QString b = QFileInfo(e).completeBaseName().toLower();
+                            if (!b.isEmpty() && (squashed.contains(b) || b.contains(squashed))) {
+                                icon = QDir(dir).filePath(e);
+                                break;
+                            }
+                        }
+                    }
+                }
+                addExe(display, icon);
+            }
             reg.endGroup();
         }
     }

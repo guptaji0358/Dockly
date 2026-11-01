@@ -52,7 +52,7 @@ The **Sites** tab keeps links to the websites you use most (GitHub, ChatGPT, Cla
 .\scripts\build.ps1 -Deploy    # also copy Qt runtime into .\dist (runs on any PC)
 ```
 
-Needs Qt 6.11 (MinGW 64) + CMake + Ninja; adjust `$qtRoot` in `scripts/build.ps1` if Qt lives elsewhere.
+Needs Qt 6.12 (MinGW 64) + CMake + Ninja; adjust `$qtRoot` in `scripts/build.ps1` if Qt lives elsewhere.
 Open the top-level `CMakeLists.txt` in Qt Creator to work on it there.
 
 ## Data: two SQLite files, read on demand

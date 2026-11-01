@@ -1,5 +1,7 @@
 #include "iconpack.h"
 
+#include <QCache>
+
 #include <QHash>
 #include <QPainter>
 #include <QSvgRenderer>
@@ -68,10 +70,10 @@ QPixmap pixmap(const QString &name, int px, const QColor &color)
 {
     if (px <= 0)
         return {};
-    static QHash<QString, QPixmap> cache;
+    static QCache<QString, QPixmap> cache(1024); // KB; icons are cheap to re-rasterise
     const QString key = name + QLatin1Char('|') + QString::number(px) + QLatin1Char('|') + color.name(QColor::HexArgb);
-    if (const auto it = cache.constFind(key); it != cache.cend())
-        return it.value();
+    if (const QPixmap *hit = cache.object(key))
+        return *hit;
 
     QPixmap pm(px, px);
     pm.fill(Qt::transparent);
@@ -82,9 +84,7 @@ QPixmap pixmap(const QString &name, int px, const QColor &color)
         p.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
         r.render(&p, QRectF(0, 0, px, px));
     }
-    if (cache.size() > 600)
-        cache.clear();
-    cache.insert(key, pm);
+    cache.insert(key, new QPixmap(pm), qMax(1, px * px * 4 / 1024));
     return pm;
 }
 

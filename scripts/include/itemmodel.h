@@ -15,6 +15,7 @@ class ItemModel : public QAbstractListModel
     Q_PROPERTY(int mode READ mode WRITE setMode NOTIFY filterChanged)
     Q_PROPERTY(QString search READ search WRITE setSearch NOTIFY filterChanged)
     Q_PROPERTY(QString collectionId READ collectionId WRITE setCollectionId NOTIFY filterChanged)
+    Q_PROPERTY(QString tag READ tag WRITE setTag NOTIFY filterChanged) // only items carrying this tag ("" = any)
     Q_PROPERTY(int count READ count NOTIFY countChanged)
 
 public:
@@ -28,6 +29,8 @@ public:
         IconSourceRole,
         CategoryNameRole,
         SubtitleRole,
+        RunningRole,  // a program with an open window
+        TagsRole,     // "work, client-a"
     };
 
     explicit ItemModel(QObject *parent = nullptr);
@@ -44,9 +47,12 @@ public:
     void setSearch(const QString &s);
     QString collectionId() const { return m_collectionId; }
     void setCollectionId(const QString &id);
+    QString tag() const { return m_tag; }
+    void setTag(const QString &t);
     int count() const { return m_ids.size(); }
 
     Q_INVOKABLE QString idAt(int row) const { return m_ids.value(row); }
+    Q_INVOKABLE QString nameAt(int row) const { return data(index(row), NameRole).toString(); }
     Q_INVOKABLE int rowOf(const QString &id) const { return m_ids.indexOf(id); }
 
 signals:
@@ -61,5 +67,6 @@ private:
     int m_mode = LH::ModeCategory;
     QString m_search;
     QString m_collectionId;
+    QString m_tag;
     QStringList m_ids;
 };

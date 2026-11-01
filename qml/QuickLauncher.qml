@@ -92,12 +92,17 @@ Window {
         field.forceActiveFocus()
     }
     function refresh() {
-        results = core.quickSearch(field.text, maxRows)
+        results = core.quickSearch(field.text, field.text.charAt(0) === "#" ? 200 : maxRows)
         current = 0
     }
     function activate(i) {
         if (i < 0 || i >= results.length)
             return
+        if (results[i].filter === true) { // a "#" suggestion: fill it in and go on typing
+            field.text = results[i].token
+            field.cursorPosition = field.text.length
+            return
+        }
         const id = results[i].id
         hide()
         if (core.launch(id) === LH.TargetMissing)
@@ -126,7 +131,7 @@ Window {
         }
     }
 
-    // press-and-drag on any bare part of the bar or hint moves the box; double-click puts it back top-centre
+    // press-and-drag on the search icon moves the box; double-click puts it back top-centre
     component DragZone: MouseArea {
         cursorShape: ql.placing ? Qt.ClosedHandCursor : Qt.OpenHandCursor
         acceptedButtons: Qt.LeftButton
@@ -234,17 +239,17 @@ Window {
                 size: 22
                 color: ql.th.accent
             }
-            DragZone { anchors.fill: parent }
+            DragZone { // the search icon is the only drag handle
+                width: 52
+                height: parent.height
+            }
             TextField {
                 id: field
                 anchors.fill: parent
                 anchors.leftMargin: 52
-                anchors.rightMargin: 12
-                anchors.topMargin: 9
-                anchors.bottomMargin: 9
                 leftPadding: 8
-                rightPadding: 10
-                placeholderText: "Open an app, file, site or workspace…"
+                rightPadding: 22
+                placeholderText: "Open an app, file, site or workspace…   ( # to filter )"
                 placeholderTextColor: ql.th.subtext
                 color: ql.th.text
                 font.pixelSize: 20
@@ -259,8 +264,11 @@ Window {
                     } else if (event.key === Qt.Key_Up) {
                         ql.current = Math.max(ql.current - 1, 0)
                         event.accepted = true
+                    } else if (event.key === Qt.Key_Tab && ql.results.length > 0 && ql.results[ql.current].filter === true) {
+                        ql.activate(ql.current)
+                        event.accepted = true
                     } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        if ((event.modifiers & Qt.ControlModifier) && ql.results.length > 0) {
+                        if ((event.modifiers & Qt.ControlModifier) && ql.results.length > 0 && ql.results[ql.current].filter !== true) {
                             const id = ql.results[ql.current].id
                             ql.hide()
                             core.showInFolder(id)
@@ -291,10 +299,13 @@ Window {
             anchors.top: bar.bottom
             anchors.topMargin: 6
             width: parent.width
-            height: Math.max(count, 1) * ql.rowH
-            interactive: false
+            height: Math.min(Math.max(count, 1), ql.maxRows) * ql.rowH
+            clip: true
+            interactive: count > ql.maxRows
+            boundsBehavior: Flickable.StopAtBounds
             model: ql.results
             currentIndex: ql.current
+            onCurrentIndexChanged: positionViewAtIndex(currentIndex, ListView.Contain)
             delegate: Item {
                 id: row
                 required property int index
@@ -310,12 +321,34 @@ Window {
                     radius: ql.th.radius === 0 ? 0 : 12
                     color: row.on ? Qt.rgba(ql.th.accent.r, ql.th.accent.g, ql.th.accent.b, ql.th.dark ? 0.22 : 0.16) : "transparent"
                 }
+                readonly property bool isFilter: row.modelData.filter === true
+                // "#" suggestion: the category's own icon, or a hash sign for a tag
+                Icon {
+                    visible: row.isFilter && row.modelData.iconName !== ""
+                    x: 26
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: row.modelData.iconName || ""
+                    size: 24
+                    color: ql.th.accent
+                }
+                Text {
+                    visible: row.isFilter && row.modelData.iconName === ""
+                    x: 26
+                    width: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "#"
+                    color: ql.th.accent
+                    font.pixelSize: 22
+                    font.weight: Font.DemiBold
+                }
                 Image {
+                    visible: !row.isFilter
                     x: 22
                     anchors.verticalCenter: parent.verticalCenter
                     width: 32
                     height: 32
-                    source: row.modelData.iconSource
+                    source: row.isFilter ? "" : row.modelData.iconSource
                     sourceSize: Qt.size(64, 64)
                     fillMode: Image.PreserveAspectFit
                     smooth: true
@@ -359,7 +392,7 @@ Window {
                         id: tagText
                         anchors.centerIn: parent
                         text: row.modelData.categoryName
-                        color: ql.th.categoryColor(row.modelData.category)
+                        color: row.modelData.category >= 0 ? ql.th.categoryColor(row.modelData.category) : ql.th.accent
                         font.pixelSize: 11
                         font.weight: Font.DemiBold
                     }
@@ -388,15 +421,11 @@ Window {
             anchors.horizontalCenter: parent.horizontalCenter
             height: 24
             visible: ql.expanded
-            text: "↑↓ select   ·   Enter open   ·   Ctrl+Enter show in folder   ·   Esc close"
+            text: field.text.charAt(0) === "#" && ql.results.length > 0 && ql.results[0].filter === true
+                  ? "↑↓ select   ·   Enter or Tab pick the filter   ·   Esc close"
+                  : "↑↓ select   ·   Enter open   ·   Ctrl+Enter show in folder   ·   Esc close"
             color: ql.th.subtext
             font.pixelSize: 11
-        }
-        DragZone {
-            visible: ql.expanded
-            anchors.top: list.bottom
-            anchors.bottom: parent.bottom
-            width: parent.width
         }
     }
 }

@@ -23,6 +23,9 @@ add_library(lhcore STATIC
     ${LH_INCLUDE}/dockguard.h ${LH_SRC}/dockguard.cpp
     ${LH_INCLUDE}/connectors.h ${LH_SRC}/connectors.cpp
     ${LH_INCLUDE}/sites.h ${LH_SRC}/sites.cpp
+    ${LH_INCLUDE}/runningapps.h ${LH_SRC}/runningapps.cpp
+    ${LH_INCLUDE}/gamepad.h ${LH_SRC}/gamepad.cpp
+    ${LH_INCLUDE}/perfmonitor.h ${LH_SRC}/perfmonitor.cpp
 )
 
 target_include_directories(lhcore PUBLIC ${LH_INCLUDE})
@@ -32,6 +35,9 @@ target_link_libraries(lhcore PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network
 # core_test.exe
 find_package(Qt6 REQUIRED COMPONENTS Test)
 qt_add_executable(core_test ${LH_MAIN}/core_test.cpp)
+if(WIN32)
+    target_link_libraries(lhcore PUBLIC psapi dwmapi pdh)
+endif()
 target_link_libraries(core_test PRIVATE lhcore Qt6::Test)
 add_test(NAME core_test COMMAND core_test)
 

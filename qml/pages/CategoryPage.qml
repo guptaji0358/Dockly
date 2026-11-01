@@ -8,7 +8,17 @@ Item {
     property var host
     property int category: LH.Software
 
-    ItemModel { id: itemModel; category: page.category }
+    property string tag: "" // active tag filter ("" = all)
+    property var tags: core.tagList(page.category)
+    ItemModel { id: itemModel; category: page.category; tag: page.tag }
+    Connections {
+        target: core
+        function onItemsChanged() {
+            page.tags = core.tagList(page.category)
+            if (page.tag !== "" && !page.tags.some(t => t.tag === page.tag))
+                page.tag = "" // the last item with this tag lost it
+        }
+    }
 
     readonly property string title: category === LH.Software ? "Software Hub"
                                   : category === LH.Document ? "Documents Hub"
@@ -61,6 +71,42 @@ Item {
                         page.host.addSoftware()
                     else
                         page.host.addFiles(page.category)
+                }
+            }
+        }
+
+        // tag filter: click a tag to narrow the hub to it, click again (or "All") to clear
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+            visible: page.tags.length > 0
+            Repeater {
+                model: [{tag: "", count: 0}].concat(page.tags)
+                delegate: Rectangle {
+                    id: chip
+                    required property var modelData
+                    readonly property bool on: page.tag === modelData.tag
+                    height: 26
+                    width: chipText.implicitWidth + 20
+                    radius: core.theme.radius === 0 ? 0 : 13
+                    color: on ? core.theme.accent : (chipMouse.containsMouse ? core.theme.cardHover : "transparent")
+                    border.width: 1
+                    border.color: on ? core.theme.accent : core.theme.border
+                    Text {
+                        id: chipText
+                        anchors.centerIn: parent
+                        text: chip.modelData.tag === "" ? "All" : "#" + chip.modelData.tag
+                        color: chip.on ? "white" : core.theme.text
+                        font.pixelSize: 12
+                        font.weight: Font.DemiBold
+                    }
+                    MouseArea {
+                        id: chipMouse
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: page.tag = chip.on ? "" : chip.modelData.tag
+                    }
                 }
             }
         }

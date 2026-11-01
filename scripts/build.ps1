@@ -1,11 +1,11 @@
-﻿# Configure + build Dockly with the Qt 6.11.1 MinGW kit, then (optionally) deploy.
+﻿# Configure + build Dockly with the Qt 6.12.0 MinGW kit, then (optionally) deploy.
 #   .\scripts\build.ps1            build
 #   .\scripts\build.ps1 -Deploy    build + copy Qt DLLs/plugins into .\dist so Dockly.exe runs anywhere
 param([switch]$Deploy)
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
 $qtRoot = 'D:\Apps\Qt6'
-$qt     = "$qtRoot\6.11.1\mingw_64"
+$qt     = "$qtRoot\6.12.0\mingw_64"
 $env:PATH = "$qtRoot\Tools\mingw1310_64\bin;$qtRoot\Tools\Ninja;$qtRoot\Tools\CMake_64\bin;$qt\bin;$env:PATH"
 
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=$qt" `

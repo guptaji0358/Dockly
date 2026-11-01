@@ -14,6 +14,7 @@ Item {
     required property int status
     required property int category
     required property bool favorite
+    required property bool running
     required property int index
 
     property string viewStyle: "grid"
@@ -29,7 +30,7 @@ Item {
     signal itemDropped(string draggedId)   // another card was dropped on this one
 
     readonly property var th: core.theme
-    readonly property bool animated: core.settings.values.animations
+    readonly property bool animated: Fx.animated
     readonly property bool grid: viewStyle === "grid"
     readonly property bool compact: viewStyle === "compact"
     readonly property int iconSize: grid ? Math.round(cardW * 0.5) : (compact ? 22 : 38)
@@ -142,6 +143,17 @@ Item {
             size: Math.round(root.iconSize * 0.6)
             color: root.status === 2 ? root.th.missing : root.th.warning
         }
+    }
+
+    // open program: a dot under the icon (grid) or beside it (list / compact)
+    Rectangle {
+        visible: root.running && core.settings.values.showRunning
+        width: 8; height: 8; radius: 4
+        x: iconBox.x + (iconBox.width - width) / 2
+        y: root.grid ? iconBox.y + iconBox.height + 3 : iconBox.y + iconBox.height - 2
+        color: root.accent
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, 0.7)
     }
 
     Text {

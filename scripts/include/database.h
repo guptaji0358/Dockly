@@ -22,8 +22,10 @@ public:
     // --- library: items --------------------------------------------------
     bool getItem(const QString &id, Item &out) const;
     QStringList queryIds(int mode, int category, const QString &search, const QString &collectionId,
-                         int recentLimit) const;
+                         int recentLimit, const QString &tag = {}) const;
     bool insertItem(const Item &it);
+    void setTags(const QString &id, const QStringList &tags);
+    QVariantList tagCounts(int category) const; // [{tag, count}], most used first
     bool updateItem(const Item &it);
     void setIcon(const QString &id, const QString &icon);
     void setFavorite(const QString &id, bool favorite);

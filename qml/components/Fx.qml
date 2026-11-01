@@ -14,17 +14,19 @@ QtObject {
 
     readonly property var s: core.settings.values
     readonly property string level: s.gpuLevel
-    readonly property bool animated: s.animations
+    // Lite mode (manual switch, or automatic while CPU / RAM / GPU is high): no animations, glow or shader backdrop
+    readonly property bool lite: core.perf.lite
+    readonly property bool animated: s.animations && !lite
     // effects run only while the window is in front (when the user wants that)
     readonly property bool live: animated && (windowActive || !s.pauseWhenInactive)
 
-    readonly property bool aurora: !softwareRenderer && level !== "low"
+    readonly property bool aurora: !softwareRenderer && level !== "low" && !lite
     readonly property bool auroraLive: aurora && live
     readonly property int auroraInterval: level === "high" ? 16 : 33
-    readonly property bool stars: level === "high" && !softwareRenderer
+    readonly property bool stars: level === "high" && !softwareRenderer && !lite
     readonly property bool parallax: level === "high" && animated
-    readonly property bool glow: level !== "low"
-    readonly property bool haloGlow: level === "high"
+    readonly property bool glow: level !== "low" && !lite
+    readonly property bool haloGlow: level === "high" && !lite
     readonly property bool tilt: level !== "low" && animated
     readonly property bool floating: level !== "low" && animated && s.floatingTiles
     readonly property bool spin: level === "high" && animated   // orbit rings slowly turn

@@ -1,5 +1,7 @@
 #include "database.h"
 
+#include <algorithm>
+
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
@@ -47,6 +49,7 @@ bool Database::open(const QString &dir)
            " norm TEXT NOT NULL DEFAULT '', favorite INTEGER NOT NULL DEFAULT 0,"
            " last_opened TEXT, status INTEGER NOT NULL DEFAULT 0)");
     q.exec("ALTER TABLE items ADD COLUMN icon TEXT NOT NULL DEFAULT ''"); // fails harmlessly when it exists
+    q.exec("ALTER TABLE items ADD COLUMN tags TEXT NOT NULL DEFAULT ''"); // comma-separated, fails harmlessly when it exists
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_cat ON items(category, name COLLATE NOCASE)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_norm ON items(category, norm)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_fav ON items(favorite)");
@@ -86,6 +89,7 @@ static Item rowToItem(QSqlQuery &q)
     it.lastOpened = QDateTime::fromString(q.value(5).toString(), Qt::ISODate);
     it.status = LH::Status(q.value(6).toInt());
     it.icon = q.value(7).toString();
+    it.tags = Item::parseTags(q.value(8).toString());
     return it;
 }
 
@@ -94,7 +98,7 @@ bool Database::getItem(const QString &id, Item &out) const
     if (!m_open)
         return {};
     QSqlQuery q(lib());
-    q.prepare("SELECT id,category,name,target,favorite,last_opened,status,icon FROM items WHERE id=?");
+    q.prepare("SELECT id,category,name,target,favorite,last_opened,status,icon,tags FROM items WHERE id=?");
     q.addBindValue(id);
     if (!q.exec() || !q.next())
         return false;
@@ -103,7 +107,7 @@ bool Database::getItem(const QString &id, Item &out) const
 }
 
 QStringList Database::queryIds(int mode, int category, const QString &search, const QString &collectionId,
-                               int recentLimit) const
+                               int recentLimit, const QString &tag) const
 {
     if (!m_open)
         return {};
@@ -111,11 +115,18 @@ QStringList Database::queryIds(int mode, int category, const QString &search, co
     QVariantList binds;
     QString where;
     const QString needle = search.trimmed();
+    const QString wantTag = tag.trimmed().toLower();
     auto addSearch = [&](const QString &prefix) {
+        if (!wantTag.isEmpty()) { // tags are stored as "a,b,c": match the whole tag between commas
+            where += QStringLiteral(" AND (',' || %1tags || ',') LIKE ? ESCAPE '\\'").arg(prefix);
+            QString e = wantTag;
+            e.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_");
+            binds << QStringLiteral("%,") + e + QStringLiteral(",%");
+        }
         if (needle.isEmpty())
             return;
-        where += QStringLiteral(" AND (%1name LIKE ? ESCAPE '\\' OR %1target LIKE ? ESCAPE '\\')").arg(prefix);
-        binds << likePattern(needle) << likePattern(needle);
+        where += QStringLiteral(" AND (%1name LIKE ? ESCAPE '\\' OR %1target LIKE ? ESCAPE '\\' OR %1tags LIKE ? ESCAPE '\\')").arg(prefix);
+        binds << likePattern(needle) << likePattern(needle) << likePattern(needle);
     };
 
     switch (mode) {
@@ -167,7 +178,7 @@ bool Database::insertItem(const Item &it)
     if (!m_open)
         return {};
     QSqlQuery q(lib());
-    q.prepare("INSERT INTO items(id,category,name,target,norm,favorite,last_opened,status,icon) VALUES(?,?,?,?,?,?,?,?,?)");
+    q.prepare("INSERT INTO items(id,category,name,target,norm,favorite,last_opened,status,icon,tags) VALUES(?,?,?,?,?,?,?,?,?,?)");
     q.addBindValue(it.id);
     q.addBindValue(int(it.category));
     q.addBindValue(it.name);
@@ -177,7 +188,43 @@ bool Database::insertItem(const Item &it)
     q.addBindValue(it.lastOpened.isValid() ? QVariant(it.lastOpened.toString(Qt::ISODate)) : QVariant(QMetaType(QMetaType::QString)));
     q.addBindValue(int(it.status));
     q.addBindValue(it.icon.isNull() ? QStringLiteral("") : it.icon); // never bind NULL
+    q.addBindValue(it.tags.isEmpty() ? QStringLiteral("") : it.tags.join(QLatin1Char(','))); // never bind NULL
     return q.exec();
+}
+
+void Database::setTags(const QString &id, const QStringList &tags)
+{
+    if (!m_open)
+        return;
+    QSqlQuery q(lib());
+    q.prepare("UPDATE items SET tags=? WHERE id=?");
+    q.addBindValue(tags.isEmpty() ? QStringLiteral("") : tags.join(QLatin1Char(','))); // never bind NULL
+    q.addBindValue(id);
+    q.exec();
+}
+
+QVariantList Database::tagCounts(int category) const
+{
+    if (!m_open)
+        return {};
+    QSqlQuery q(lib());
+    q.prepare(category == LH::AllCategories ? "SELECT tags FROM items WHERE tags<>''"
+                                            : "SELECT tags FROM items WHERE tags<>'' AND category=?");
+    if (category != LH::AllCategories)
+        q.addBindValue(category);
+    QHash<QString, int> count;
+    if (q.exec())
+        while (q.next())
+            for (const QString &t : q.value(0).toString().split(',', Qt::SkipEmptyParts))
+                ++count[t];
+    QStringList names = count.keys();
+    std::sort(names.begin(), names.end(), [&](const QString &a, const QString &b) {
+        return count[a] != count[b] ? count[a] > count[b] : a < b;
+    });
+    QVariantList out;
+    for (const QString &t : names)
+        out.append(QVariantMap{{"tag", t}, {"count", count[t]}});
+    return out;
 }
 
 bool Database::updateItem(const Item &it)
@@ -485,7 +532,7 @@ QJsonObject Database::exportAll() const
         return {};
     QJsonArray items;
     QSqlQuery q(lib());
-    q.exec("SELECT id,category,name,target,favorite,last_opened,status,icon FROM items ORDER BY rowid");
+    q.exec("SELECT id,category,name,target,favorite,last_opened,status,icon,tags FROM items ORDER BY rowid");
     while (q.next()) {
         Item it = rowToItem(q);
         if (it.category == LH::Collection)

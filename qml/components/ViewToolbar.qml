@@ -32,7 +32,7 @@ Rectangle {
                 Layout.preferredHeight: 34
                 radius: bar.th.radius === 0 ? 0 : 8
                 color: on ? bar.th.accent : (segMouse.containsMouse ? bar.th.cardHover : "transparent")
-                Behavior on color { enabled: core.settings.values.animations; ColorAnimation { duration: 120 } }
+                Behavior on color { enabled: Fx.animated; ColorAnimation { duration: 120 } }
                 Icon {
                     anchors.centerIn: parent
                     name: seg.modelData

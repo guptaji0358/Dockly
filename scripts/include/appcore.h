@@ -3,14 +3,19 @@
 #include "appsettings.h"
 #include "connectors.h"
 #include "database.h"
+#include "gamepad.h"
 #include "item.h"
+#include "perfmonitor.h"
+#include "runningapps.h"
 #include "sites.h"
 #include "softwarescanner.h"
 #include "theme.h"
 
+#include <QCache>
 #include <QFileIconProvider>
 #include <QFutureWatcher>
 #include <QHash>
+#include <QMultiHash>
 #include <QIcon>
 #include <QObject>
 #include <QPixmap>
@@ -36,6 +41,9 @@ class AppCore : public QObject
     Q_PROPERTY(int catalogCount READ catalogCount NOTIFY catalogChanged)
     Q_PROPERTY(Connectors *connectors READ connectors CONSTANT)
     Q_PROPERTY(Sites *sites READ sites CONSTANT)
+    Q_PROPERTY(RunningApps *running READ running CONSTANT)
+    Q_PROPERTY(Gamepad *gamepad READ gamepad CONSTANT)
+    Q_PROPERTY(PerfMonitor *perf READ perf CONSTANT)
 
 public:
     static AppCore *instance();
@@ -48,6 +56,10 @@ public:
     Theme *theme() const { return m_theme; }
     Connectors *connectors() const { return m_connectors; }
     Sites *sites() const { return m_sites; }
+    RunningApps *running() const { return m_running; }
+    Gamepad *gamepad() const { return m_gamepad; }
+    PerfMonitor *perf() const { return m_perf; }
+    bool lite() const { return m_perf->lite(); }
     // new web shortcuts are filed into their site's group; importers that pick their own group switch it off
     void setAutoFile(bool on) { m_autoFile = on; }
     bool autoFile() const { return m_autoFile; }
@@ -61,7 +73,8 @@ public:
     // Row access (cached). Returns an Item with an empty id when it does not exist.
     Item item(const QString &id) const;
     bool exists(const QString &id) const { return !item(id).id.isEmpty(); }
-    QStringList queryIds(int mode, int category, const QString &search, const QString &collectionId) const;
+    QStringList queryIds(int mode, int category, const QString &search, const QString &collectionId,
+                         const QString &tag = {}) const;
     QString subtitleFor(const Item &it) const;
     QPixmap pixmapFor(const QString &id, int size);          // what the card shows (custom icon if set)
     QPixmap pixmapOriginal(const QString &id, int size);     // the automatic icon, ignoring any custom one
@@ -75,13 +88,18 @@ public:
     Q_INVOKABLE void clearItemIcon(const QString &id);                         // back to the automatic icon
     Q_INVOKABLE QString imageFilter() const;                                   // every readable image type
     Q_INVOKABLE bool updateItem(const QString &id, const QString &name, const QString &target);
+    Q_INVOKABLE bool autoRelocate(const QString &id); // searches likely places for the moved file; true = target fixed
     Q_INVOKABLE void removeItem(const QString &id);
     Q_INVOKABLE void setFavorite(const QString &id, bool favorite);
+    // Tags: free labels on any item ("work", "client-a"). Text is split on commas / spaces; a leading # is ignored.
+    Q_INVOKABLE void setItemTags(const QString &id, const QString &tagsText);
+    Q_INVOKABLE QVariantList tagList(int category = -1) const; // [{tag, count}], most used first
     Q_INVOKABLE QVariantMap itemInfo(const QString &id) const;
     Q_INVOKABLE void select(const QString &id);
 
     // --- launching -------------------------------------------------------
-    Q_INVOKABLE int launch(const QString &id); // returns LH::LaunchResult
+    Q_INVOKABLE int launch(const QString &id); // returns LH::LaunchResult; an open program is brought forward (setting focusRunning)
+    Q_INVOKABLE int launchNew(const QString &id); // always starts a fresh instance of a program
     Q_INVOKABLE int launchAll(const QString &collectionId);
     Q_INVOKABLE void showInFolder(const QString &id);
     // quick actions on one item
@@ -92,6 +110,8 @@ public:
     // --- quick launcher -----------------------------------------------------
     // Best matches first (name prefix, word prefix, name contains, path contains; favourites win ties).
     // An empty query lists recents, then favourites. Each row: {id, name, subtitle, category, categoryName, iconSource}.
+    // "#" alone, or "#so" (no space yet), lists the filters instead of items: categories, then tags. Those rows have
+    // filter = true and a `token` ("#software ") to put in the box; "#software " then lists that category's items.
     Q_INVOKABLE QVariantList quickSearch(const QString &query, int limit = 8) const;
     Q_INVOKABLE void showLauncher() { emit launcherRequested(); } // for menus, buttons and the tray (no shortcut needed)
     Q_INVOKABLE QVariantList browsers() const; // installed browsers: [{text, value = exe path}]
@@ -126,6 +146,8 @@ public:
     Q_INVOKABLE void resetSettings();
     Q_INVOKABLE void openBackupFolder();
     Q_INVOKABLE void clearCache();
+    Q_INVOKABLE void trimMemory();          // drop every rebuildable cache and hand free pages back to Windows
+    Q_INVOKABLE double memoryUsageMB() const; // private bytes of this process, in MB
     Q_INVOKABLE QString checkForUpdates() const;
     Q_INVOKABLE QString aboutText() const;
     Q_INVOKABLE QString dataFolder() const { return m_dataDir; }
@@ -149,6 +171,10 @@ signals:
     void selectionChanged();
     void launcherRequested();
     void message(const QString &text);
+    void memoryTrimmed(); // QML: unload pages and images nobody is looking at
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     explicit AppCore(QObject *parent = nullptr);
@@ -171,6 +197,14 @@ private:
     Theme *m_theme;
     Connectors *m_connectors = nullptr;
     Sites *m_sites = nullptr;
+    RunningApps *m_running = nullptr;
+    Gamepad *m_gamepad = nullptr;
+    PerfMonitor *m_perf = nullptr;
+    void applyPerfSettings();  // hands the Lite settings to the monitor
+    void applyLite();          // Lite mode just turned on / off: slow Dockly's own background work, lighten icons
+    QTimer m_runningSync;
+    void syncRunning();                                       // tells RunningApps which programs to look for
+    int launchImpl(const QString &id, bool focusIfRunning);
     bool m_autoFile = true;
     Database m_db;
     mutable QHash<QString, Item> m_cache;
@@ -184,7 +218,18 @@ private:
     bool m_closed = false;
 
     QFileIconProvider m_iconProvider;
-    QHash<QString, QPixmap> m_pixCache;
+    // Small RAM tier (a few MB) in front of a PNG-per-icon disk tier, so rendered icons live
+    // on disk instead of piling up in memory.
+    QCache<QString, QPixmap> m_pixCache;
+    QString m_pixDir;
+    QPixmap cachedPixmap(const QString &key);
+    void storePixmap(const QString &key, const QPixmap &pm);
+    void clearPixCache();
+    void evictIcon(const QString &id, bool includeOriginal); // forget one item's icons (RAM + disk)
+    void applyIdleTrim();
+    QMultiHash<QString, QString> m_pixIndex; // owner (item id / file path) -> cache keys
+    QTimer m_trimTimer;
+    qint64 m_lastInput = 0;
     QNetworkAccessManager *m_net = nullptr;
     QSet<QString> m_faviconRequested;
 

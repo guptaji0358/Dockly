@@ -39,6 +39,7 @@ AppDialog {
         previewTarget = ""
         nameField.text = ""
         targetField.text = ""
+        tagsField.text = ""
         open()
         if (category === LH.Collection)
             nameField.forceActiveFocus()
@@ -59,6 +60,7 @@ AppDialog {
         itemId = id
         nameField.text = i.name
         targetField.text = i.target
+        tagsField.text = i.tagsText || ""
         resetIcon(i.icon !== "")
         previewTarget = i.target
         open()
@@ -104,6 +106,12 @@ AppDialog {
                 }
             }
         }
+    }
+    Text { text: "Tags"; color: dlg.th.subtext }
+    Field {
+        id: tagsField
+        placeholderText: "work, client-a, ...   (find them with # in the search box)"
+        onAccepted: save.clicked()
     }
     Text { text: "Icon"; color: dlg.th.subtext }
     RowLayout {
@@ -191,6 +199,7 @@ AppDialog {
                                                         : core.addItem(dlg.category, nameField.text, targetField.text)
                 }
                 if (id !== "") {
+                    core.setItemTags(id, tagsField.text)
                     if (dlg.pickedIcon !== "")
                         core.setItemIcon(id, dlg.pickedIcon)
                     else if (dlg.removeIcon)

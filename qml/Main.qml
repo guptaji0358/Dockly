@@ -18,6 +18,14 @@ ApplicationWindow {
 
     readonly property var th: core.theme
     property int tab: 0
+    readonly property string query: search.text
+    property var visited: [0]
+    function keep(i) { return visible && (tab === i || visited.indexOf(i) >= 0) }
+    Connections {
+        target: core
+        function onMemoryTrimmed() { win.visited = [win.tab] }
+    }
+    onVisibleChanged: if (!visible) visited = [tab]
     Binding { target: Fx; property: "windowActive"; value: win.active }
     property var ctx: ({})
     property string ctxCollection: ""
@@ -53,6 +61,25 @@ ApplicationWindow {
         {icon: "settings", name: "Settings", full: "Settings"}
     ]
 
+    // "#tag" filters in the search box; alias is an extra spelling (#docs, #media, #links)
+    readonly property var searchTags: [
+        {key: "software", alias: "apps", cat: LH.Software, hint: "Installed programs"},
+        {key: "documents", alias: "docs", cat: LH.Document, hint: "Files and folders"},
+        {key: "entertainment", alias: "media", cat: LH.Entertainment, hint: "Music, video, games"},
+        {key: "web", alias: "links", cat: LH.Web, hint: "Websites and shortcuts"},
+        {key: "collections", alias: "workspaces", cat: LH.Collection, hint: "Groups of cards"}
+    ]
+
+    // the user's own tags join the categories in the "#" list (#work, #client-a)
+    property var userTags: core.tagList(-1)
+    Connections {
+        target: core
+        function onItemsChanged() { win.userTags = core.tagList(-1) }
+    }
+    readonly property var allSearchTags: searchTags.concat(
+        userTags.filter(t => !searchTags.some(c => c.key === t.tag || c.alias === t.tag))
+                .map(t => ({key: t.tag, alias: "", cat: -1, tag: true, hint: "Tag  ·  " + t.count + " item(s)"})))
+
     // ---- actions shared by every page ---------------------------------
 
     function launch(id) {
@@ -66,6 +93,8 @@ ApplicationWindow {
         choice.ask(isWeb ? "Invalid link" : "Item missing", "\"" + i.name + "\" can't be opened.\n\n" + text, labels, k => {
             const a = labels[k]
             if (a === "Locate Again") {
+                if (core.autoRelocate(id))
+                    return
                 const f = core.pickFiles("Locate " + i.name, core.fileFilter(i.category), false)
                 if (f.length > 0)
                     core.updateItem(id, i.name, f[0])
@@ -134,7 +163,9 @@ ApplicationWindow {
             Qt.callLater(hide)
     }
     onTabChanged: {
-        if (core.settings.values.animations)
+        if (visited.indexOf(tab) < 0)
+            visited = visited.concat(tab)
+        if (Fx.animated)
             fade.restart()
     }
 
@@ -292,6 +323,7 @@ ApplicationWindow {
         anchors.margins: 20
         anchors.topMargin: 8
         height: 46
+        z: 45   // the "#" suggestion list hangs below this bar, over the pages
 
         Row {
             id: brand
@@ -339,13 +371,98 @@ ApplicationWindow {
                 verticalAlignment: TextInput.AlignVCenter
                 background: null
                 onTextChanged: {
+                    tagList.cur = 0
                     // any text jumps Home and searches every hub
                     if (text.trim() !== "" && win.tab !== 0)
                         win.tab = 0
                 }
                 Keys.onEscapePressed: { text = ""; focus = false }
+                Keys.onPressed: event => {
+                    if (!tagList.shown)
+                        return
+                    const n = tagList.matches.length
+                    if (event.key === Qt.Key_Down) {
+                        tagList.cur = (tagList.cur + 1) % n
+                        event.accepted = true
+                    } else if (event.key === Qt.Key_Up) {
+                        tagList.cur = (tagList.cur + n - 1) % n
+                        event.accepted = true
+                    } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        tagList.pick(tagList.matches[tagList.cur])
+                        event.accepted = true
+                    }
+                }
             }
             Shortcut { sequences: [StandardKey.Find, "/"]; onActivated: { search.forceActiveFocus(); search.selectAll() } }
+        }
+
+        // "#" suggestions: every category while typing the tag, hidden once a space follows it
+        Rectangle {
+            id: tagList
+            readonly property string word: search.text.charAt(0) === "#" && search.text.indexOf(" ") < 0
+                                           ? search.text.slice(1).toLowerCase() : ""
+            readonly property var matches: {
+                if (search.text.charAt(0) !== "#" || search.text.indexOf(" ") >= 0)
+                    return []
+                return win.allSearchTags.filter(t => t.key.indexOf(word) === 0 || (t.alias !== "" && t.alias.indexOf(word) === 0))
+            }
+            readonly property bool shown: search.activeFocus && matches.length > 0
+            property int cur: 0
+            function pick(t) {
+                search.text = "#" + t.key + " "
+                search.cursorPosition = search.text.length
+            }
+
+            visible: shown
+            z: 60
+            x: searchBox.x
+            y: searchBox.y + searchBox.height + 6
+            width: searchBox.width
+            height: col.height + 12
+            color: win.th.surface
+            border.color: win.th.border
+            radius: win.th.radius === 0 ? 0 : 12
+
+            Column {
+                id: col
+                x: 6; y: 6
+                width: parent.width - 12
+                Repeater {
+                    model: tagList.matches
+                    delegate: Rectangle {
+                        id: row
+                        required property var modelData
+                        required property int index
+                        width: col.width
+                        height: 38
+                        radius: win.th.radius === 0 ? 0 : 8
+                        color: row.index === tagList.cur || rowMouse.containsMouse ? win.th.cardHover : "transparent"
+                        Text {
+                            x: 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "#" + row.modelData.key
+                            color: win.th.accent
+                            font.pixelSize: 14
+                            font.weight: Font.DemiBold
+                        }
+                        Text {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: row.modelData.hint
+                            color: win.th.subtext
+                            font.pixelSize: 12
+                        }
+                        MouseArea {
+                            id: rowMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: { tagList.pick(row.modelData); search.forceActiveFocus() }
+                        }
+                    }
+                }
+            }
         }
 
         Row {
@@ -429,15 +546,17 @@ ApplicationWindow {
         anchors.bottomMargin: 96
         currentIndex: win.tab
 
-        HomePage { host: win; search: search.text }
-        CategoryPage { host: win; category: LH.Software }
-        CategoryPage { host: win; category: LH.Document }
-        CategoryPage { host: win; category: LH.Entertainment }
-        CategoryPage { host: win; category: LH.Web }
-        CollectionsPage { host: win }
-        SitesPage { host: win }
-        ConnectorsPage { host: win }
-        SettingsPage { host: win }
+        // A page exists only while the window is shown and it has been visited since the last memory trim,
+        // so hidden pages (and their images and delegates) do not sit in RAM.
+        Loader { active: win.keep(0); sourceComponent: HomePage { host: win; search: win.query } }
+        Loader { active: win.keep(1); sourceComponent: CategoryPage { host: win; category: LH.Software } }
+        Loader { active: win.keep(2); sourceComponent: CategoryPage { host: win; category: LH.Document } }
+        Loader { active: win.keep(3); sourceComponent: CategoryPage { host: win; category: LH.Entertainment } }
+        Loader { active: win.keep(4); sourceComponent: CategoryPage { host: win; category: LH.Web } }
+        Loader { active: win.keep(5); sourceComponent: CollectionsPage { host: win } }
+        Loader { active: win.keep(6); sourceComponent: SitesPage { host: win } }
+        Loader { active: win.keep(7); sourceComponent: ConnectorsPage { host: win } }
+        Loader { active: win.keep(8); sourceComponent: SettingsPage { host: win } }
     }
 
     // ---- floating detail panel ---------------------------------------------------------
@@ -652,6 +771,13 @@ ApplicationWindow {
         }
         Sep {}
         Entry {
+            readonly property bool applies: win.ctx.category === LH.Software && win.ctx.running === true
+            text: "Open New Window"
+            visible: applies
+            height: applies ? implicitHeight : 0
+            onTriggered: core.launchNew(win.ctx.id)
+        }
+        Entry {
             readonly property bool applies: win.ctx.category === LH.Software
             text: "Run as Administrator"
             visible: applies
@@ -688,6 +814,8 @@ ApplicationWindow {
             visible: applies
             height: applies ? implicitHeight : 0
             onTriggered: {
+                if (core.autoRelocate(win.ctx.id))
+                    return
                 const f = core.pickFiles("Locate " + win.ctx.name, core.fileFilter(win.ctx.category), false)
                 if (f.length > 0)
                     core.updateItem(win.ctx.id, win.ctx.name, f[0])

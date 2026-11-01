@@ -257,6 +257,10 @@ Glass {
                 iconName: "locate"
                 tip: "Locate again…"
                 onClicked: {
+                    if (core.autoRelocate(panel.info.id)) {
+                        panel.load()
+                        return
+                    }
                     const f = core.pickFiles("Locate " + nameField.text, core.fileFilter(panel.info.category), false)
                     if (f.length > 0) {
                         core.updateItem(panel.info.id, nameField.text, f[0])

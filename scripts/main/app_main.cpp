@@ -93,7 +93,7 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     QCoreApplication::setApplicationName("Dockly");
     if (qEnvironmentVariableIsEmpty("LH_NO_GL")) {
         QFile f(dataDirPath() + "/settings.json");
-        QString api = QStringLiteral("opengl");
+        QString api = QStringLiteral("software");
         if (f.open(QIODevice::ReadOnly)) {
             const QString v = QJsonDocument::fromJson(f.readAll()).object().value("graphicsApi").toString();
             if (!v.isEmpty())
@@ -228,6 +228,9 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
 
     auto *win = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
     win->setIcon(AppCore::appIcon());
+    // rarely shown windows give their scene graph and GPU resources back as soon as they are hidden
+    win->setPersistentSceneGraph(false);
+    win->setPersistentGraphics(false);
     auto *dockWin = qobject_cast<QQuickWindow *>(engine.rootObjects().at(1));
     auto revealDock = [dockWin] { QMetaObject::invokeMethod(dockWin, "reveal"); };
     QObject::connect(&tray, &TrayController::showRequested, win, [win] { bringToFront(win); });
@@ -236,6 +239,13 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     QObject::connect(&tray, &TrayController::editMainRequested, win, [win](const QString &id) {
         bringToFront(win);
         QMetaObject::invokeMethod(win, "edit", Q_ARG(QVariant, id));
+    });
+    // memory trim: sweep the QML engine once the pages have been unloaded
+    QObject::connect(core, &AppCore::memoryTrimmed, &engine, [&engine] {
+        QTimer::singleShot(250, &engine, [&engine] {
+            engine.trimComponentCache();
+            engine.collectGarbage();
+        });
     });
     GlobalHotkey hotkey;
     auto applyHotkey = [&hotkey, core] {
@@ -252,6 +262,8 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
 
     // the quick launcher: a type-to-launch box over whatever you are doing, opened by its own system-wide shortcut
     auto *launcherWin = qobject_cast<QQuickWindow *>(engine.rootObjects().at(2));
+    launcherWin->setPersistentSceneGraph(false);
+    launcherWin->setPersistentGraphics(false);
     auto showLauncher = [launcherWin] {
         QMetaObject::invokeMethod(launcherWin, "toggle");
         if (launcherWin->isVisible())

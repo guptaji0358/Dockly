@@ -22,6 +22,10 @@ class DockGuard : public QObject
     Q_PROPERTY(QWindow *window READ window WRITE setWindow NOTIFY windowChanged)
     Q_PROPERTY(QRectF edgeZone READ edgeZone WRITE setEdgeZone NOTIFY zonesChanged)
     Q_PROPERTY(QRectF dockZone READ dockZone WRITE setDockZone NOTIFY zonesChanged)
+    // a dock split across two separate edges (left + right) has a second window and second zones; null = none
+    Q_PROPERTY(QWindow *window2 READ window2 WRITE setWindow2 NOTIFY windowChanged)
+    Q_PROPERTY(QRectF edgeZone2 READ edgeZone2 WRITE setEdgeZone2 NOTIFY zonesChanged)
+    Q_PROPERTY(QRectF dockZone2 READ dockZone2 WRITE setDockZone2 NOTIFY zonesChanged)
     // while true the dock window lets every click and hover through to the program underneath
     Q_PROPERTY(bool clickThrough READ clickThrough WRITE setClickThrough NOTIFY clickThroughChanged)
     // ms the pointer must stay untouched before `idle` turns true; 0 = never
@@ -47,6 +51,12 @@ public:
     void setEdgeZone(const QRectF &r);
     QRectF dockZone() const { return m_dock; }
     void setDockZone(const QRectF &r);
+    QWindow *window2() const { return m_window2; }
+    void setWindow2(QWindow *w);
+    QRectF edgeZone2() const { return m_edge2; }
+    void setEdgeZone2(const QRectF &r);
+    QRectF dockZone2() const { return m_dock2; }
+    void setDockZone2(const QRectF &r);
     bool clickThrough() const { return m_clickThrough; }
     void setClickThrough(bool on);
     int idleAfter() const { return m_idleAfter; }
@@ -80,6 +90,12 @@ private:
     void trackIdle(const QPointF &p);
     bool wantsOpen(const QPointF &p);
     bool atWall(const QPointF &p) const;
+    double edgeDistance(const QPointF &p) const;
+    double dockDistance(const QPointF &p) const;
+    bool inEdge(const QPointF &p) const;
+    bool inDock(const QPointF &p) const;
+    void clickThroughOf(QWindow *w) const;
+    void liftOf(QWindow *w) const;
     bool foregroundIsFullscreen();
     bool isCalmApp(quintptr hwnd) const;
     void liftWindow();
@@ -88,7 +104,9 @@ private:
 
     bool m_enabled = true;
     QPointer<QWindow> m_window;
+    QPointer<QWindow> m_window2;
     QRectF m_edge, m_dock;
+    QRectF m_edge2, m_dock2;   // the second half of a dock split across two edges (null otherwise)
     bool m_clickThrough = false;
     int m_ticks = 0;
     QStringList m_calmApps;

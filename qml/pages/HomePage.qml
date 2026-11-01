@@ -12,7 +12,28 @@ Item {
 
     ItemModel { id: favModel; mode: LH.ModeFavorites }
     ItemModel { id: recentModel; mode: LH.ModeRecent }
-    ItemModel { id: searchModel; search: page.search }
+    // "#software photo" = only Software cards matching "photo"; a bare "#" lists everything.
+    // Unknown tags match nothing (-2), so a typo never silently searches all hubs.
+    readonly property var parsed: {
+        const raw = page.search.trim()
+        if (raw.charAt(0) !== "#")
+            return {cat: LH.AllCategories, rest: raw, tag: ""}
+        const m = /^#(\S*)\s*(.*)$/.exec(raw)
+        const word = m[1].toLowerCase()
+        if (word === "")
+            return {cat: LH.AllCategories, rest: m[2], tag: ""}
+        const tags = page.host.allSearchTags
+        // an exact name wins over a prefix ("#web" is the category even though a tag "website" exists)
+        for (let i = 0; i < tags.length; ++i)
+            if (tags[i].key === word)
+                return tags[i].tag ? {cat: LH.AllCategories, rest: m[2], tag: tags[i].key} : {cat: tags[i].cat, rest: m[2], tag: ""}
+        for (let i = 0; i < tags.length; ++i)
+            if (tags[i].key.indexOf(word) === 0 || (tags[i].alias !== "" && tags[i].alias.indexOf(word) === 0))
+                return tags[i].tag ? {cat: LH.AllCategories, rest: m[2], tag: tags[i].key} : {cat: tags[i].cat, rest: m[2], tag: ""}
+        return {cat: -2, rest: m[2], tag: ""}
+    }
+
+    ItemModel { id: searchModel; category: page.parsed.cat; search: page.parsed.rest; tag: page.parsed.tag }
 
     component Heading: Text {
         color: core.theme.accent

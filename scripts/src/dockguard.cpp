@@ -83,6 +83,53 @@ void DockGuard::setWindow(QWindow *w)
     emit windowChanged();
 }
 
+void DockGuard::setWindow2(QWindow *w)
+{
+    if (m_window2 == w)
+        return;
+    m_window2 = w;
+    emit windowChanged();
+}
+
+void DockGuard::setEdgeZone2(const QRectF &r)
+{
+    if (m_edge2 == r)
+        return;
+    m_edge2 = r;
+    emit zonesChanged();
+}
+
+void DockGuard::setDockZone2(const QRectF &r)
+{
+    if (m_dock2 == r)
+        return;
+    m_dock2 = r;
+    emit zonesChanged();
+}
+
+// The zones of both halves count as one dock: the nearest half decides.
+double DockGuard::edgeDistance(const QPointF &p) const
+{
+    const double d = distanceTo(m_edge, p);
+    return m_edge2.isEmpty() ? d : qMin(d, distanceTo(m_edge2, p));
+}
+
+double DockGuard::dockDistance(const QPointF &p) const
+{
+    const double d = distanceTo(m_dock, p);
+    return m_dock2.isEmpty() ? d : qMin(d, distanceTo(m_dock2, p));
+}
+
+bool DockGuard::inEdge(const QPointF &p) const
+{
+    return m_edge.contains(p) || (!m_edge2.isEmpty() && m_edge2.contains(p));
+}
+
+bool DockGuard::inDock(const QPointF &p) const
+{
+    return m_dock.contains(p) || (!m_dock2.isEmpty() && m_dock2.contains(p));
+}
+
 void DockGuard::setEdgeZone(const QRectF &r)
 {
     if (m_edge == r)
@@ -165,7 +212,7 @@ void DockGuard::trackIdle(const QPointF &p)
     const qint64 now = m_clock.elapsed();
     // Once the line has hidden, moving the pointer around the screen leaves it hidden: only reaching for the
     // edge (or a click) brings it back. Before that, any movement counts and restarts the countdown.
-    const double d = distanceTo(m_edge, p);
+    const double d = edgeDistance(p);
     const bool closeEnough = d <= (m_idle ? kWakePx : kNearPx);
     if ((QLineF(m_idlePos, p).length() > kTouchPx || buttonHeld()) && closeEnough) {
         m_idlePos = p;
@@ -200,7 +247,7 @@ void DockGuard::track(const QPointF &p)
     const qint64 now = m_clock.elapsed();
     const double dt = qMax<qint64>(now - m_lastMs, 1) / 1000.0;
     m_speed = m_speed * 0.5 + QLineF(m_last, p).length() / dt * 0.5;
-    const double d = distanceTo(m_dock, p);
+    const double d = dockDistance(p);
     m_approaching = d < m_lastDist - 1;
     m_lastDist = d;
     m_last = p;
@@ -210,11 +257,12 @@ void DockGuard::track(const QPointF &p)
 // Pushing against the screen boundary the dock lives on (the pointer cannot go further).
 bool DockGuard::atWall(const QPointF &p) const
 {
-    const QScreen *s = QGuiApplication::screenAt(m_edge.center().toPoint());
+    const QRectF &zone = !m_edge2.isEmpty() && m_edge2.contains(p) ? m_edge2 : m_edge;
+    const QScreen *s = QGuiApplication::screenAt(zone.center().toPoint());
     if (!s)
         return false;
     const QRectF g = s->geometry();
-    const QPointF c = m_edge.center();
+    const QPointF c = zone.center();
     const double l = std::abs(c.x() - g.left()), r = std::abs(g.right() - c.x());
     const double t = std::abs(c.y() - g.top()), b = std::abs(g.bottom() - c.y());
     const double m = qMin(qMin(l, r), qMin(t, b));
@@ -231,7 +279,7 @@ bool DockGuard::atWall(const QPointF &p) const
 //  - leaving the edge drains it quickly rather than wiping it, so a jittery hand does not lose its progress.
 bool DockGuard::wantsOpen(const QPointF &p)
 {
-    if (!m_edge.contains(p) || buttonHeld()) {
+    if (!inEdge(p) || buttonHeld()) {
         m_score = qMax(0.0, m_score - 2 * kTickMs);
         return false;
     }
@@ -271,10 +319,10 @@ void DockGuard::tick()
         } else {
             // revealed: stay while the pointer is on the dock, or heading for it; go sooner when it clearly left
             m_score = 0;
-            const double dist = distanceTo(m_dock, p);
+            const double dist = dockDistance(p);
             // a button held while the pointer is away (dragging something elsewhere) never keeps the dock up
             const bool held = buttonHeld();
-            if (m_dock.contains(p) || m_edge.contains(p) || (!held && m_approaching && dist < kHeadingPx)) {
+            if (inDock(p) || inEdge(p) || (!held && m_approaching && dist < kHeadingPx)) {
                 m_away.invalidate();
             } else if (held && dist > kNearPx) {
                 revealed = false;
@@ -359,10 +407,18 @@ void DockGuard::setClickThrough(bool on)
 // WS_EX_TRANSPARENT makes Windows route mouse input to whatever is beneath the window.
 void DockGuard::applyClickThrough()
 {
-#ifdef Q_OS_WIN
-    if (!m_window || !m_window->isVisible())
+    clickThroughOf(m_window);
+    clickThroughOf(m_window2);
+}
+
+void DockGuard::clickThroughOf(QWindow *w) const
+{
+#ifndef Q_OS_WIN
+    Q_UNUSED(w)
+#else
+    if (!w || !w->isVisible())
         return;
-    const HWND h = reinterpret_cast<HWND>(m_window->winId());
+    const HWND h = reinterpret_cast<HWND>(w->winId());
     const LONG_PTR ex = GetWindowLongPtrW(h, GWL_EXSTYLE);
     const LONG_PTR want = m_clickThrough ? (ex | WS_EX_TRANSPARENT | WS_EX_LAYERED) : (ex & ~LONG_PTR(WS_EX_TRANSPARENT));
     if (want != ex)
@@ -379,9 +435,19 @@ void DockGuard::liftWindow()
     if (reinterpret_cast<quintptr>(fg) == m_lastForeground)
         return;
     m_lastForeground = reinterpret_cast<quintptr>(fg);
-    if (!m_window || !m_window->isVisible())
+    liftOf(m_window);
+    liftOf(m_window2);
+#endif
+}
+
+void DockGuard::liftOf(QWindow *w) const
+{
+#ifdef Q_OS_WIN
+    if (!w || !w->isVisible())
         return;
-    SetWindowPos(reinterpret_cast<HWND>(m_window->winId()), HWND_TOPMOST, 0, 0, 0, 0,
+    SetWindowPos(reinterpret_cast<HWND>(w->winId()), HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+#else
+    Q_UNUSED(w)
 #endif
 }

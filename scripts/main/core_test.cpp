@@ -158,8 +158,9 @@ private slots:
         const QString d = m_dir.path();
         auto touch = [&](const QString &name) {
             QFile f(d + "/" + name);
-            f.open(QIODevice::WriteOnly);
-            f.write("x");
+            if (f.open(QIODevice::WriteOnly))
+                f.write("x");
+            f.close(); // flush before the path is handed to addDropped
             return QUrl::fromLocalFile(f.fileName()).toString();
         };
         const QStringList drop = {touch("tool.exe"), touch("photo.png"), touch("notes.txt"),
@@ -215,6 +216,66 @@ private slots:
         QCOMPARE(core->quickSearch("zqpad", 2).size(), 2);    // limit
         QVERIFY(core->quickSearch("no-such-thing-xyz", 5).isEmpty());
         QVERIFY(core->quickSearch({}, 50).toList().size() >= 1); // empty query lists favourites
+    }
+
+    void hashListsFiltersNotItems()
+    {
+        const QString t = core->addItem(LH::Web, "taggedsite", "https://tagged.example");
+        core->setItemTags(t, "#Work, client_a  work");
+        QCOMPARE(core->item(t).tags, QStringList({"client-a", "work"})); // lower-case, deduped, sorted
+
+        // a bare "#" offers the categories (and tags), never the items themselves
+        const QVariantList all = core->quickSearch("#", 50);
+        QVERIFY(all.size() >= 7);
+        for (const QVariant &v : all)
+            QVERIFY(v.toMap()["filter"].toBool());
+        QCOMPARE(all[0].toMap()["token"].toString(), QString("#software "));
+        QVERIFY(core->quickSearch("#we", 50).size() >= 1);
+        QCOMPARE(core->quickSearch("#we", 50)[0].toMap()["token"].toString(), QString("#web "));
+        bool sawTag = false;
+        for (const QVariant &v : core->quickSearch("#wor", 50))
+            sawTag = sawTag || v.toMap()["token"].toString() == "#work ";
+        QVERIFY(sawTag);
+
+        // after the space the filter lists items
+        const QVariantList web = core->quickSearch("#web ", 200);
+        QVERIFY(!web.isEmpty());
+        for (const QVariant &v : web)
+            QVERIFY(!v.toMap()["filter"].toBool());
+        const QVariantList byTag = core->quickSearch("#work ", 200);
+        QCOMPARE(byTag.size(), 1);
+        QCOMPARE(byTag[0].toMap()["id"].toString(), t);
+        QCOMPARE(core->quickSearch("#work tagged", 10).size(), 1);
+        QVERIFY(core->quickSearch("#work nothing-like-this", 10).isEmpty());
+        QVERIFY(core->quickSearch("#nosuchfilter x", 10).isEmpty());
+
+        // the model filter, the tag list and the backup keep tags
+        ItemModel m;
+        m.setTag("client-a");
+        QCOMPARE(m.count(), 1);
+        QVERIFY(core->tagList().toList().size() >= 2);
+        QCOMPARE(core->tagList(LH::Document).toList().size(), 0);
+        const QString backup = m_dir.path() + "/tags-backup.json";
+        QVERIFY(core->backupTo(backup));
+        core->setItemTags(t, "");
+        QVERIFY(core->item(t).tags.isEmpty());
+        QVERIFY(core->restoreFrom(backup));
+        QCOMPARE(core->item(t).tags, QStringList({"client-a", "work"}));
+    }
+
+    void runningAppsTracksTheTestProcess()
+    {
+#ifdef Q_OS_WIN
+        // this test program owns no window, so it must not be reported - and scanning must be safe
+        RunningApps r;
+        r.setTargets({{"x", QCoreApplication::applicationFilePath()}});
+        r.setEnabled(true);
+        r.refresh();
+        QVERIFY(!r.isRunning("x"));
+        QVERIFY(!r.focus("x"));
+        r.setEnabled(false);
+        QVERIFY(!r.isRunning("x"));
+#endif
     }
 
     void droppedOnCollectionLandsInIt()
