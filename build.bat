@@ -1,8 +1,9 @@
 @echo off
 rem Clean rebuild of Dockly (wipes .\build, reconfigures, compiles, deploys Qt DLLs into .\dist).
-rem   scripts\build.bat         full clean rebuild + deploy
-rem   scripts\build.bat nodeploy  full clean rebuild only
-cd /d "%~dp0.."
+rem   build.bat           full clean rebuild + deploy
+rem   build.bat nodeploy  full clean rebuild only
+rem On a successful build, commits everything with .\commit.txt and pushes (if commit.txt exists).
+cd /d "%~dp0"
 
 if exist build rmdir /s /q build
 if exist build (
@@ -23,6 +24,24 @@ if errorlevel 1 (
 
 echo.
 echo BUILD OK
+
+rem Commit and push: the message comes from commit.txt (git-ignored, rewritten for each change).
+if exist commit.txt (
+    echo Committing with commit.txt
+    git add -A
+    git commit -F commit.txt
+    if errorlevel 1 (
+        echo COMMIT FAILED
+        exit /b 1
+    )
+    git push
+    if errorlevel 1 (
+        echo PUSH FAILED
+        exit /b 1
+    )
+) else (
+    echo commit.txt not found - skipping commit and push.
+)
 
 rem Auto-launch: the deployed copy in .\dist, or the raw build output with "nodeploy".
 if /i "%~1"=="nodeploy" (

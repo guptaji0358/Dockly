@@ -2,3 +2,6 @@ build/
 dist/
 *.user
 build-stale-*/
+
+# Commit message for build.bat
+commit.txt
