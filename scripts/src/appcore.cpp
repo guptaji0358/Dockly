@@ -1,6 +1,7 @@
 #include "appcore.h"
 #include "connectors.h"
 #include "iconpack.h"
+#include "softwarescanner.h"
 
 #include <QApplication>
 #include <QColorDialog>
@@ -72,7 +73,8 @@ QString autoName(LH::Category c, const QString &target)
             host.remove(0, 4);
         return host.isEmpty() ? target : host;
     }
-    return QFileInfo(target).completeBaseName();
+    const QString friendly = executableDisplayName(target);
+    return friendly.isEmpty() ? QFileInfo(target).completeBaseName() : friendly;
 }
 } // namespace
 

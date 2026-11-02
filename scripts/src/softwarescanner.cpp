@@ -7,6 +7,10 @@
 #include <QSettings>
 #include <QStandardPaths>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
 namespace {
 bool looksLikeNoise(const QString &name, const QString &target)
 {
@@ -22,6 +26,45 @@ bool looksLikeNoise(const QString &name, const QString &target)
     return base.startsWith("unins") || base == "msiexec.exe";
 }
 } // namespace
+
+QString executableDisplayName(const QString &exePath)
+{
+#ifdef Q_OS_WIN
+    if (!exePath.endsWith(QLatin1String(".exe"), Qt::CaseInsensitive))
+        return {};
+    const std::wstring path = QDir::toNativeSeparators(exePath).toStdWString();
+    DWORD ignored = 0;
+    const DWORD size = GetFileVersionInfoSizeW(path.c_str(), &ignored);
+    if (!size)
+        return {};
+    QByteArray data(int(size), 0);
+    if (!GetFileVersionInfoW(path.c_str(), 0, size, data.data()))
+        return {};
+    struct LangCodepage { WORD lang, codepage; } *tr = nullptr;
+    UINT trLen = 0;
+    QList<QString> prefixes;
+    if (VerQueryValueW(data.data(), L"\\VarFileInfo\\Translation", reinterpret_cast<void **>(&tr), &trLen) && tr) {
+        for (UINT i = 0; i < trLen / sizeof(LangCodepage); ++i)
+            prefixes << QStringLiteral("%1%2").arg(tr[i].lang, 4, 16, QChar('0')).arg(tr[i].codepage, 4, 16, QChar('0'));
+    }
+    prefixes << QStringLiteral("040904b0") << QStringLiteral("040904e4");
+    for (const QString &key : {QStringLiteral("ProductName"), QStringLiteral("FileDescription")}) {
+        for (const QString &pre : prefixes) {
+            const std::wstring q = QStringLiteral("\\StringFileInfo\\%1\\%2").arg(pre, key).toStdWString();
+            wchar_t *val = nullptr;
+            UINT len = 0;
+            if (VerQueryValueW(data.data(), q.c_str(), reinterpret_cast<void **>(&val), &len) && val && len > 1) {
+                const QString v = QString::fromWCharArray(val).trimmed();
+                if (!v.isEmpty())
+                    return v;
+            }
+        }
+    }
+#else
+    Q_UNUSED(exePath)
+#endif
+    return {};
+}
 
 QVector<ScannedApp> scanInstalledSoftware()
 {
@@ -54,7 +97,7 @@ QVector<ScannedApp> scanInstalledSoftware()
     }
 
     // Programs without a Start Menu shortcut: registry "Uninstall" entries and "App Paths".
-    auto addExe = [&](QString name, QString exe) {
+    auto addExe = [&](QString name, QString exe, bool fromAppPaths = false) {
         exe = exe.trimmed();
         if (exe.startsWith('"'))
             exe = exe.section('"', 1, 1);
@@ -64,6 +107,11 @@ QVector<ScannedApp> scanInstalledSoftware()
         exe = QDir::cleanPath(exe);
         if (name.isEmpty() || !exe.endsWith(".exe", Qt::CaseInsensitive) || !QFileInfo::exists(exe))
             return;
+        if (fromAppPaths) {
+            const QString friendly = executableDisplayName(exe);
+            if (!friendly.isEmpty())
+                name = friendly;
+        }
         if (looksLikeNoise(name, exe))
             return;
         const QString key = exe.toLower();
@@ -114,7 +162,7 @@ QVector<ScannedApp> scanInstalledSoftware()
         QSettings reg(root, QSettings::NativeFormat);
         for (const QString &sub : reg.childGroups()) {
             reg.beginGroup(sub);
-            addExe(QFileInfo(sub).completeBaseName(), reg.value("Default").toString());
+            addExe(QFileInfo(sub).completeBaseName(), reg.value("Default").toString(), true);
             reg.endGroup();
         }
     }

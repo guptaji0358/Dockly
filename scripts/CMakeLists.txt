@@ -36,7 +36,7 @@ target_link_libraries(lhcore PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network
 find_package(Qt6 REQUIRED COMPONENTS Test)
 qt_add_executable(core_test ${LH_MAIN}/core_test.cpp)
 if(WIN32)
-    target_link_libraries(lhcore PUBLIC psapi dwmapi pdh)
+    target_link_libraries(lhcore PUBLIC psapi dwmapi pdh version)
 endif()
 target_link_libraries(core_test PRIVATE lhcore Qt6::Test)
 add_test(NAME core_test COMMAND core_test)
