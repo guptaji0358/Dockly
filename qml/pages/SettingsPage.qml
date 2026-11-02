@@ -287,20 +287,26 @@ Item {
                     title: "Lite mode"
                     SettingCheck { key: "liteMode"; text: "Lite mode: no animations or glow, smaller icons, Dockly's background work slowed down" }
                     SettingCheck { key: "liteAuto"; text: "Switch Lite mode on by itself when CPU, RAM or GPU is high" }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        enabled: core.settings.values.liteAuto
-                        opacity: enabled ? 1 : 0.5
-                        spacing: 12
-                        Text { text: "High usage means"; color: page.th.text }
-                        Slider {
-                            id: thr
+                    Repeater {
+                        model: [ { key: "liteCpu", label: "CPU is high at" },
+                                 { key: "liteGpu", label: "GPU is high at" },
+                                 { key: "liteRam", label: "RAM is high at" } ]
+                        delegate: RowLayout {
+                            required property var modelData
                             Layout.fillWidth: true
-                            from: 50; to: 100; stepSize: 5
-                            value: core.settings.values.liteThreshold
-                            onMoved: core.settings.set("liteThreshold", value)
+                            enabled: core.settings.values.liteAuto
+                            opacity: enabled ? 1 : 0.5
+                            spacing: 12
+                            Text { text: modelData.label; color: page.th.text; Layout.preferredWidth: 110 }
+                            Slider {
+                                id: thr
+                                Layout.fillWidth: true
+                                from: 30; to: 100; stepSize: 5
+                                value: core.settings.values[modelData.key]
+                                onMoved: core.settings.set(modelData.key, value)
+                            }
+                            Text { text: Math.round(thr.value) + "%"; color: page.th.text; Layout.preferredWidth: 40 }
                         }
-                        Text { text: Math.round(thr.value) + "%"; color: page.th.text; Layout.preferredWidth: 40 }
                     }
                     Text {
                         readonly property var p: core.perf

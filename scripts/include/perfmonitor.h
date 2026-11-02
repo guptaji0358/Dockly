@@ -6,7 +6,7 @@
 // Watches the machine's CPU, RAM and GPU load and decides when Dockly should switch to Lite mode:
 // fewer graphics (no animations, glow or blur), cheaper icons, and Dockly's own background work slowed down.
 // Lite mode is on when the user switched it on by hand, or (liteAuto) when any of the three stays at or above
-// liteThreshold for a few seconds; it drops back once all three have calmed down. Dockly never touches other programs.
+// its own threshold (liteCpu / liteGpu / liteRam) for a few seconds; it drops back once all three have calmed down. Dockly never touches other programs.
 class PerfMonitor : public QObject
 {
     Q_OBJECT
@@ -28,8 +28,8 @@ public:
     bool monitoring() const { return m_timer.isActive(); }
 
     void setManual(bool on);
-    // auto: watch the load and switch by itself; threshold in percent
-    void configure(bool autoOn, int threshold);
+    // auto: watch the load and switch by itself; one threshold per resource, in percent
+    void configure(bool autoOn, int cpuAt, int gpuAt, int ramAt);
 
 signals:
     void sampled();
@@ -48,7 +48,7 @@ private:
     bool m_manual = false;
     bool m_autoOn = false;
     bool m_auto = false;
-    int m_threshold = 75;
+    int m_cpuAt = 50, m_gpuAt = 60, m_ramAt = 60;
     int m_cpu = 0, m_ram = 0, m_gpu = -1;
     int m_hot = 0, m_cool = 0;   // consecutive seconds above / well below the threshold
 

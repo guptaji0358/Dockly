@@ -103,7 +103,8 @@ AppCore::AppCore(QObject *parent)
             emit itemsChanged(); // views re-read the running flag
         } else if (k == QLatin1String("gamepadEnabled")) {
             m_gamepad->setEnabled(m_settings->boolean("gamepadEnabled"));
-        } else if (k == QLatin1String("liteMode") || k == QLatin1String("liteAuto") || k == QLatin1String("liteThreshold")) {
+        } else if (k == QLatin1String("liteMode") || k == QLatin1String("liteAuto") || k == QLatin1String("liteCpu")
+                   || k == QLatin1String("liteGpu") || k == QLatin1String("liteRam")) {
             applyPerfSettings();
         }
     });
@@ -1508,7 +1509,8 @@ void AppCore::openBackupFolder()
 void AppCore::applyPerfSettings()
 {
     m_perf->setManual(m_settings->boolean("liteMode"));
-    m_perf->configure(m_settings->boolean("liteAuto"), m_settings->integer("liteThreshold"));
+    m_perf->configure(m_settings->boolean("liteAuto"), m_settings->integer("liteCpu"),
+                      m_settings->integer("liteGpu"), m_settings->integer("liteRam"));
 }
 
 // Lite mode only ever lightens Dockly itself: it never closes or slows other programs.

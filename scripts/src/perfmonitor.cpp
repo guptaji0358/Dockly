@@ -49,9 +49,11 @@ void PerfMonitor::setManual(bool on)
     applyState(was);
 }
 
-void PerfMonitor::configure(bool autoOn, int threshold)
+void PerfMonitor::configure(bool autoOn, int cpuAt, int gpuAt, int ramAt)
 {
-    m_threshold = std::clamp(threshold, 40, 100);
+    m_cpuAt = std::clamp(cpuAt, 30, 100);
+    m_gpuAt = std::clamp(gpuAt, 30, 100);
+    m_ramAt = std::clamp(ramAt, 30, 100);
     if (m_autoOn != autoOn) {
         m_autoOn = autoOn;
         if (!autoOn && m_auto) {
@@ -93,14 +95,17 @@ void PerfMonitor::sample()
     m_gpu = readGpu();
     emit sampled();
 
-    const int worst = std::max({m_cpu, m_ram, m_gpu});
+    // hot = any resource at its own threshold; calm = every resource kCoolMargin points under its threshold
+    // (an unavailable GPU reads -1 and never counts as hot)
+    const bool hot = m_cpu >= m_cpuAt || m_ram >= m_ramAt || m_gpu >= m_gpuAt;
+    const bool calm = m_cpu < m_cpuAt - kCoolMargin && m_ram < m_ramAt - kCoolMargin && m_gpu < m_gpuAt - kCoolMargin;
     const bool wasLite = lite();
-    if (worst >= m_threshold) {
+    if (hot) {
         ++m_hot;
         m_cool = 0;
         if (!m_auto && m_hot >= kHotSeconds)
             m_auto = true;
-    } else if (worst < m_threshold - kCoolMargin) {
+    } else if (calm) {
         ++m_cool;
         m_hot = 0;
         if (m_auto && m_cool >= kCoolSeconds)

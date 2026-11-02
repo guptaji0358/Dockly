@@ -62,7 +62,9 @@ QVariantMap AppSettings::defaults()
         {"gamepadEnabled", true}, // a game controller can drive the radial ring (only while Dockly's own window is in front)
         {"liteMode", false},      // Lite mode switched on by hand: no animations / glow, cheaper icons, Dockly's background work slowed down
         {"liteAuto", true},       // switch Lite mode on by itself while CPU, RAM or GPU stays high
-        {"liteThreshold", 75},    // percent of CPU / RAM / GPU that counts as "high" for the automatic switch
+        {"liteCpu", 50},          // percent of CPU that counts as "high" for the automatic switch
+        {"liteGpu", 60},          // same for the GPU
+        {"liteRam", 60},          // same for memory
         {"defaultBrowser", ""},  // empty = the system default; otherwise the browser's exe path
     };
 }
