@@ -25,7 +25,74 @@ bool looksLikeNoise(const QString &name, const QString &target)
     const QString base = QFileInfo(target).fileName().toLower();
     return base.startsWith("unins") || base == "msiexec.exe";
 }
+
+QString squash(QString s)
+{
+    s = s.toLower().trimmed();
+    if (s.endsWith(QLatin1String(".exe")))
+        s.chop(4);
+    QString out;
+    for (const QChar c : s)
+        if (c.isLetterOrNumber())
+            out += c;
+    return out;
+}
+
+// "visualStudioCode", "code_helper", "notepad-plus" -> "Visual Studio Code", "Code Helper", "Notepad Plus"
+QString prettifyFileName(const QString &base)
+{
+    QString s;
+    for (int i = 0; i < base.size(); ++i) {
+        const QChar c = base[i];
+        if (c == '_' || c == '-' || c == '.') {
+            s += ' ';
+            continue;
+        }
+        if (i > 0 && c.isUpper() && base[i - 1].isLower())
+            s += ' ';
+        s += c;
+    }
+    QStringList words = s.simplified().split(' ', Qt::SkipEmptyParts);
+    for (QString &w : words)
+        if (w == w.toLower() || w == w.toUpper())
+            w = w.left(1).toUpper() + w.mid(1).toLower();
+    return words.join(' ');
+}
 } // namespace
+
+bool looksLikeExecutableName(const QString &name, const QString &exePath)
+{
+    const QString n = name.trimmed();
+    if (n.isEmpty())
+        return true;
+    if (n.endsWith(QLatin1String(".exe"), Qt::CaseInsensitive))
+        return true;
+    return squash(n) == squash(QFileInfo(exePath).completeBaseName());
+}
+
+QString resolveFriendlyName(const QString &candidate, const QString &exePath)
+{
+    if (!looksLikeExecutableName(candidate, exePath))
+        return candidate;
+    const QString version = executableDisplayName(exePath);
+    if (!version.isEmpty())
+        return version;
+    // No usable version info: the install folder usually carries the product name.
+    static const QSet<QString> generic = {"bin", "app", "application", "program files", "program files (x86)", "programs",
+                                          "x64", "x86", "win32", "win64", "release", "system32", "windows", "users",
+                                          "appdata", "local", "roaming", "current", "latest"};
+    QDir dir = QFileInfo(exePath).dir();
+    for (int depth = 0; depth < 3 && !dir.isRoot(); ++depth) {
+        const QString folder = dir.dirName();
+        const bool versionLike = !folder.isEmpty() && folder[0].isDigit();
+        if (!folder.isEmpty() && !folder.contains(':') && !versionLike && !generic.contains(folder.toLower())
+            && !folder.startsWith(QLatin1String("app-"), Qt::CaseInsensitive))
+            return prettifyFileName(folder);
+        if (!dir.cdUp())
+            break;
+    }
+    return prettifyFileName(QFileInfo(exePath).completeBaseName());
+}
 
 QString executableDisplayName(const QString &exePath)
 {
@@ -56,7 +123,9 @@ QString executableDisplayName(const QString &exePath)
             UINT len = 0;
             if (VerQueryValueW(data.data(), q.c_str(), reinterpret_cast<void **>(&val), &len) && val && len > 1) {
                 const QString v = QString::fromWCharArray(val).trimmed();
-                if (!v.isEmpty())
+                // skip values that just repeat the file name or describe the OS component
+                if (!v.isEmpty() && !looksLikeExecutableName(v, exePath)
+                    && !v.contains(QLatin1String("operating system"), Qt::CaseInsensitive))
                     return v;
             }
         }
@@ -93,7 +162,8 @@ QVector<ScannedApp> scanInstalledSoftware()
             if (seen.contains(key))
                 continue;
             seen.insert(key);
-            result.append({name, QDir::toNativeSeparators(QDir::cleanPath(launch))});
+            const QString shown = exeTarget ? resolveFriendlyName(name, target) : name;
+            result.append({shown, QDir::toNativeSeparators(QDir::cleanPath(launch))});
         }
     }
 
@@ -109,17 +179,11 @@ QVector<ScannedApp> scanInstalledSoftware()
         if (name.isEmpty() || !exe.endsWith(".exe", Qt::CaseInsensitive) || !QFileInfo::exists(exe))
             return;
         if (fromAppPaths) {
+            // App Paths keys are file names; always look for the real product name
             const QString friendly = executableDisplayName(exe);
-            if (!friendly.isEmpty() && !friendly.contains("operating system", Qt::CaseInsensitive)) {
-                name = friendly;
-            } else {
-                // No usable version info: the install folder usually carries the product name.
-                static const QSet<QString> generic = {"bin", "app", "application", "program files", "program files (x86)",
-                                                      "programs", "x64", "x86", "win32", "win64", "release", "system32"};
-                const QString folder = QFileInfo(exe).dir().dirName();
-                if (!folder.isEmpty() && !generic.contains(folder.toLower()) && !folder.contains(':'))
-                    name = folder;
-            }
+            name = friendly.isEmpty() ? resolveFriendlyName(QFileInfo(exe).completeBaseName(), exe) : friendly;
+        } else {
+            name = resolveFriendlyName(name, exe);
         }
         if (looksLikeNoise(name, exe))
             return;

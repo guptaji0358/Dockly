@@ -73,8 +73,8 @@ QString autoName(LH::Category c, const QString &target)
             host.remove(0, 4);
         return host.isEmpty() ? target : host;
     }
-    const QString friendly = executableDisplayName(target);
-    return friendly.isEmpty() ? QFileInfo(target).completeBaseName() : friendly;
+    const QString base = QFileInfo(target).completeBaseName();
+    return target.endsWith(QLatin1String(".exe"), Qt::CaseInsensitive) ? resolveFriendlyName(base, target) : base;
 }
 } // namespace
 
