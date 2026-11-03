@@ -48,7 +48,8 @@ QString executableDisplayName(const QString &exePath)
             prefixes << QStringLiteral("%1%2").arg(tr[i].lang, 4, 16, QChar('0')).arg(tr[i].codepage, 4, 16, QChar('0'));
     }
     prefixes << QStringLiteral("040904b0") << QStringLiteral("040904e4");
-    for (const QString &key : {QStringLiteral("ProductName"), QStringLiteral("FileDescription")}) {
+    // FileDescription is usually the user-facing name; ProductName is often a vendor suite or generic text.
+    for (const QString &key : {QStringLiteral("FileDescription"), QStringLiteral("ProductName")}) {
         for (const QString &pre : prefixes) {
             const std::wstring q = QStringLiteral("\\StringFileInfo\\%1\\%2").arg(pre, key).toStdWString();
             wchar_t *val = nullptr;
@@ -109,8 +110,16 @@ QVector<ScannedApp> scanInstalledSoftware()
             return;
         if (fromAppPaths) {
             const QString friendly = executableDisplayName(exe);
-            if (!friendly.isEmpty())
+            if (!friendly.isEmpty() && !friendly.contains("operating system", Qt::CaseInsensitive)) {
                 name = friendly;
+            } else {
+                // No usable version info: the install folder usually carries the product name.
+                static const QSet<QString> generic = {"bin", "app", "application", "program files", "program files (x86)",
+                                                      "programs", "x64", "x86", "win32", "win64", "release", "system32"};
+                const QString folder = QFileInfo(exe).dir().dirName();
+                if (!folder.isEmpty() && !generic.contains(folder.toLower()) && !folder.contains(':'))
+                    name = folder;
+            }
         }
         if (looksLikeNoise(name, exe))
             return;
