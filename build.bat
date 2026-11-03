@@ -27,17 +27,22 @@ echo BUILD OK
 
 rem Commit and push: the message comes from commit.txt (git-ignored, rewritten for each change).
 if exist commit.txt (
-    echo Committing with commit.txt
     git add -A
-    git commit -F commit.txt
+    git diff --cached --quiet
     if errorlevel 1 (
-        echo COMMIT FAILED
-        exit /b 1
-    )
-    git push
-    if errorlevel 1 (
-        echo PUSH FAILED
-        exit /b 1
+        echo Committing with commit.txt
+        git commit -F commit.txt
+        if errorlevel 1 (
+            echo COMMIT FAILED
+            exit /b 1
+        )
+        git push
+        if errorlevel 1 (
+            echo PUSH FAILED
+            exit /b 1
+        )
+    ) else (
+        echo Nothing to commit - skipping commit and push.
     )
 ) else (
     echo commit.txt not found - skipping commit and push.
