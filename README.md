@@ -4,9 +4,9 @@ A launcher / hub / shortcut plate for Windows, built with C++17 and Qt 6 (Qt Qui
 One core library, one frontend (`Dockly.exe`):
 
 ```
-core/     SQLite databases, settings, launching, validation, tray, theme   (static lib)
+scripts/  C++ code: include/ (headers), src/ (.cpp), main/ (entry points); build.ps1 / build.bat
 qml/      Qt Quick frontend: honeycomb / orbit / grid layouts, radial ring, GLSL aurora shader
-tests/    QtTest unit tests for the core
+          core = SQLite, settings, launching, tray, theme (static lib); main/core_test.cpp = QtTest tests
 ```
 
 ## Interface
@@ -14,6 +14,11 @@ tests/    QtTest unit tests for the core
 - **Honeycomb / Orbit / Classic grid** - switch from the top bar. Honeycomb and orbit are pan (drag) and zoom (wheel) maps of floating glass hexagons that tilt toward the pointer.
 - **Radial ring** - the glowing orb (or `Ctrl+Space`, `F2`, middle click) opens a ring: sections on the inner ring, favourites on the outer one.
 - **Search** - `/` or `Ctrl+F`; `Ctrl+1..7` jump between hubs.
+- **Quick launcher** - `Alt+Space` (system-wide, changeable in Settings > General) opens a type-to-launch box over whatever you are doing. Best matches first, favourites win ties; empty box shows recents and favourites. `Enter` opens, `Ctrl+Enter` shows in folder, `Esc` closes.
+- **Workspaces** - a collection opens everything in it, one item after another (spacing in Settings > Items). Right-click a collection > *Open at startup* to launch it when Dockly starts.
+- **Quick actions** - right-click a program: *Run as Administrator*, *Run with Arguments...*; any item: *Copy Path / Link*.
+- **Drag and drop** - drop files, folders or links on the window to add them; on a collection card to add them into it; on the dock to pin them. Drag a card from the window onto the dock to pin it.
+- **Colour themes** - Settings > Appearance: Ocean, Forest, Sunset, Rose, Violet, Graphite re-tint the active skin; a custom accent still wins.
 
 ## Connectors
 
@@ -21,10 +26,14 @@ The **Connectors** tab links Dockly with other apps:
 
 | Connector | What it does |
 |---|---|
-| Chrome / Edge / Brave | Browser extension (`connectors/browser`): add the current page, a link or all tabs as web shortcuts. Dockly listens on `127.0.0.1` only, requires a pairing code (secret token), accepts only `http(s)` links and answers cross-origin requests only for browser extensions. Load it via `chrome://extensions` > Developer mode > Load unpacked. |
+| Chrome / Edge / Brave | Browser extension (`connectors/browser`): add the current page, a link or all tabs as web shortcuts. Dockly listens on `127.0.0.1` only, requires a pairing code (secret token), accepts only `http(s)` links and answers cross-origin requests only for browser extensions. Load it via `chrome://extensions` > Developer mode > Load unpacked. The popup shows the site a page will be filed under (and "Already in Dockly"), lets you pick the group, make a new site from the current host, choose individual tabs, and browse your sites; the toolbar badge shows a check for saved pages and `+` for pages one of your sites covers. Shortcuts: `Alt+Shift+D` adds the page, `Alt+Shift+T` adds all tabs. |
 | Browser bookmarks | Pick bookmarks from Chrome, Edge or Brave and pin them. |
 | GitHub | Pin any user's public repositories (no sign-in). |
 | Visual Studio Code | Pin recent folders / workspaces; they open in VS Code (`vscode://`). |
+
+## Sites
+
+The **Sites** tab keeps links to the websites you use most (GitHub, ChatGPT, Claude, YouTube... or any you add). A site is a small rule you edit: a name, the hosts it covers, and how its links are grouped (one group, by first folder such as a GitHub owner, or by subdomain). Any web shortcut you add, from the browser extension, an import, a drop or by hand, is filed into its site's group automatically, and each site with links gets its own dock icon. When you have 5 or more loose links on a host that is not a site yet, Dockly offers to make it one. Rules are stored in `sites.json` in the data folder.
 
 ## GPU settings (Settings > Performance)
 
@@ -39,11 +48,11 @@ The **Connectors** tab links Dockly with other apps:
 ## Build
 
 ```powershell
-.\build.ps1            # build both apps into .\build
-.\build.ps1 -Deploy    # also copy Qt runtime into .\dist (runs on any PC)
+.\scripts\build.ps1            # build both apps into .\build
+.\scripts\build.ps1 -Deploy    # also copy Qt runtime into .\dist (runs on any PC)
 ```
 
-Needs Qt 6.11 (MinGW 64) + CMake + Ninja; adjust `$qtRoot` in `build.ps1` if Qt lives elsewhere.
+Needs Qt 6.12 (MinGW 64) + CMake + Ninja; adjust `$qtRoot` in `scripts/build.ps1` if Qt lives elsewhere.
 Open the top-level `CMakeLists.txt` in Qt Creator to work on it there.
 
 ## Data: two SQLite files, read on demand
@@ -87,7 +96,7 @@ catalog instead of becoming cards; the old file is renamed `data.json.migrated`)
 * **View toolbar** next to the search box on every page: Grid / List / Compact switch and a
   card-size slider (these moved out of Settings).
 * **Custom SVG icons**: the whole icon set (navigation, toolbar, card buttons, warnings, the
-  rocket logo / app icon) is drawn from SVG markup embedded in `core/iconpack.cpp`; any colour
+  rocket logo / app icon) is drawn from SVG markup embedded in `scripts/src/iconpack.cpp`; any colour
   is applied at render time, so icons follow the skin.
 * **Web shortcuts show the site's real icon**: the page's `<link rel="icon">` / apple-touch-icon,
   then `/favicon.ico`, cached on disk. Until it arrives (or if a site has none) the card shows a
@@ -123,6 +132,10 @@ catalog instead of becoming cards; the old file is renamed `data.json.migrated`)
 
 * *Check for Updates* just reports the version: no update server is configured.
 * *Language* lists English only: strings are not translated yet, so the option is a placeholder.
-* Website icons are fetched from `https://<site>/favicon.ico` and cached locally.
+* Website icons are fetched from the page's `<link rel="icon">` / apple-touch-icon, then
+  `/apple-touch-icon.png` and `/favicon.ico`, and cached locally.
+* Some icons look blurry (for example Google, Spotify and Hugging Face). This is a source-file
+  size limit, not a rendering error: those sites publish only a 16-32px icon, which is scaled up
+  to fill a tile. Sites that publish a larger icon look sharp.
 * Command-line: `--minimized` (start in tray when tray is enabled), `--screenshot=file.png`
   and `--page=N` (diagnostics).
