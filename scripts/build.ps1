@@ -4,7 +4,7 @@
 param([switch]$Deploy)
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
-$qtRoot = 'D:\Apps\Qt6'
+$qtRoot = 'C:\Qt'
 $qt     = "$qtRoot\6.12.0\mingw_64"
 $env:PATH = "$qtRoot\Tools\mingw1310_64\bin;$qtRoot\Tools\Ninja;$qtRoot\Tools\CMake_64\bin;$qt\bin;$env:PATH"
 
