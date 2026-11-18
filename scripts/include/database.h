@@ -62,6 +62,7 @@ private:
     QSqlDatabase lib() const { return QSqlDatabase::database(QStringLiteral("lh_library")); }
     QSqlDatabase cat() const { return QSqlDatabase::database(QStringLiteral("lh_catalog")); }
     static QString likePattern(const QString &s);
+    static QVariantList runCatalogQuery(QSqlQuery &q);
 
     bool m_libraryIsNew = false;
     bool m_open = false;

@@ -63,6 +63,14 @@ bool Database::open(const QString &dir)
     QSqlQuery cq(c);
     cq.exec("PRAGMA journal_mode=WAL");
     cq.exec("CREATE TABLE IF NOT EXISTS apps (target TEXT PRIMARY KEY, name TEXT NOT NULL)");
+    // The catalog is a rebuildable cache: schema upgrades just add columns (old rows stay, empty until the next scan).
+    if (cq.exec("PRAGMA user_version") && cq.next() && cq.value(0).toInt() < 2) {
+        cq.exec("ALTER TABLE apps ADD COLUMN publisher TEXT NOT NULL DEFAULT ''");
+        cq.exec("ALTER TABLE apps ADD COLUMN version TEXT NOT NULL DEFAULT ''");
+        cq.exec("ALTER TABLE apps ADD COLUMN install_dir TEXT NOT NULL DEFAULT ''");
+        cq.exec("ALTER TABLE apps ADD COLUMN sources INTEGER NOT NULL DEFAULT 0");
+        cq.exec("PRAGMA user_version=2");
+    }
     cq.exec("CREATE INDEX IF NOT EXISTS idx_apps_name ON apps(name COLLATE NOCASE)");
     return true;
 }
@@ -484,10 +492,16 @@ int Database::replaceCatalog(const QVector<ScannedApp> &apps)
     db.transaction();
     QSqlQuery q(db);
     q.exec("DELETE FROM apps");
-    q.prepare("INSERT OR IGNORE INTO apps(target,name) VALUES(?,?)");
+    q.prepare("INSERT OR IGNORE INTO apps(target,name,publisher,version,install_dir,sources) VALUES(?,?,?,?,?,?)");
     for (const ScannedApp &a : apps) {
         q.addBindValue(a.target);
         q.addBindValue(a.name);
+        // columns are NOT NULL: a null QString would bind as NULL and INSERT OR IGNORE would silently drop the row
+        const auto text = [](const QString &s) { return s.isNull() ? QString(QLatin1String("")) : s; };
+        q.addBindValue(text(a.publisher));
+        q.addBindValue(text(a.version));
+        q.addBindValue(text(a.installDir));
+        q.addBindValue(a.sources);
         q.exec();
     }
     db.commit();
@@ -501,16 +515,24 @@ QVariantList Database::catalog(const QString &search, int limit) const
     QSqlQuery q(cat());
     const QString needle = search.trimmed();
     if (needle.isEmpty()) {
-        q.prepare("SELECT name,target FROM apps ORDER BY name COLLATE NOCASE LIMIT ?");
+        q.prepare("SELECT name,target,publisher,version,install_dir,sources FROM apps ORDER BY name COLLATE NOCASE LIMIT ?");
     } else {
-        q.prepare("SELECT name,target FROM apps WHERE name LIKE ? ESCAPE '\\' ORDER BY name COLLATE NOCASE LIMIT ?");
+        q.prepare("SELECT name,target,publisher,version,install_dir,sources FROM apps"
+                  " WHERE name LIKE ? ESCAPE '\\' OR publisher LIKE ? ESCAPE '\\' ORDER BY name COLLATE NOCASE LIMIT ?");
+        q.addBindValue(likePattern(needle));
         q.addBindValue(likePattern(needle));
     }
     q.addBindValue(limit);
+    return runCatalogQuery(q);
+}
+
+QVariantList Database::runCatalogQuery(QSqlQuery &q)
+{
     QVariantList out;
     if (q.exec())
         while (q.next())
-            out.append(QVariantMap{{"name", q.value(0)}, {"target", q.value(1)}});
+            out.append(QVariantMap{{"name", q.value(0)}, {"target", q.value(1)}, {"publisher", q.value(2)},
+                                   {"version", q.value(3)}, {"installDir", q.value(4)}, {"sources", q.value(5)}});
     return out;
 }
 

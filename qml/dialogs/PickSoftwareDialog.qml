@@ -214,7 +214,11 @@ AppDialog {
                 }
                 ToolTip.visible: tm.containsMouse
                 ToolTip.delay: 700
-                ToolTip.text: cell.modelData.target
+                ToolTip.text: {
+                    const m = cell.modelData
+                    const meta = [m.publisher, m.version ? "v" + m.version : ""].filter(s => s).join("  ·  ")
+                    return m.name + (meta ? "\n" + meta : "") + "\n" + m.target
+                }
             }
         }
 

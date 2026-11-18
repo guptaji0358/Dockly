@@ -87,6 +87,112 @@ private slots:
         QCOMPARE(members.count(), 1);
     }
 
+    void registryValueParsing()
+    {
+        QCOMPARE(exeFromRegistryValue("\"C:\\Apps\\A\\a.exe\",0"), QString("C:/Apps/A/a.exe"));
+        QCOMPARE(exeFromRegistryValue("C:\\Apps\\A\\a.exe,-3"), QString("C:/Apps/A/a.exe"));
+        QCOMPARE(exeFromRegistryValue("  C:\\Apps\\A\\a.EXE "), QString("C:/Apps/A/a.EXE"));
+        QVERIFY(exeFromRegistryValue("C:\\Apps\\A\\a.ico").isEmpty());
+        QVERIFY(exeFromRegistryValue("C:\\Windows\\system32\\shell32.dll,-3").isEmpty());
+        QVERIFY(exeFromRegistryValue({}).isEmpty());
+    }
+
+    void registryValueExpandsEnvironmentVariables()
+    {
+        qputenv("DOCKLY_TEST_DIR", "C:\\Apps");
+        QCOMPARE(exeFromRegistryValue("%DOCKLY_TEST_DIR%\\A\\a.exe,0"), QString("C:/Apps/A/a.exe"));
+        QCOMPARE(exeFromRegistryValue("\"%DOCKLY_TEST_DIR%\\a.exe\""), QString("C:/Apps/a.exe"));
+        qputenv("DOCKLY_TEST_LOOP", "%DOCKLY_TEST_LOOP%");
+        exeFromRegistryValue("%DOCKLY_TEST_LOOP%\\a.exe"); // must terminate
+        qunsetenv("DOCKLY_TEST_DIR");
+        qunsetenv("DOCKLY_TEST_LOOP");
+    }
+
+    void noiseIsMatchedByWholeWord()
+    {
+        QVERIFY(looksLikeNoise("Foo Help", "C:/x/foo.exe"));
+        QVERIFY(looksLikeNoise("Foo Uninstaller", "C:/x/foo.exe"));
+        QVERIFY(looksLikeNoise("Product Setup", "C:/x/foo.exe"));
+        QVERIFY(!looksLikeNoise("Helpdesk Pro", "C:/x/foo.exe"));
+        QVERIFY(!looksLikeNoise("Manualist", "C:/x/foo.exe"));
+        QVERIFY(!looksLikeNoise("Setuptools GUI Studio", "C:/x/foo.exe"));
+    }
+
+    void mainExeIsRanked()
+    {
+        QCOMPARE(pickMainExe("Notepad++", {"notepad++.exe", "updater.exe", "uninstall.exe"}), QString("notepad++.exe"));
+        QCOMPARE(pickMainExe("My App", {"crashhandler.exe", "myapp.exe", "unins000.exe"}), QString("myapp.exe"));
+        // exact beats partial; a helper only wins when nothing else matches
+        QCOMPARE(pickMainExe("Foo", {"foobar.exe", "foo.exe"}), QString("foo.exe"));
+        QCOMPARE(pickMainExe("Foo", {"fooupdater.exe", "foolauncher.exe"}), QString("foolauncher.exe"));
+        QCOMPARE(pickMainExe("Foo", {"fooupdater.exe"}), QString("fooupdater.exe"));
+        QVERIFY(pickMainExe("Foo", {"bar.exe", "unins000.exe"}).isEmpty());
+        QVERIFY(pickMainExe({}, {"foo.exe"}).isEmpty());
+    }
+
+    void packagedTargetsAreRecognised()
+    {
+        QVERIFY(isPackagedTarget("shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"));
+        QVERIFY(isPackagedTarget("SHELL:appsfolder/Foo_123!App")); // after cleanPath-style separators
+        QVERIFY(!isPackagedTarget("C:\\Apps\\a.exe"));
+        QVERIFY(!isPackagedTarget("shell:AppsFolder\\"));
+        QVERIFY(!isPackagedTarget("https://example.com"));
+        QCOMPARE(packagedAppId("shell:AppsFolder\\Foo_123!App"), QString("Foo_123!App"));
+        QVERIFY(packagedAppId("C:\\Apps\\a.exe").isEmpty());
+        QVERIFY(!packagedAppExists("shell:AppsFolder\\Not.A.Real.Package_0000000000000!App"));
+
+        QVector<RawRecord> in;
+        in.append({AppSource::Packaged, "Calculator", "shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", {}});
+        in.append({AppSource::Packaged, "Calculator again", "SHELL:AppsFolder\\microsoft.windowscalculator_8wekyb3d8bbwe!app", {}});
+        const QVector<ScannedApp> out = mergeRecords(in, true);
+        QCOMPARE(out.size(), 1); // same AUMID in another case is the same program
+        QCOMPARE(out[0].target, QString("shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"));
+        QCOMPARE(out[0].sources, 1 << int(AppSource::Packaged));
+        QVERIFY(out[0].installDir.isEmpty() && out[0].publisher.isEmpty());
+    }
+
+    void noiseRules()
+    {
+        QVERIFY(looksLikeNoise("Uninstall Foo", "C:/x/foo.exe"));
+        QVERIFY(looksLikeNoise("Foo", "C:/x/unins000.exe"));
+        QVERIFY(looksLikeNoise("Foo", "C:/Windows/System32/msiexec.exe"));
+        QVERIFY(!looksLikeNoise("Visual Studio Code", "C:/x/Code.exe"));
+    }
+
+    void mergeKeepsFirstRecordPerExe()
+    {
+        QVector<RawRecord> in;
+        in.append({AppSource::StartMenu, "Alpha", "C:/Apps/alpha.exe", {}});
+        in.append({AppSource::Uninstall, "Alpha Duplicate", "c:/apps/ALPHA.exe", {}});
+        in.append({AppSource::Uninstall, "Uninstall Beta", "C:/Apps/beta.exe", {}});
+        RawRecord lazy{AppSource::AppPaths, "gamma", "C:/Apps/gamma.exe", [] { return QString("Gamma Pro"); }};
+        in.append(lazy);
+        in.append({AppSource::AppPaths, "x", "C:/Apps/x.exe", [] { return QString(); }}); // unresolvable name
+        const QVector<ScannedApp> out = mergeRecords(in);
+        QCOMPARE(out.size(), 2);
+        QCOMPARE(out[0].name, QString("Alpha"));
+        QCOMPARE(out[0].target, QDir::toNativeSeparators("C:/Apps/alpha.exe"));
+        QCOMPARE(out[1].name, QString("Gamma Pro"));
+    }
+
+    void mergeFillsMissingMetadataFromLaterSources()
+    {
+        RawRecord a{AppSource::StartMenu, "Alpha", "C:/Apps/alpha.exe", {}};
+        RawRecord b{AppSource::Uninstall, "Alpha Reg", "c:/apps/alpha.exe", {}};
+        b.publisher = " Alpha Corp ";
+        b.version = "1.2.3";
+        b.installDir = "C:/Apps";
+        RawRecord c{AppSource::AppPaths, "alpha", "C:/Apps/alpha.exe", {}};
+        c.publisher = "Someone Else"; // never overrides a value that is already set
+        const QVector<ScannedApp> out = mergeRecords({a, b, c});
+        QCOMPARE(out.size(), 1);
+        QCOMPARE(out[0].name, QString("Alpha"));
+        QCOMPARE(out[0].publisher, QString("Alpha Corp"));
+        QCOMPARE(out[0].version, QString("1.2.3"));
+        QCOMPARE(out[0].installDir, QString("C:/Apps"));
+        QCOMPARE(out[0].sources, (1 << int(AppSource::StartMenu)) | (1 << int(AppSource::Uninstall)) | (1 << int(AppSource::AppPaths)));
+    }
+
     void scanFillsCatalogOnlyOnDemand()
     {
         QCOMPARE(core->catalogCount(), 0); // nothing is scanned at startup
@@ -94,7 +200,27 @@ private slots:
         core->refreshSoftware();
         QVERIFY(spy.wait(60000));
         QVERIFY(core->catalogCount() > 0);
-        QVERIFY(core->catalogSearch({}, 5).size() > 0);
+        const QVariantList some = core->catalogSearch({}, 5);
+        QVERIFY(some.size() > 0);
+        for (const QVariant &v : some) { // schema v2 columns are returned and filled where the exe has version info
+            const QVariantMap m = v.toMap();
+            QVERIFY(m.contains("publisher") && m.contains("version") && m.contains("installDir") && m.contains("sources"));
+            QVERIFY(m["sources"].toInt() != 0);
+            QVERIFY(!m["installDir"].toString().isEmpty() || isPackagedTarget(m["target"].toString()));
+        }
+        // Store/MSIX apps (present on any Windows 10/11 install) come through the shell's Apps folder.
+        int packaged = 0;
+        for (const QVariant &v : core->catalogSearch({}, 5000)) {
+            const QString target = v.toMap()["target"].toString();
+            if (!isPackagedTarget(target))
+                continue;
+            if (packaged++ == 0) {
+                QVERIFY2(packagedAppExists(target), qPrintable(target));
+                QVERIFY2(!packagedAppIcon(target, 48).isNull(), qPrintable(target));
+            }
+        }
+        qInfo() << "packaged apps in catalog:" << packaged;
+        QVERIFY(packaged > 0);
         // ...and the scan never creates cards by itself.
         QCOMPARE(core->queryIds(LH::ModeCategory, LH::Software, {}, {}).size(), 0);
     }
@@ -275,6 +401,37 @@ private slots:
         QVERIFY(!r.focus("x"));
         r.setEnabled(false);
         QVERIFY(!r.isRunning("x"));
+#endif
+    }
+
+    void tmpManualPackagedLaunch() // TEMP: removed after manual verification
+    {
+#ifdef Q_OS_WIN
+        const QString t = "shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App";
+        QVERIFY(packagedAppExists(t));
+        RunningApps r;
+        r.setTargets({{"calc", t}});
+        r.setEnabled(true);
+        QVERIFY(!r.isRunning("calc"));
+        QVERIFY(launchPackagedApp(t));
+        bool seen = false;
+        for (int i = 0; i < 40 && !seen; ++i) {
+            QTest::qWait(250);
+            r.refresh();
+            seen = r.isRunning("calc");
+        }
+        qInfo() << "MANUAL running detected:" << seen;
+        const bool focused = seen && r.focus("calc");
+        qInfo() << "MANUAL focus:" << focused;
+        QProcess::execute("taskkill", {"/IM", "CalculatorApp.exe", "/F"});
+        bool gone = false;
+        for (int i = 0; i < 20 && !gone; ++i) {
+            QTest::qWait(250);
+            r.refresh();
+            gone = !r.isRunning("calc");
+        }
+        qInfo() << "MANUAL gone after close:" << gone;
+        QVERIFY(seen && focused && gone);
 #endif
     }
 

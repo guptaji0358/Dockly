@@ -378,6 +378,8 @@ LH::Status AppCore::computeStatus(const Item &it)
     case LH::Collection:
         return LH::Normal;
     default:
+        if (isPackagedTarget(it.target))
+            return packagedAppExists(it.target) ? LH::Normal : LH::Missing;
         return QFileInfo::exists(it.target) ? LH::Normal : LH::Missing;
     }
 }
@@ -739,6 +741,10 @@ int AppCore::launchImpl(const QString &id, bool focusIfRunning)
             ok = true; // already open: its window came forward
             break;
         }
+        if (isPackagedTarget(it.target)) {
+            ok = launchPackagedApp(it.target);
+            break;
+        }
         ok = QProcess::startDetached(it.target, {}, QFileInfo(it.target).absolutePath())
              || QDesktopServices::openUrl(QUrl::fromLocalFile(it.target));
         break;
@@ -805,8 +811,8 @@ int AppCore::launchAll(const QString &collectionId)
 bool AppCore::launchAsAdmin(const QString &id)
 {
     const Item it = item(id);
-    if (it.id.isEmpty() || it.category != LH::Software || computeStatus(it) != LH::Normal)
-        return false;
+    if (it.id.isEmpty() || it.category != LH::Software || isPackagedTarget(it.target) || computeStatus(it) != LH::Normal)
+        return false; // packaged apps can't be elevated or given arguments from here
 #ifdef Q_OS_WIN
     const QString path = QDir::toNativeSeparators(it.target);
     const QString dir = QDir::toNativeSeparators(QFileInfo(it.target).absolutePath());
@@ -828,7 +834,7 @@ bool AppCore::launchAsAdmin(const QString &id)
 bool AppCore::launchWithArgs(const QString &id, const QString &args)
 {
     const Item it = item(id);
-    if (it.id.isEmpty() || it.category != LH::Software || computeStatus(it) != LH::Normal)
+    if (it.id.isEmpty() || it.category != LH::Software || isPackagedTarget(it.target) || computeStatus(it) != LH::Normal)
         return false;
     const bool ok = QProcess::startDetached(it.target, QProcess::splitCommand(args), QFileInfo(it.target).absolutePath());
     if (!ok) {
@@ -1309,7 +1315,11 @@ QPixmap AppCore::pixmapForFile(const QString &path, int size)
     const QString key = QStringLiteral("file:") + path + QLatin1Char('|') + QString::number(size);
     if (const QPixmap c = cachedPixmap(key); !c.isNull())
         return c;
-    QPixmap pm = m_iconProvider.icon(QFileInfo(path)).pixmap(size);
+    QPixmap pm;
+    if (isPackagedTarget(path))
+        pm = QPixmap::fromImage(packagedAppIcon(path, size));
+    else
+        pm = m_iconProvider.icon(QFileInfo(path)).pixmap(size);
     if (pm.isNull())
         pm = m_iconProvider.icon(QFileIconProvider::File).pixmap(size);
     storePixmap(key, pm);
@@ -1399,6 +1409,8 @@ QPixmap AppCore::originalPixmap(const Item &it, int size)
             if (!img.isNull())
                 pm = QPixmap::fromImage(img);
         }
+        if (pm.isNull() && it.category == LH::Software && isPackagedTarget(it.target))
+            pm = QPixmap::fromImage(packagedAppIcon(it.target, size));
         if (pm.isNull()) {
             pm = m_iconProvider.icon(fi).pixmap(size);
             if (pm.isNull())

@@ -5,9 +5,13 @@
 #include <QDir>
 #include <QFileInfo>
 
+#include "softwarescanner.h"
+
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <dwmapi.h>
+#include <propsys.h>
+#include <shlobj.h>
 #endif
 
 RunningApps::RunningApps(QObject *parent)
@@ -41,6 +45,11 @@ QString RunningApps::exeKey(const QString &target)
     const auto cached = m_resolved.constFind(target);
     if (cached != m_resolved.cend())
         return cached.value();
+    if (isPackagedTarget(target)) { // matched by the window's AppUserModelID, not by exe path
+        const QString key = QStringLiteral("aumid:") + packagedAppId(target).toLower();
+        m_resolved.insert(target, key);
+        return key;
+    }
     QString path = target;
     const QFileInfo fi(target);
     if (fi.suffix().compare(QLatin1String("lnk"), Qt::CaseInsensitive) == 0)
@@ -98,6 +107,24 @@ bool isAppWindow(HWND h)
     return true;
 }
 
+// The AppUserModelID the shell associates with a window (empty when it has none).
+QString windowAppUserModelId(HWND h)
+{
+    IPropertyStore *store = nullptr;
+    if (FAILED(SHGetPropertyStoreForWindow(h, IID_PPV_ARGS(&store))) || !store)
+        return {};
+    // PKEY_AppUserModel_ID {9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}, 5
+    const PROPERTYKEY key = {{0x9F4C2855, 0x9F79, 0x4B39, {0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3}}, 5};
+    PROPVARIANT pv;
+    PropVariantInit(&pv);
+    QString out;
+    if (SUCCEEDED(store->GetValue(key, &pv)) && pv.vt == VT_LPWSTR && pv.pwszVal)
+        out = QString::fromWCharArray(pv.pwszVal);
+    PropVariantClear(&pv);
+    store->Release();
+    return out;
+}
+
 BOOL CALLBACK collect(HWND h, LPARAM lp)
 {
     auto *scan = reinterpret_cast<Scan *>(lp);
@@ -112,6 +139,12 @@ BOOL CALLBACK collect(HWND h, LPARAM lp)
         it = scan->exeOfPid.insert(pid, imagePath(pid));
     if (!it.value().isEmpty())
         scan->windowsOfExe[it.value()].append(reinterpret_cast<quintptr>(h));
+    // Store/UWP windows are hosted (ApplicationFrameHost) or live under WindowsApps: identify them by AUMID
+    if (it.value().endsWith(QLatin1String("\\applicationframehost.exe")) || it.value().contains(QLatin1String("\\windowsapps\\"))) {
+        const QString id = windowAppUserModelId(h);
+        if (!id.isEmpty())
+            scan->windowsOfExe[QStringLiteral("aumid:") + id.toLower()].append(reinterpret_cast<quintptr>(h));
+    }
     return TRUE;
 }
 } // namespace
