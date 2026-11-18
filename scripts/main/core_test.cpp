@@ -404,37 +404,6 @@ private slots:
 #endif
     }
 
-    void tmpManualPackagedLaunch() // TEMP: removed after manual verification
-    {
-#ifdef Q_OS_WIN
-        const QString t = "shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App";
-        QVERIFY(packagedAppExists(t));
-        RunningApps r;
-        r.setTargets({{"calc", t}});
-        r.setEnabled(true);
-        QVERIFY(!r.isRunning("calc"));
-        QVERIFY(launchPackagedApp(t));
-        bool seen = false;
-        for (int i = 0; i < 40 && !seen; ++i) {
-            QTest::qWait(250);
-            r.refresh();
-            seen = r.isRunning("calc");
-        }
-        qInfo() << "MANUAL running detected:" << seen;
-        const bool focused = seen && r.focus("calc");
-        qInfo() << "MANUAL focus:" << focused;
-        QProcess::execute("taskkill", {"/IM", "CalculatorApp.exe", "/F"});
-        bool gone = false;
-        for (int i = 0; i < 20 && !gone; ++i) {
-            QTest::qWait(250);
-            r.refresh();
-            gone = !r.isRunning("calc");
-        }
-        qInfo() << "MANUAL gone after close:" << gone;
-        QVERIFY(seen && focused && gone);
-#endif
-    }
-
     void droppedOnCollectionLandsInIt()
     {
         const QString col = core->createCollection("Drop target");
