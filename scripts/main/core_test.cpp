@@ -1,4 +1,5 @@
 #include "appcore.h"
+#include "softwarescanner.h"
 #include "iconpack.h"
 #include "itemmodel.h"
 
@@ -162,8 +163,8 @@ private slots:
     void mergeKeepsFirstRecordPerExe()
     {
         QVector<RawRecord> in;
-        in.append({AppSource::StartMenu, "Alpha", "C:/Apps/alpha.exe", {}});
-        in.append({AppSource::Uninstall, "Alpha Duplicate", "c:/apps/ALPHA.exe", {}});
+        in.append({AppSource::StartMenu, "Alpha", "C:/Apps/al.exe", {}});
+        in.append({AppSource::Uninstall, "Alpha Duplicate", "c:/apps/AL.exe", {}});
         in.append({AppSource::Uninstall, "Uninstall Beta", "C:/Apps/beta.exe", {}});
         RawRecord lazy{AppSource::AppPaths, "gamma", "C:/Apps/gamma.exe", [] { return QString("Gamma Pro"); }};
         in.append(lazy);
@@ -171,18 +172,18 @@ private slots:
         const QVector<ScannedApp> out = mergeRecords(in);
         QCOMPARE(out.size(), 2);
         QCOMPARE(out[0].name, QString("Alpha"));
-        QCOMPARE(out[0].target, QDir::toNativeSeparators("C:/Apps/alpha.exe"));
+        QCOMPARE(out[0].target, QDir::toNativeSeparators("C:/Apps/al.exe"));
         QCOMPARE(out[1].name, QString("Gamma Pro"));
     }
 
     void mergeFillsMissingMetadataFromLaterSources()
     {
-        RawRecord a{AppSource::StartMenu, "Alpha", "C:/Apps/alpha.exe", {}};
-        RawRecord b{AppSource::Uninstall, "Alpha Reg", "c:/apps/alpha.exe", {}};
+        RawRecord a{AppSource::StartMenu, "Alpha", "C:/Apps/al.exe", {}};
+        RawRecord b{AppSource::Uninstall, "Alpha Reg", "c:/apps/al.exe", {}};
         b.publisher = " Alpha Corp ";
         b.version = "1.2.3";
         b.installDir = "C:/Apps";
-        RawRecord c{AppSource::AppPaths, "alpha", "C:/Apps/alpha.exe", {}};
+        RawRecord c{AppSource::AppPaths, "alpha", "C:/Apps/al.exe", {}};
         c.publisher = "Someone Else"; // never overrides a value that is already set
         const QVector<ScannedApp> out = mergeRecords({a, b, c});
         QCOMPARE(out.size(), 1);
@@ -191,6 +192,148 @@ private slots:
         QCOMPARE(out[0].version, QString("1.2.3"));
         QCOMPARE(out[0].installDir, QString("C:/Apps"));
         QCOMPARE(out[0].sources, (1 << int(AppSource::StartMenu)) | (1 << int(AppSource::Uninstall)) | (1 << int(AppSource::AppPaths)));
+    }
+
+    // ---- synthetic fixtures: no real software, no vendor names that the code could special-case ----------
+
+    void nameRankingIsGeneric()
+    {
+        // an exe-like name loses to a human-readable one from another source, whatever the vendor
+        QCOMPARE(rankNames({{"contosostudio", 20}, {"Contoso Studio", 39}}, "C:/x/contosostudio.exe"), QString("Contoso Studio"));
+        QCOMPARE(rankNames({{"Fabrikam Notes", 48}, {"fabrikamnotes.exe", 20}}, "C:/x/fabrikamnotes.exe"), QString("Fabrikam Notes"));
+        // only file-name-like candidates: no name at all rather than a wrong one
+        QVERIFY(rankNames({{"zz.exe", 20}}, "C:/x/zz.exe").isEmpty());
+        // version/arch decoration is stripped from the winner
+        QCOMPARE(stripVersionDecoration("Northwind Editor 12.4.1 (x64)"), QString("Northwind Editor"));
+        QCOMPARE(stripVersionDecoration("7-Zip 23.01 (x64 edition)"), QString("7-Zip 23.01 (x64 edition)")); // not a pure suffix: untouched
+        QCOMPARE(stripVersionDecoration("Windows 11 Helper"), QString("Windows 11 Helper"));
+        QCOMPARE(stripVersionDecoration("Qt 6.12.0 (MinGW 64-bit)"), QString("Qt 6.12.0 (MinGW 64-bit)")); // brackets never left half-open
+        QCOMPARE(stripVersionDecoration("Tailspin Racer x64"), QString("Tailspin Racer"));
+        QCOMPARE(stripVersionDecoration("Wingtip Mail v3.2"), QString("Wingtip Mail"));
+        QVERIFY(nameQuality("Proper Name") > nameQuality("proper_name.exe"));
+        QVERIFY(nameQuality("{1E87508D-89C2-42F0-8A7E-645A0F50CA58}") < 0);
+        // two sources agreeing beat one outlier of the same prior
+        QCOMPARE(rankNames({{"Tailspin Toys Racer", 48}, {"Tailspin Toys Racer Pro", 48}, {"Tailspin Toys Racer", 50}}), QString("Tailspin Toys Racer"));
+    }
+
+    void registryValuesKeepArgumentsAndRejectUnresolvedVariables()
+    {
+        QString args;
+        QCOMPARE(exeFromRegistryValue("\"C:\\Apps\\A\\a.exe\" --flag \"x y\"", &args), QString("C:/Apps/A/a.exe"));
+        QCOMPARE(args, QString("--flag \"x y\""));
+        QCOMPARE(exeFromRegistryValue("C:\\Program Files\\Vendor App\\v.exe /silent", &args), QString("C:/Program Files/Vendor App/v.exe"));
+        QCOMPARE(args, QString("/silent"));
+        QCOMPARE(exeFromRegistryValue("C:\\Apps\\a.exe,0", &args), QString("C:/Apps/a.exe"));
+        QVERIFY(args.isEmpty()); // an icon index is not an argument
+        qunsetenv("DOCKLY_TEST_UNDEFINED");
+        QVERIFY(exeFromRegistryValue("%DOCKLY_TEST_UNDEFINED%\\a.exe").isEmpty()); // never a wrong half-path
+        bool ok = true;
+        expandEnvironment("%DOCKLY_TEST_UNDEFINED%\\x", &ok);
+        QVERIFY(!ok);
+        qputenv("DOCKLY_TEST_A", "%DOCKLY_TEST_B%");
+        qputenv("DOCKLY_TEST_B", "C:\\Loop");
+        QCOMPARE(expandEnvironment("%DOCKLY_TEST_A%", &ok), QString("%DOCKLY_TEST_B%")); // single pass, no recursion
+        qunsetenv("DOCKLY_TEST_A");
+        qunsetenv("DOCKLY_TEST_B");
+    }
+
+    void installersAreFilteredByNameAndLocation()
+    {
+        for (const char *n : {"C:/x/setup.exe", "C:/x/Setup_v2.exe", "C:/x/vc_redist.x64.exe", "C:/x/unins000.exe",
+                              "C:/x/install.exe", "C:/x/foo-installer.exe", "C:/Windows/System32/msiexec.exe",
+                              "C:/Windows/Installer/{AB}/icon.exe"})
+            QVERIFY2(looksLikeInstallerExe(n), n);
+        for (const char *n : {"C:/x/Studio.exe", "C:/x/settings.exe", "C:/x/installed-apps.exe", "C:/x/Notes.exe"})
+            QVERIFY2(!looksLikeInstallerExe(n), n);
+    }
+
+    void mainExeNeverChosenBySizeAlone()
+    {
+        QTemporaryDir d;
+        QVERIFY(d.isValid());
+        auto make = [&](const QString &rel, int size) {
+            QDir().mkpath(QFileInfo(d.filePath(rel)).absolutePath());
+            QFile f(d.filePath(rel));
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(QByteArray(size, 'x'));
+        };
+        make("zzbig.exe", 200000);          // largest, but unrelated to the product
+        make("setup.exe", 100000);
+        make("Aurora Notes.exe", 10);       // small, but named like the product
+        make("aurora-updater.exe", 5000);
+        make("bin/helper.exe", 90000);
+        QCOMPARE(QFileInfo(findMainExeInDir(d.path(), "Aurora Notes")).fileName(), QString("Aurora Notes.exe"));
+        QCOMPARE(QFileInfo(findMainExeInDir(d.path(), "Aurora", "Aurora Corp")).fileName(), QString("Aurora Notes.exe")); // partial name beats updater
+        QVERIFY(findMainExeInDir(d.path(), "Unrelated Product").isEmpty()); // big files never win without evidence
+        QVERIFY(findMainExeInDir(d.path() + "/missing", "Aurora").isEmpty());
+        // one level down is searched, top level preferred when equal
+        make("tools/Zephyr.exe", 10);
+        QCOMPARE(findMainExeInDir(d.path(), "Zephyr"), d.filePath("tools/Zephyr.exe"));
+    }
+
+    void mergeReportsRejectionReasons()
+    {
+        QVector<RawRecord> in;
+        in.append({AppSource::StartMenu, "Uninstall Foo", "C:/Apps/foo.exe", {}});
+        in.append({AppSource::StartMenu, "Foo", "C:/Apps/unins000.exe", {}});
+        in.append({AppSource::AppPaths, "x", "C:/Apps/x.exe", [] { return QString(); }});
+        in.append({AppSource::Uninstall, "Good Tool", "", {}});
+        in.append({AppSource::StartMenu, "Fine Program", "C:/Apps/fine.exe", {}});
+        QVector<Rejection> rej;
+        const QVector<ScannedApp> out = mergeRecords(in, false, &rej);
+        QCOMPARE(out.size(), 1);
+        QCOMPARE(rej.size(), 4);
+        QStringList reasons;
+        for (const Rejection &r : rej) {
+            QVERIFY(!r.reason.isEmpty());
+            reasons << r.reason;
+        }
+        reasons.sort();
+        QCOMPARE(reasons, QStringList({"no-launch-target", "noise-name", "noise-target", "unresolved-name"}));
+    }
+
+    void argumentsAndNonExeTargetsSurvive()
+    {
+        QVector<RawRecord> in;
+        RawRecord a{AppSource::StartMenu, "Console Tool", "C:/Apps/console.exe", {}};
+        RawRecord b{AppSource::StartMenu, "Console Tool Debug", "C:/Apps/console.exe", {}};
+        a.args = "--profile work";
+        b.args = "--debug";
+        RawRecord c{AppSource::StartMenu, "Batch Runner", "C:/Apps/run all.bat", {}};
+        in << a << b << c;
+        const QVector<ScannedApp> out = mergeRecords(in);
+        QCOMPARE(out.size(), 3); // same exe, different arguments = different programs; .bat is not dropped
+        QCOMPARE(out[0].args, QString("--profile work"));
+        QCOMPARE(out[1].args, QString("--debug"));
+        QVERIFY(isLaunchableTarget("C:/Apps/run all.bat") && isLaunchableTarget("x.msc") && isLaunchableTarget("x.lnk"));
+        QVERIFY(!isLaunchableTarget("C:/Docs/readme.txt") && !isLaunchableTarget("C:/Docs"));
+
+        // the card keeps the arguments, and they take part in identity
+        const QString t = m_realFile.fileName();
+        QCOMPARE(core->addSoftware({QVariantMap{{"name", "Args One"}, {"target", t}, {"args", "--one"}}}), 1);
+        QCOMPARE(core->addSoftware({QVariantMap{{"name", "Args Two"}, {"target", t}, {"args", "--two"}}}), 1);
+        QCOMPARE(core->addSoftware({QVariantMap{{"name", "Args One again"}, {"target", t}, {"args", "--one"}}}), 0);
+        bool found = false;
+        for (const QString &id : core->queryIds(LH::ModeCategory, LH::Software, {}, {}))
+            if (core->item(id).name == "Args One") {
+                QCOMPARE(core->item(id).args, QString("--one"));
+                found = true;
+            }
+        QVERIFY(found);
+        for (const QString &id : core->queryIds(LH::ModeCategory, LH::Software, {}, {})) // leave no cards behind
+            if (core->item(id).name.startsWith("Args "))
+                core->removeItem(id);
+    }
+
+    void aumidIdentityIsCaseAndSeparatorStable()
+    {
+        QVector<RawRecord> in;
+        in.append({AppSource::AppsFolder, "Stable App", "shell:AppsFolder\\Contoso.Stable_8abc!App", {}});
+        in.append({AppSource::Packaged, "Stable App", "SHELL:appsfolder/contoso.stable_8abc!app", {}});
+        const QVector<ScannedApp> out = mergeRecords(in);
+        QCOMPARE(out.size(), 1);
+        QCOMPARE(out[0].sources, (1 << int(AppSource::AppsFolder)) | (1 << int(AppSource::Packaged)));
+        QCOMPARE(packagedAppId(out[0].target), QString("Contoso.Stable_8abc!App")); // first spelling is kept
     }
 
     void scanFillsCatalogOnlyOnDemand()
@@ -223,6 +366,76 @@ private slots:
         QVERIFY(packaged > 0);
         // ...and the scan never creates cards by itself.
         QCOMPARE(core->queryIds(LH::ModeCategory, LH::Software, {}, {}).size(), 0);
+    }
+
+    // ---- real machine: runs after the scan above; asserts invariants, not a nonzero count ----------------
+
+    void realMachineCoverageAndNaming()
+    {
+        const ScanReport &rep = core->lastScanReport();
+        QVERIFY(rep.shellEntries > 0);
+        QVERIFY(rep.apps.size() == core->catalogCount());
+
+        // 1. every rejected entry says why
+        QHash<QString, int> byReason;
+        for (const Rejection &r : rep.rejected) {
+            QVERIFY2(!r.reason.isEmpty(), qPrintable(r.name + " | " + r.launch));
+            byReason[r.reason]++;
+        }
+        // 2. coverage of the shell's Apps folder (what Start shows): kept + rejected-with-reason + merged duplicates
+        int shellRejected = 0;
+        for (const Rejection &r : rep.rejected)
+            if (r.source == AppSource::AppsFolder)
+                ++shellRejected;
+        const int unaccounted = rep.shellEntries - rep.shellEntriesKept - shellRejected;
+        qInfo().noquote() << QStringLiteral("COVERAGE shell=%1 kept=%2 rejected=%3 unaccounted(dup/merged)=%4 catalog=%5")
+                                 .arg(rep.shellEntries).arg(rep.shellEntriesKept).arg(shellRejected).arg(unaccounted).arg(rep.apps.size());
+        QVERIFY2(unaccounted >= 0, "more outcomes than entries");
+        QVERIFY2(rep.shellEntriesKept + shellRejected >= rep.shellEntries * 0.9, "over 10% of Apps-folder entries vanished without a reason");
+
+        // 3. naming accuracy: names that still look like file names / GUIDs / versions
+        int bad = 0;
+        QStringList badNames;
+        for (const ScannedApp &a : rep.apps) {
+            const QString exe = isPackagedTarget(a.target) ? QString() : a.target;
+            if (nameQuality(a.name, exe) <= -50 || a.name.endsWith(".exe", Qt::CaseInsensitive)) { // same bar rankNames uses for "unusable"
+                ++bad;
+                badNames << a.name + " <- " + a.target;
+            }
+        }
+        const double badPct = rep.apps.isEmpty() ? 100.0 : 100.0 * bad / rep.apps.size();
+        qInfo().noquote() << QStringLiteral("NAMING weak=%1 of %2 (%3%)").arg(bad).arg(rep.apps.size()).arg(badPct, 0, 'f', 1);
+        for (const QString &n : badNames)
+            qInfo().noquote() << "  weak name:" << n;
+        QVERIFY2(badPct < 5.0, "too many catalog names still look like file names");
+
+        // 4. no duplicate launch identities, no installer targets, targets resolvable
+        QSet<QString> seen;
+        int args = 0, nonExe = 0;
+        for (const ScannedApp &a : rep.apps) {
+            const QString key = Item::normalizedLaunch(a.target, a.args);
+            QVERIFY2(!seen.contains(key), qPrintable(a.target));
+            seen.insert(key);
+            if (!a.args.isEmpty())
+                ++args;
+            if (!isPackagedTarget(a.target) && !a.target.endsWith(".exe", Qt::CaseInsensitive))
+                ++nonExe;
+            if (a.target.endsWith(".exe", Qt::CaseInsensitive))
+                QVERIFY2(!looksLikeInstallerExe(a.target), qPrintable(a.target));
+        }
+        qInfo().noquote() << QStringLiteral("SHORTCUT args kept on %1 entries; non-exe launch targets: %2").arg(args).arg(nonExe);
+        for (auto it = byReason.constBegin(); it != byReason.constEnd(); ++it)
+            qInfo().noquote() << QStringLiteral("REJECTED %1: %2").arg(it.key()).arg(it.value());
+        QVERIFY(QFile::exists(m_dir.path() + "/scan-report.txt"));
+        if (const QByteArray dump = qgetenv("DOCKLY_SCAN_DUMP"); !dump.isEmpty()) { // manual review of the real catalog
+            QFile out(QString::fromLocal8Bit(dump));
+            if (out.open(QIODevice::WriteOnly | QIODevice::Text)) {
+                for (const ScannedApp &a : rep.apps)
+                    out.write((QStringLiteral("%1 | %2 | args=%3 | src=%4").arg(a.name, a.target, a.args).arg(a.sources) + QLatin1Char('\n')).toUtf8());
+                out.write("\n");
+                out.write(rep.toText().toUtf8());
+            }
+        }
     }
 
     void catalogIsHiddenUntilPicked()
