@@ -17,13 +17,13 @@ void Database::close()
     if (!m_open)
         return; // also avoids touching QtSql after QCoreApplication is gone
     m_open = false;
-    for (const char *name : {"lh_library", "lh_catalog"}) {
+    for (const QString &name : {m_libConn, m_catConn}) {
         {
-            QSqlDatabase db = QSqlDatabase::database(QLatin1String(name), false);
+            QSqlDatabase db = QSqlDatabase::database(name, false);
             if (db.isValid())
                 db.close();
         }
-        QSqlDatabase::removeDatabase(QLatin1String(name));
+        QSqlDatabase::removeDatabase(name);
     }
 }
 
@@ -32,9 +32,9 @@ bool Database::open(const QString &dir)
     const QString libPath = dir + "/library.db";
     m_libraryIsNew = !QFile::exists(libPath);
 
-    QSqlDatabase l = QSqlDatabase::addDatabase("QSQLITE", "lh_library");
+    QSqlDatabase l = QSqlDatabase::addDatabase("QSQLITE", m_libConn);
     l.setDatabaseName(libPath);
-    QSqlDatabase c = QSqlDatabase::addDatabase("QSQLITE", "lh_catalog");
+    QSqlDatabase c = QSqlDatabase::addDatabase("QSQLITE", m_catConn);
     c.setDatabaseName(dir + "/catalog.db");
     if (!l.open() || !c.open())
         return false;
@@ -50,6 +50,7 @@ bool Database::open(const QString &dir)
            " last_opened TEXT, status INTEGER NOT NULL DEFAULT 0)");
     q.exec("ALTER TABLE items ADD COLUMN icon TEXT NOT NULL DEFAULT ''"); // fails harmlessly when it exists
     q.exec("ALTER TABLE items ADD COLUMN tags TEXT NOT NULL DEFAULT ''"); // comma-separated, fails harmlessly when it exists
+    q.exec("ALTER TABLE items ADD COLUMN args TEXT NOT NULL DEFAULT ''"); // shortcut arguments; fails harmlessly when it exists
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_cat ON items(category, name COLLATE NOCASE)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_norm ON items(category, norm)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_fav ON items(favorite)");
@@ -62,15 +63,17 @@ bool Database::open(const QString &dir)
 
     QSqlQuery cq(c);
     cq.exec("PRAGMA journal_mode=WAL");
-    cq.exec("CREATE TABLE IF NOT EXISTS apps (target TEXT PRIMARY KEY, name TEXT NOT NULL)");
-    // The catalog is a rebuildable cache: schema upgrades just add columns (old rows stay, empty until the next scan).
-    if (cq.exec("PRAGMA user_version") && cq.next() && cq.value(0).toInt() < 2) {
-        cq.exec("ALTER TABLE apps ADD COLUMN publisher TEXT NOT NULL DEFAULT ''");
-        cq.exec("ALTER TABLE apps ADD COLUMN version TEXT NOT NULL DEFAULT ''");
-        cq.exec("ALTER TABLE apps ADD COLUMN install_dir TEXT NOT NULL DEFAULT ''");
-        cq.exec("ALTER TABLE apps ADD COLUMN sources INTEGER NOT NULL DEFAULT 0");
-        cq.exec("PRAGMA user_version=2");
+    // The catalog is a rebuildable cache, so a schema change just drops it (the next scan refills it).
+    // v4: identity is target + shortcut arguments, so one exe can appear with different arguments.
+    // v5: merge keys use canonical paths and cross-source duplicates are merged, so rows written by older
+    //     scans (duplicates, stale spellings) are discarded. Only this cache is dropped, never library.db.
+    if (cq.exec("PRAGMA user_version") && cq.next() && cq.value(0).toInt() < 5) {
+        cq.exec("DROP TABLE IF EXISTS apps");
+        cq.exec("PRAGMA user_version=5");
     }
+    cq.exec("CREATE TABLE IF NOT EXISTS apps (target TEXT NOT NULL, name TEXT NOT NULL,"
+            " publisher TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '', install_dir TEXT NOT NULL DEFAULT '',"
+            " sources INTEGER NOT NULL DEFAULT 0, args TEXT NOT NULL DEFAULT '', PRIMARY KEY(target, args))");
     cq.exec("CREATE INDEX IF NOT EXISTS idx_apps_name ON apps(name COLLATE NOCASE)");
     return true;
 }
@@ -98,6 +101,7 @@ static Item rowToItem(QSqlQuery &q)
     it.status = LH::Status(q.value(6).toInt());
     it.icon = q.value(7).toString();
     it.tags = Item::parseTags(q.value(8).toString());
+    it.args = q.value(9).toString();
     return it;
 }
 
@@ -106,7 +110,7 @@ bool Database::getItem(const QString &id, Item &out) const
     if (!m_open)
         return {};
     QSqlQuery q(lib());
-    q.prepare("SELECT id,category,name,target,favorite,last_opened,status,icon,tags FROM items WHERE id=?");
+    q.prepare("SELECT id,category,name,target,favorite,last_opened,status,icon,tags,args FROM items WHERE id=?");
     q.addBindValue(id);
     if (!q.exec() || !q.next())
         return false;
@@ -186,17 +190,18 @@ bool Database::insertItem(const Item &it)
     if (!m_open)
         return {};
     QSqlQuery q(lib());
-    q.prepare("INSERT INTO items(id,category,name,target,norm,favorite,last_opened,status,icon,tags) VALUES(?,?,?,?,?,?,?,?,?,?)");
+    q.prepare("INSERT INTO items(id,category,name,target,norm,favorite,last_opened,status,icon,tags,args) VALUES(?,?,?,?,?,?,?,?,?,?,?)");
     q.addBindValue(it.id);
     q.addBindValue(int(it.category));
     q.addBindValue(it.name);
     q.addBindValue(it.target.isNull() ? QStringLiteral("") : it.target); // never bind NULL
-    q.addBindValue(it.category == LH::Collection ? QStringLiteral("") : Item::normalizedTarget(it.target));
+    q.addBindValue(it.category == LH::Collection ? QStringLiteral("") : Item::normalizedLaunch(it.target, it.args));
     q.addBindValue(it.favorite ? 1 : 0);
     q.addBindValue(it.lastOpened.isValid() ? QVariant(it.lastOpened.toString(Qt::ISODate)) : QVariant(QMetaType(QMetaType::QString)));
     q.addBindValue(int(it.status));
     q.addBindValue(it.icon.isNull() ? QStringLiteral("") : it.icon); // never bind NULL
     q.addBindValue(it.tags.isEmpty() ? QStringLiteral("") : it.tags.join(QLatin1Char(','))); // never bind NULL
+    q.addBindValue(it.args.isNull() ? QStringLiteral("") : it.args);
     return q.exec();
 }
 
@@ -243,7 +248,7 @@ bool Database::updateItem(const Item &it)
     q.prepare("UPDATE items SET name=?,target=?,norm=?,status=? WHERE id=?");
     q.addBindValue(it.name);
     q.addBindValue(it.target.isNull() ? QStringLiteral("") : it.target); // never bind NULL
-    q.addBindValue(it.category == LH::Collection ? QStringLiteral("") : Item::normalizedTarget(it.target));
+    q.addBindValue(it.category == LH::Collection ? QStringLiteral("") : Item::normalizedLaunch(it.target, it.args));
     q.addBindValue(int(it.status));
     q.addBindValue(it.id);
     return q.exec();
@@ -491,8 +496,12 @@ int Database::replaceCatalog(const QVector<ScannedApp> &apps)
     QSqlDatabase db = cat();
     db.transaction();
     QSqlQuery q(db);
-    q.exec("DELETE FROM apps");
-    q.prepare("INSERT OR IGNORE INTO apps(target,name,publisher,version,install_dir,sources) VALUES(?,?,?,?,?,?)");
+    // All-or-nothing: a failed refresh must leave the previous catalog intact, not a half-filled one.
+    if (!q.exec("DELETE FROM apps")) {
+        db.rollback();
+        return catalogCount();
+    }
+    q.prepare("INSERT OR IGNORE INTO apps(target,name,publisher,version,install_dir,sources,args) VALUES(?,?,?,?,?,?,?)");
     for (const ScannedApp &a : apps) {
         q.addBindValue(a.target);
         q.addBindValue(a.name);
@@ -502,10 +511,41 @@ int Database::replaceCatalog(const QVector<ScannedApp> &apps)
         q.addBindValue(text(a.version));
         q.addBindValue(text(a.installDir));
         q.addBindValue(a.sources);
-        q.exec();
+        q.addBindValue(text(a.args));
+        if (!q.exec()) {
+            db.rollback();
+            return catalogCount();
+        }
     }
     db.commit();
     return catalogCount();
+}
+
+int Database::pruneCatalog(const std::function<bool(const QString &)> &exists)
+{
+    if (!m_open)
+        return 0;
+    QSqlDatabase db = cat();
+    QVector<QPair<QString, QString>> gone;
+    {
+        QSqlQuery q(db);
+        if (q.exec("SELECT target,args FROM apps"))
+            while (q.next())
+                if (!exists(q.value(0).toString()))
+                    gone.append({q.value(0).toString(), q.value(1).toString()});
+    }
+    if (gone.isEmpty())
+        return 0;
+    db.transaction();
+    QSqlQuery d(db);
+    d.prepare("DELETE FROM apps WHERE target=? AND args=?");
+    for (const auto &g : gone) {
+        d.addBindValue(g.first);
+        d.addBindValue(g.second);
+        d.exec();
+    }
+    db.commit();
+    return int(gone.size());
 }
 
 QVariantList Database::catalog(const QString &search, int limit) const
@@ -515,9 +555,9 @@ QVariantList Database::catalog(const QString &search, int limit) const
     QSqlQuery q(cat());
     const QString needle = search.trimmed();
     if (needle.isEmpty()) {
-        q.prepare("SELECT name,target,publisher,version,install_dir,sources FROM apps ORDER BY name COLLATE NOCASE LIMIT ?");
+        q.prepare("SELECT name,target,publisher,version,install_dir,sources,args FROM apps ORDER BY name COLLATE NOCASE LIMIT ?");
     } else {
-        q.prepare("SELECT name,target,publisher,version,install_dir,sources FROM apps"
+        q.prepare("SELECT name,target,publisher,version,install_dir,sources,args FROM apps"
                   " WHERE name LIKE ? ESCAPE '\\' OR publisher LIKE ? ESCAPE '\\' ORDER BY name COLLATE NOCASE LIMIT ?");
         q.addBindValue(likePattern(needle));
         q.addBindValue(likePattern(needle));
@@ -532,7 +572,7 @@ QVariantList Database::runCatalogQuery(QSqlQuery &q)
     if (q.exec())
         while (q.next())
             out.append(QVariantMap{{"name", q.value(0)}, {"target", q.value(1)}, {"publisher", q.value(2)},
-                                   {"version", q.value(3)}, {"installDir", q.value(4)}, {"sources", q.value(5)}});
+                                   {"version", q.value(3)}, {"installDir", q.value(4)}, {"sources", q.value(5)}, {"args", q.value(6)}});
     return out;
 }
 
@@ -554,7 +594,7 @@ QJsonObject Database::exportAll() const
         return {};
     QJsonArray items;
     QSqlQuery q(lib());
-    q.exec("SELECT id,category,name,target,favorite,last_opened,status,icon,tags FROM items ORDER BY rowid");
+    q.exec("SELECT id,category,name,target,favorite,last_opened,status,icon,tags,args FROM items ORDER BY rowid");
     while (q.next()) {
         Item it = rowToItem(q);
         if (it.category == LH::Collection)

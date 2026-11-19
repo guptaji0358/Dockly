@@ -176,7 +176,10 @@ signals:
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
 
+public:
+    const ScanReport &lastScanReport() const { return m_lastScan; }
 private:
+    QString addItemWithArgs(int category, const QString &name, const QString &target, const QString &args);
     explicit AppCore(QObject *parent = nullptr);
 
     QString settingsPath() const;
@@ -233,6 +236,7 @@ private:
     QNetworkAccessManager *m_net = nullptr;
     QSet<QString> m_faviconRequested;
 
-    QFutureWatcher<QVector<ScannedApp>> m_scanWatcher;
+    QFutureWatcher<ScanReport> m_scanWatcher;
+    ScanReport m_lastScan;
     QFutureWatcher<QHash<QString, int>> m_checkWatcher;
 };

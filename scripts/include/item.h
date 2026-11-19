@@ -12,6 +12,7 @@ struct Item {
     LH::Category category = LH::Software;
     QString name;
     QString target; // file path, or URL for web shortcuts
+    QString args; // command-line arguments kept from a shortcut (programs only); empty = none
     QString icon; // optional user-chosen icon image (a copy kept in the data folder); empty = automatic
     bool favorite = false;
     QStringList tags; // user labels, lowercase, no spaces or commas
@@ -27,6 +28,8 @@ struct Item {
     static LH::Category categoryFromKey(const QString &key);
     static QString categoryLabel(LH::Category c);
     static QString normalizedTarget(const QString &target);
+    // identity of a program card: target plus shortcut arguments (same exe, other arguments = another card)
+    static QString normalizedLaunch(const QString &target, const QString &args);
     // "Work, #Design  side-project" -> {"work", "design", "side-project"} (unique, sorted, max 12)
     static QStringList parseTags(const QString &text);
 };

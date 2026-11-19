@@ -2,6 +2,7 @@
 
 #include "item.h"
 #include "softwarescanner.h"
+#include <functional>
 
 #include <QHash>
 #include <QJsonObject>
@@ -53,17 +54,21 @@ public:
     int replaceCatalog(const QVector<ScannedApp> &apps);
     QVariantList catalog(const QString &search, int limit) const;
     int catalogCount() const;
+    int pruneCatalog(const std::function<bool(const QString &target)> &exists); // drops rows whose program is gone; library.db untouched
 
     // --- backup -------------------------------------------------------------
     QJsonObject exportAll() const;
     bool importAll(const QJsonObject &data); // replaces library contents
 
 private:
-    QSqlDatabase lib() const { return QSqlDatabase::database(QStringLiteral("lh_library")); }
-    QSqlDatabase cat() const { return QSqlDatabase::database(QStringLiteral("lh_catalog")); }
+    QSqlDatabase lib() const { return QSqlDatabase::database(m_libConn); }
+    QSqlDatabase cat() const { return QSqlDatabase::database(m_catConn); }
     static QString likePattern(const QString &s);
     static QVariantList runCatalogQuery(QSqlQuery &q);
 
+    // one connection pair per instance, so several databases (e.g. tests) never share a connection name
+    QString m_libConn = QStringLiteral("lh_library_%1").arg(quintptr(this), 0, 16);
+    QString m_catConn = QStringLiteral("lh_catalog_%1").arg(quintptr(this), 0, 16);
     bool m_libraryIsNew = false;
     bool m_open = false;
 };

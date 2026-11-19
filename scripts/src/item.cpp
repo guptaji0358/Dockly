@@ -45,6 +45,12 @@ QString Item::normalizedTarget(const QString &target)
     return t.toLower();
 }
 
+QString Item::normalizedLaunch(const QString &target, const QString &args)
+{
+    const QString a = args.simplified();
+    return a.isEmpty() ? normalizedTarget(target) : normalizedTarget(target) + QChar(0x1f) + a.toLower();
+}
+
 QStringList Item::parseTags(const QString &text)
 {
     QStringList out;
@@ -68,6 +74,8 @@ QJsonObject Item::toJson() const
     o["name"] = name;
     o["target"] = target;
     o["favorite"] = favorite;
+    if (!args.isEmpty())
+        o["args"] = args;
     if (!icon.isEmpty())
         o["icon"] = icon;
     if (!tags.isEmpty())
@@ -87,6 +95,7 @@ Item Item::fromJson(const QJsonObject &o)
     it.name = o["name"].toString();
     it.target = o["target"].toString();
     it.favorite = o["favorite"].toBool();
+    it.args = o["args"].toString();
     it.icon = o["icon"].toString();
     for (const QJsonValue &v : o["tags"].toArray())
         it.tags << v.toString();

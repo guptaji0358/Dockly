@@ -1,24 +1,35 @@
 @echo off
-rem Clean rebuild of Dockly (wipes .\build, reconfigures, compiles, deploys Qt DLLs into .\dist).
-rem   build.bat           full clean rebuild + deploy
-rem   build.bat nodeploy  full clean rebuild only
+rem Incremental build of Dockly: only what changed is recompiled, and Qt is deployed into .\dist only once.
+rem   build.bat                  incremental build + deploy
+rem   build.bat nodeploy         incremental build only
+rem   build.bat clean            wipe .\build and .\dist first (full rebuild); "clean nodeploy" also works
 rem On a successful build, commits everything with .\commit.txt and pushes (if commit.txt exists).
 cd /d "%~dp0"
 
-if exist build rmdir /s /q build
-if exist build (
-    echo Could not delete the build folder - is Dockly.exe still running?
-    exit /b 1
+set "NODEPLOY="
+set "CLEAN="
+for %%A in (%*) do (
+    if /i "%%A"=="nodeploy" set "NODEPLOY=1"
+    if /i "%%A"=="clean" set "CLEAN=1"
 )
 
-if /i "%~1"=="nodeploy" (
+if defined CLEAN (
+    if exist build rmdir /s /q build
+    if exist dist rmdir /s /q dist
+    if exist build (
+        echo Could not delete the build folder - is Dockly.exe still running?
+        exit /b 1
+    )
+)
+
+if defined NODEPLOY (
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build.ps1
 ) else (
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build.ps1 -Deploy
 )
 if errorlevel 1 (
     echo.
-    echo BUILD FAILED
+    echo BUILD FAILED - if the linker could not write a file, close the running Dockly.exe and retry.
     exit /b 1
 )
 
@@ -49,7 +60,7 @@ if exist commit.txt (
 )
 
 rem Auto-launch: the deployed copy in .\dist, or the raw build output with "nodeploy".
-if /i "%~1"=="nodeploy" (
+if defined NODEPLOY (
     set "DOCKLY_EXE=build\Dockly.exe"
 ) else (
     set "DOCKLY_EXE=dist\Dockly.exe"
