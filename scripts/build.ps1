@@ -20,18 +20,19 @@ if ($Deploy) {
     # Incremental: the slow Qt deployment (windeployqt) only runs when it has never completed
     # (delete .\dist or run "build.bat clean" to force it). Our own files are refreshed only when they changed.
     $stamp = 'dist\.qt-deployed'
-    if (-not (Test-Path $stamp) -and (Test-Path dist\resources\DLLs\Qt6Core.dll)) {
-        # a deployment from before this stamp existed: keep it (it may be in use) and just mark it done
-        Set-Content $stamp $qt
-    }
     if (-not (Test-Path $stamp)) {
-        if (Test-Path dist) { Remove-Item dist -Recurse -Force }
+        # Deploy in place (never wipe dist: a running Dockly.exe may lock files, and a half-wiped dist is broken).
         New-Item -ItemType Directory -Force dist\resources\DLLs | Out-Null
-        Copy-Item build\DocklyApp.dll dist\resources\DLLs\ -Force
+        Copy-Item build\DocklyApp.dll dist\resources\DLLs\ -Force -ErrorAction Stop
         windeployqt --release --compiler-runtime --no-translations --qmldir qml --dir dist\resources\DLLs build\DocklyApp.dll
         if ($LASTEXITCODE) { exit $LASTEXITCODE }
         # plugin folders (platforms, qml, styles ...) go up into resources; only loose DLLs stay in resources\DLLs
-        Get-ChildItem dist\resources\DLLs -Directory | Move-Item -Destination dist\resources -Force
+        foreach ($d in Get-ChildItem dist\resources\DLLs -Directory) {
+            robocopy $d.FullName "dist\resources\$($d.Name)" /E /MOVE /NFL /NDL /NJH /NJS /NP | Out-Null
+            if ($LASTEXITCODE -ge 8) { Write-Host "Could not move $($d.Name)"; exit 1 }
+            Remove-Item $d.FullName -Recurse -Force # robocopy leaves files that were already identical in place
+        }
+        $global:LASTEXITCODE = 0
         Set-Content $stamp $qt
     }
     function Sync-IfChanged($from, $to) {
