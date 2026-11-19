@@ -336,6 +336,92 @@ private slots:
         QCOMPARE(packagedAppId(out[0].target), QString("Contoso.Stable_8abc!App")); // first spelling is kept
     }
 
+    // ---- duplicates and stale data ------------------------------------------------------------------------
+
+    static QString touch(const QTemporaryDir &d, const QString &rel)
+    {
+        QDir().mkpath(QFileInfo(d.filePath(rel)).absolutePath());
+        QFile f(d.filePath(rel));
+        f.open(QIODevice::WriteOnly);
+        f.write("x");
+        return d.filePath(rel);
+    }
+
+    void crossSourceDuplicatesMerge()
+    {
+        QTemporaryDir d;
+        QVERIFY(d.isValid());
+        const QString exe = touch(d, "Contoso/Studio/studio.exe");
+        const QString exe2 = touch(d, "Contoso/Studio/bin/studio64.exe");
+        const QString other = touch(d, "Fabrikam/Studio/studio.exe"); // same name, separate install: must stay
+        RawRecord shell{AppSource::AppsFolder, "Contoso Studio", "shell:AppsFolder\\Contoso.Studio", {}};
+        RawRecord sm{AppSource::StartMenu, "Contoso Studio", exe, {}};
+        RawRecord reg{AppSource::Uninstall, "Contoso Studio", exe2, {}};
+        RawRecord paths{AppSource::AppPaths, "Contoso Studio", QString(exe).replace("/Contoso/", "/Contoso/./"), {}}; // other spelling
+        RawRecord sep{AppSource::StartMenu, "Contoso Studio", other, {}};
+        const QVector<ScannedApp> out = mergeRecords({shell, sm, reg, paths, sep});
+        QCOMPARE(out.size(), 2);
+        QVERIFY(isPackagedTarget(out[0].target)); // first (primary-source) record survives
+        QCOMPARE(out[0].sources, (1 << int(AppSource::AppsFolder)) | (1 << int(AppSource::StartMenu))
+                                     | (1 << int(AppSource::Uninstall)) | (1 << int(AppSource::AppPaths)));
+        QCOMPARE(out[1].target, QDir::toNativeSeparators(other));
+    }
+
+    void registryEntryJoinsArgumentShortcutsButArgsStayDistinct()
+    {
+        QTemporaryDir d;
+        const QString exe = touch(d, "Tool/tool.exe");
+        RawRecord a{AppSource::StartMenu, "Tool Work", exe, {}};
+        a.args = "--profile work";
+        RawRecord b{AppSource::StartMenu, "Tool Debug", exe, {}};
+        b.args = "--debug";
+        RawRecord reg{AppSource::Uninstall, "Tool Work", exe, {}};
+        const QVector<ScannedApp> out = mergeRecords({a, b, reg});
+        QCOMPARE(out.size(), 2); // registry record merged, the two argument variants kept apart
+        QVERIFY(out[0].sources & (1 << int(AppSource::Uninstall)));
+        QCOMPARE(out[1].args, QString("--debug"));
+        // a shortcut-backed AUMID pairs with its exe+arguments entry (same name, unique AUMID)
+        RawRecord au{AppSource::AppsFolder, "Tool Shell", "shell:AppsFolder\\Vendor.Auto.{1}", {}};
+        RawRecord ex{AppSource::StartMenu, "Tool Shell", exe, {}};
+        ex.args = "/K setup.bat";
+        QCOMPARE(mergeRecords({au, ex}).size(), 1);
+        // two packaged apps sharing a name are never merged with an exe
+        RawRecord p1{AppSource::AppsFolder, "Photos", "shell:AppsFolder\\A.Photos!App", {}};
+        RawRecord p2{AppSource::AppsFolder, "Photos", "shell:AppsFolder\\B.Photos!App", {}};
+        RawRecord e{AppSource::Uninstall, "Photos", touch(d, "Other/photos.exe"), {}};
+        QCOMPARE(mergeRecords({p1, p2, e}).size(), 3);
+    }
+
+    void catalogRefreshReflectsCurrentState()
+    {
+        QTemporaryDir d;
+        const QString v1 = touch(d, "App/app.exe");
+        const QString gone = touch(d, "Gone/gone.exe");
+        Database db;
+        QVERIFY(db.open(d.filePath("data")) || (QDir().mkpath(d.filePath("data")) && db.open(d.filePath("data"))));
+        auto scan = [&] {
+            QVector<RawRecord> in;
+            in.append({AppSource::StartMenu, "App Pro", v1, {}});
+            in.append({AppSource::StartMenu, "Gone Tool", gone, {}});
+            return mergeRecords(in);
+        };
+        QCOMPARE(db.replaceCatalog(scan()), 2);              // first scan
+        QCOMPARE(db.replaceCatalog(scan()), 2);              // repeated scan: identical, no growth
+        QVERIFY(QFile::remove(gone));                        // uninstall
+        QCOMPARE(db.pruneCatalog([](const QString &t) { return QFileInfo::exists(t); }), 1); // startup prune
+        QCOMPARE(db.catalogCount(), 1);
+        QVector<RawRecord> in;                               // update: same program, new publisher/version, rescan
+        RawRecord u{AppSource::StartMenu, "App Pro", v1, {}};
+        u.version = "2.0";
+        in.append(u);
+        QCOMPARE(db.replaceCatalog(mergeRecords(in)), 1);
+        const QVariantList rows = db.catalog({}, 10);
+        QCOMPARE(rows.size(), 1);
+        QCOMPARE(rows[0].toMap()["version"].toString(), QString("2.0"));
+        QCOMPARE(rows[0].toMap()["name"].toString(), QString("App Pro"));
+        db.close();
+    }
+
     void scanFillsCatalogOnlyOnDemand()
     {
         QCOMPARE(core->catalogCount(), 0); // nothing is scanned at startup
@@ -366,6 +452,26 @@ private slots:
         QVERIFY(packaged > 0);
         // ...and the scan never creates cards by itself.
         QCOMPARE(core->queryIds(LH::ModeCategory, LH::Software, {}, {}).size(), 0);
+    }
+
+    void catalogRefreshNeverTouchesUserCards()
+    {
+        QTemporaryDir d;
+        const QString exe = touch(d, "Keep/keep.exe");
+        QCOMPARE(core->addSoftware({QVariantMap{{"name", "My Keep Card"}, {"target", exe}}}), 1);
+        const int before = core->queryIds(LH::ModeCategory, LH::Software, {}, {}).size();
+        QVERIFY(QFile::remove(exe)); // the program disappears from disk
+        core->refreshSoftware();
+        QSignalSpy spy(core, &AppCore::catalogChanged);
+        QVERIFY(spy.wait(60000));
+        const QStringList ids = core->queryIds(LH::ModeCategory, LH::Software, {}, {});
+        QCOMPARE(ids.size(), before); // cards survive catalog refresh and uninstall
+        QString id;
+        for (const QString &i : ids)
+            if (core->item(i).name == "My Keep Card")
+                id = i;
+        QVERIFY(!id.isEmpty());
+        core->removeItem(id);
     }
 
     // ---- real machine: runs after the scan above; asserts invariants, not a nonzero count ----------------
