@@ -21,4 +21,4 @@ AppCore: `inspectProcesses(id)` (async) -> signal `processInspection(id, result)
 ## Diagnostics (dev/test only, never reached in normal use)
 `--dialog inspect[-all][:Card]`, `--dialog menu:Card`, `--uiscript "click:x,y;right:x,y;scroll:x,y,dy;wait:ms;shot:f;shotall:prefix;quit"`
 (coordinates are window pixels as in `--screenshot`; events go only to Dockly's own window), env `LH_DEMO_PACKAGED="Name=AUMID;..."`
-(read only inside `--demo`). Popup menus did not render (width 12 px) in scripted runs even on the Stage 1 Main.qml: unresolved.
+(read only inside `--demo`). Card menu collapsed to ~12 px wide (padding only) so no entry showed; fixed by explicit `implicitWidth` on `Styled` in Main.qml (rows 310 px). `--dialog menu:#<cardId>` opens the menu for any category; the in-window menu position follows the real cursor, so scripted clicks need a screenshot first.

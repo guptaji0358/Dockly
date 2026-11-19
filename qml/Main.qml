@@ -176,7 +176,8 @@ ApplicationWindow {
             core.select(diagModel.idAt(0))
         if (startDialog.indexOf("menu:") === 0) {   // diagnostic: open a card's context menu (use with --uiscript shotall)
             const want = startDialog.substring(5)
-            for (let i = 0; i < diagModel.count; ++i)
+            if (want.charAt(0) === "#") { diagMenu.id = want.substring(1); diagMenu.start() }   // menu:#<card id>: any category
+            else for (let i = 0; i < diagModel.count; ++i)
                 if (core.itemInfo(diagModel.idAt(i)).name === want) { diagMenu.id = diagModel.idAt(i); diagMenu.start(); break }
         }
         if (startDialog.indexOf("inspect") === 0) {   // diagnostic: inspect[-all][:Card name] (default card: first program)
@@ -738,7 +739,7 @@ ApplicationWindow {
     // menu rows drawn by hand so the text is always readable in every skin (the stock rows follow the OS palette)
     component Entry: MenuItem {
         id: e
-        implicitWidth: 250
+        implicitWidth: 310
         implicitHeight: 36
         leftPadding: 16
         rightPadding: 16
@@ -763,6 +764,8 @@ ApplicationWindow {
 
     component Styled: Menu {
         padding: 6
+        // explicit width: the width derived from the custom rows collapsed to just the padding, hiding every entry
+        implicitWidth: 310 + leftPadding + rightPadding
         background: Rectangle {
             color: win.th.surface
             border.color: win.th.border
@@ -808,17 +811,10 @@ ApplicationWindow {
             readonly property bool applies: win.ctx.category === LH.Software
             readonly property bool on: win.ctx.guard !== false
             // not checkable (see "Open at startup"); the state text never claims protection that is not enforced yet
-            text: on ? "✓  Prevent Background Processes (saved, not enforced yet)" : "Prevent Background Processes: off"
+            text: on ? "✓  Prevent Background Processes: ON" : "Prevent Background Processes: OFF"
             visible: applies
             height: applies ? implicitHeight : 0
             onTriggered: core.setGuard(win.ctx.id, !on)
-        }
-        Entry {
-            readonly property bool applies: win.ctx.category === LH.Software
-            text: "Inspect Processes..."
-            visible: applies
-            height: applies ? implicitHeight : 0
-            onTriggered: inspectDialog.openFor(win.ctx.id, win.ctx.name)
         }
         Entry {
             readonly property bool applies: win.ctx.category === LH.Software
