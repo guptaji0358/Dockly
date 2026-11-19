@@ -17,13 +17,13 @@ void Database::close()
     if (!m_open)
         return; // also avoids touching QtSql after QCoreApplication is gone
     m_open = false;
-    for (const char *name : {"lh_library", "lh_catalog"}) {
+    for (const QString &name : {m_libConn, m_catConn}) {
         {
-            QSqlDatabase db = QSqlDatabase::database(QLatin1String(name), false);
+            QSqlDatabase db = QSqlDatabase::database(name, false);
             if (db.isValid())
                 db.close();
         }
-        QSqlDatabase::removeDatabase(QLatin1String(name));
+        QSqlDatabase::removeDatabase(name);
     }
 }
 
@@ -32,9 +32,9 @@ bool Database::open(const QString &dir)
     const QString libPath = dir + "/library.db";
     m_libraryIsNew = !QFile::exists(libPath);
 
-    QSqlDatabase l = QSqlDatabase::addDatabase("QSQLITE", "lh_library");
+    QSqlDatabase l = QSqlDatabase::addDatabase("QSQLITE", m_libConn);
     l.setDatabaseName(libPath);
-    QSqlDatabase c = QSqlDatabase::addDatabase("QSQLITE", "lh_catalog");
+    QSqlDatabase c = QSqlDatabase::addDatabase("QSQLITE", m_catConn);
     c.setDatabaseName(dir + "/catalog.db");
     if (!l.open() || !c.open())
         return false;
@@ -65,9 +65,11 @@ bool Database::open(const QString &dir)
     cq.exec("PRAGMA journal_mode=WAL");
     // The catalog is a rebuildable cache, so a schema change just drops it (the next scan refills it).
     // v4: identity is target + shortcut arguments, so one exe can appear with different arguments.
-    if (cq.exec("PRAGMA user_version") && cq.next() && cq.value(0).toInt() < 4) {
+    // v5: merge keys use canonical paths and cross-source duplicates are merged, so rows written by older
+    //     scans (duplicates, stale spellings) are discarded. Only this cache is dropped, never library.db.
+    if (cq.exec("PRAGMA user_version") && cq.next() && cq.value(0).toInt() < 5) {
         cq.exec("DROP TABLE IF EXISTS apps");
-        cq.exec("PRAGMA user_version=4");
+        cq.exec("PRAGMA user_version=5");
     }
     cq.exec("CREATE TABLE IF NOT EXISTS apps (target TEXT NOT NULL, name TEXT NOT NULL,"
             " publisher TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '', install_dir TEXT NOT NULL DEFAULT '',"
@@ -494,7 +496,11 @@ int Database::replaceCatalog(const QVector<ScannedApp> &apps)
     QSqlDatabase db = cat();
     db.transaction();
     QSqlQuery q(db);
-    q.exec("DELETE FROM apps");
+    // All-or-nothing: a failed refresh must leave the previous catalog intact, not a half-filled one.
+    if (!q.exec("DELETE FROM apps")) {
+        db.rollback();
+        return catalogCount();
+    }
     q.prepare("INSERT OR IGNORE INTO apps(target,name,publisher,version,install_dir,sources,args) VALUES(?,?,?,?,?,?,?)");
     for (const ScannedApp &a : apps) {
         q.addBindValue(a.target);
@@ -506,10 +512,40 @@ int Database::replaceCatalog(const QVector<ScannedApp> &apps)
         q.addBindValue(text(a.installDir));
         q.addBindValue(a.sources);
         q.addBindValue(text(a.args));
-        q.exec();
+        if (!q.exec()) {
+            db.rollback();
+            return catalogCount();
+        }
     }
     db.commit();
     return catalogCount();
+}
+
+int Database::pruneCatalog(const std::function<bool(const QString &)> &exists)
+{
+    if (!m_open)
+        return 0;
+    QSqlDatabase db = cat();
+    QVector<QPair<QString, QString>> gone;
+    {
+        QSqlQuery q(db);
+        if (q.exec("SELECT target,args FROM apps"))
+            while (q.next())
+                if (!exists(q.value(0).toString()))
+                    gone.append({q.value(0).toString(), q.value(1).toString()});
+    }
+    if (gone.isEmpty())
+        return 0;
+    db.transaction();
+    QSqlQuery d(db);
+    d.prepare("DELETE FROM apps WHERE target=? AND args=?");
+    for (const auto &g : gone) {
+        d.addBindValue(g.first);
+        d.addBindValue(g.second);
+        d.exec();
+    }
+    db.commit();
+    return int(gone.size());
 }
 
 QVariantList Database::catalog(const QString &search, int limit) const

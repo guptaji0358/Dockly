@@ -448,8 +448,14 @@ int sourcePrior(AppSource s)
 QString launchKey(const QString &launch, const QString &args)
 {
     QString k = isPackagedTarget(launch) ? launch.trimmed() : QDir::cleanPath(launch);
-    if (isPackagedTarget(launch))
+    if (isPackagedTarget(launch)) {
         k.replace('/', '\\');
+    } else {
+        // 8.3 short names, symlinks and junctions spell one file several ways: use the canonical path when it exists
+        const QString canon = QFileInfo(k).canonicalFilePath();
+        if (!canon.isEmpty())
+            k = canon;
+    }
     k = k.toLower();
     const QString a = args.simplified().toLower();
     return a.isEmpty() ? k : k + QChar(0x1f) + a;
@@ -467,6 +473,7 @@ QVector<ScannedApp> mergeRecords(const QVector<RawRecord> &records, bool fillFro
     QVector<ScannedApp> result;
     QVector<Group> groups;
     QHash<QString, int> index; // launch key -> position in result/groups
+    QHash<QString, int> exeIndex; // launch key without arguments -> first entry for that program
     auto reject = [&](const RawRecord &r, const char *why) {
         if (rejected)
             rejected->append({r.source, r.name, r.launch, QString::fromLatin1(why)});
@@ -485,9 +492,16 @@ QVector<ScannedApp> mergeRecords(const QVector<RawRecord> &records, bool fillFro
             continue;
         }
         const QString key = launchKey(r.launch, r.args);
-        if (const auto it = index.constFind(key); it != index.constEnd()) {
-            ScannedApp &a = result[*it]; // same program, another source: add what was missing
-            Group &g = groups[*it];
+        const QString baseKey = launchKey(r.launch, {});
+        int hit = index.value(key, -1);
+        // Registry entries describe the program, not a shortcut: they carry no arguments, so when the same exe is
+        // already known through argument-bearing shortcuts they add to it instead of becoming another card.
+        if (hit < 0 && r.args.simplified().isEmpty()
+            && (r.source == AppSource::Uninstall || r.source == AppSource::AppPaths))
+            hit = exeIndex.value(baseKey, -1);
+        if (hit >= 0) {
+            ScannedApp &a = result[hit]; // same program, another source: add what was missing
+            Group &g = groups[hit];
             a.sources |= 1 << int(r.source);
             fill(a.publisher, r.publisher);
             fill(a.version, r.version);
@@ -511,6 +525,8 @@ QVector<ScannedApp> mergeRecords(const QVector<RawRecord> &records, bool fillFro
             g.names.append({r.name, sourcePrior(r.source)});
         g.lazy = r.resolveName;
         index.insert(key, result.size());
+        if (!exeIndex.contains(baseKey))
+            exeIndex.insert(baseKey, result.size());
         result.append(a);
         groups.append(g);
     }
@@ -554,7 +570,58 @@ QVector<ScannedApp> mergeRecords(const QVector<RawRecord> &records, bool fillFro
                 a.installDir = QDir::toNativeSeparators(QFileInfo(a.target).absolutePath());
         }
     }
-    return result;
+    // Final pass: one program can still be reached through unrelated spellings (an AUMID and its exe, a versioned
+    // and an unversioned install path). Merge only on strong, generic evidence: same display name and same arguments,
+    // plus either a lone AUMID/exe pair or nested install folders. Separate installs never nest.
+    auto norm = [](const QString &s) { return s.simplified().toLower(); };
+    auto exeDir = [](const ScannedApp &a) {
+        return isPackagedTarget(a.target) ? QString() : QFileInfo(a.target).absolutePath().toLower().replace('\\', '/');
+    };
+    auto nested = [](const QString &x, const QString &y) {
+        return !x.isEmpty() && !y.isEmpty() && (x == y || x.startsWith(y + '/') || y.startsWith(x + '/'));
+    };
+    QHash<QString, int> aumidsByName;
+    for (const ScannedApp &a : std::as_const(result))
+        if (isPackagedTarget(a.target) && a.args.isEmpty())
+            aumidsByName[norm(a.name)]++;
+    QVector<bool> dropped(result.size(), false);
+    QVector<QStringList> dirs; // install folders of every entry merged into a survivor
+    for (const ScannedApp &a : std::as_const(result))
+        dirs.append(QStringList{exeDir(a)});
+    QSet<int> paired; // a packaged entry absorbs at most one exe: a second same-named exe is another install
+    for (int j = 1; j < result.size(); ++j) {
+        for (int i = 0; i < j && !dropped[j]; ++i) {
+            if (dropped[i] || norm(result[i].name) != norm(result[j].name))
+                continue;
+            const bool mixed = isPackagedTarget(result[i].target) != isPackagedTarget(result[j].target);
+            // An AUMID entry (what Start launches) has no arguments by nature, so it may pair with an exe entry
+            // that carries its shortcut's arguments; between two exe entries the arguments must agree.
+            if (!mixed && result[i].args != result[j].args)
+                continue;
+            const bool pair = mixed && !paired.contains(i) && !paired.contains(j) && aumidsByName.value(norm(result[i].name)) == 1;
+            bool closeBy = false;
+            for (const QString &di : std::as_const(dirs[i]))
+                closeBy = closeBy || nested(di, exeDir(result[j]));
+            if (!pair && !closeBy)
+                continue;
+            if (isPackagedTarget(result[i].target) != isPackagedTarget(result[j].target)
+                && aumidsByName.value(norm(result[i].name)) != 1)
+                continue; // ambiguous: several packaged apps share this name
+            if (mixed)
+                paired.insert(i), paired.insert(j);
+            dirs[i] += dirs[j];
+            result[i].sources |= result[j].sources;
+            fill(result[i].publisher, result[j].publisher);
+            fill(result[i].version, result[j].version);
+            fill(result[i].installDir, result[j].installDir);
+            dropped[j] = true;
+        }
+    }
+    QVector<ScannedApp> unique;
+    for (int i = 0; i < result.size(); ++i)
+        if (!dropped[i])
+            unique.append(result[i]);
+    return unique;
 }
 
 bool isLaunchableTarget(const QString &path)
