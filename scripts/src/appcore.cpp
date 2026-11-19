@@ -65,6 +65,29 @@ bool isValidWebUrl(const QString &target)
            && (scheme == "http" || scheme == "https" || scheme == "ftp" || scheme == "vscode");
 }
 
+// Starts a program card's target. .exe/.com run as processes (with the shortcut's arguments);
+// every other launch target (.bat, .cmd, .msc, .lnk, .url, .jar ...) goes through the shell.
+bool launchProgram(const QString &target, const QString &args)
+{
+    const QString suffix = QFileInfo(target).suffix().toLower();
+    const QString dir = QFileInfo(target).absolutePath();
+    if (suffix == QLatin1String("exe") || suffix == QLatin1String("com")) {
+        if (QProcess::startDetached(target, QProcess::splitCommand(args), dir))
+            return true;
+    }
+#ifdef Q_OS_WIN
+    const QString path = QDir::toNativeSeparators(target);
+    const QString nativeDir = QDir::toNativeSeparators(dir);
+    const std::wstring params = args.toStdWString();
+    const auto r = reinterpret_cast<quintptr>(ShellExecuteW(nullptr, L"open", reinterpret_cast<LPCWSTR>(path.utf16()),
+                                                            params.empty() ? nullptr : params.c_str(),
+                                                            reinterpret_cast<LPCWSTR>(nativeDir.utf16()), SW_SHOWNORMAL));
+    return r > 32;
+#else
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(target));
+#endif
+}
+
 QString autoName(LH::Category c, const QString &target)
 {
     if (c == LH::Web) {
@@ -135,12 +158,18 @@ AppCore::AppCore(QObject *parent)
             checkItems();
     });
 
-    connect(&m_scanWatcher, &QFutureWatcher<QVector<ScannedApp>>::finished, this, [this] {
+    connect(&m_scanWatcher, &QFutureWatcher<ScanReport>::finished, this, [this] {
         m_scanning = false;
         emit scanningChanged();
         if (m_closed)
             return;
-        const int n = m_db.replaceCatalog(m_scanWatcher.result());
+        m_lastScan = m_scanWatcher.result();
+        const int n = m_db.replaceCatalog(m_lastScan.apps);
+        QSaveFile log(m_dataDir + QStringLiteral("/scan-report.txt")); // diagnostics: what was kept, what was rejected and why
+        if (log.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            log.write(m_lastScan.toText().toUtf8());
+            log.commit();
+        }
         emit catalogChanged();
         emit message(QStringLiteral("Found %1 installed program(s). Pick the ones you want from \"Add Software\".").arg(n));
     });
@@ -404,6 +433,11 @@ void AppCore::checkItems()
 
 QString AppCore::addItem(int category, const QString &nameIn, const QString &targetIn)
 {
+    return addItemWithArgs(category, nameIn, targetIn, {});
+}
+
+QString AppCore::addItemWithArgs(int category, const QString &nameIn, const QString &targetIn, const QString &args)
+{
     const auto cat = LH::Category(category);
     QString target = cat == LH::Web ? normalizeUrl(targetIn) : QDir::toNativeSeparators(targetIn.trimmed());
     if (cat == LH::Collection)
@@ -412,13 +446,15 @@ QString AppCore::addItem(int category, const QString &nameIn, const QString &tar
         return {};
 
     if (cat != LH::Collection) {
-        const QString existing = m_db.findByNorm(cat, Item::normalizedTarget(target));
+        const QString existing = m_db.findByNorm(cat, Item::normalizedLaunch(target, cat == LH::Software ? args : QString()));
         if (!existing.isEmpty())
             return existing;
     }
 
     Item it;
     it.id = newId();
+    if (cat == LH::Software)
+        it.args = args.simplified();
     it.category = cat;
     it.target = target;
     it.name = nameIn.trimmed().isEmpty() ? autoName(cat, target) : nameIn.trimmed();
@@ -457,8 +493,9 @@ int AppCore::addSoftware(const QVariantList &entries)
         const QString target = m["target"].toString();
         if (target.isEmpty())
             continue;
-        const bool had = !m_db.findByNorm(LH::Software, Item::normalizedTarget(QDir::toNativeSeparators(target))).isEmpty();
-        if (!addItem(LH::Software, m["name"].toString(), target).isEmpty() && !had)
+        const QString args = m["args"].toString().simplified();
+        const bool had = !m_db.findByNorm(LH::Software, Item::normalizedLaunch(QDir::toNativeSeparators(target), args)).isEmpty();
+        if (!addItemWithArgs(LH::Software, m["name"].toString(), target, args).isEmpty() && !had)
             ++added;
     }
     if (added)
@@ -745,8 +782,7 @@ int AppCore::launchImpl(const QString &id, bool focusIfRunning)
             ok = launchPackagedApp(it.target);
             break;
         }
-        ok = QProcess::startDetached(it.target, {}, QFileInfo(it.target).absolutePath())
-             || QDesktopServices::openUrl(QUrl::fromLocalFile(it.target));
+        ok = launchProgram(it.target, it.args);
         break;
     default:
         ok = QDesktopServices::openUrl(QUrl::fromLocalFile(it.target));
@@ -818,7 +854,8 @@ bool AppCore::launchAsAdmin(const QString &id)
     const QString dir = QDir::toNativeSeparators(QFileInfo(it.target).absolutePath());
     // "runas" shows the UAC prompt; a result above 32 means Windows accepted it (declining the prompt is an error)
     const auto r = reinterpret_cast<quintptr>(ShellExecuteW(nullptr, L"runas", reinterpret_cast<LPCWSTR>(path.utf16()),
-                                                            nullptr, reinterpret_cast<LPCWSTR>(dir.utf16()), SW_SHOWNORMAL));
+                                                            it.args.isEmpty() ? nullptr : reinterpret_cast<LPCWSTR>(it.args.utf16()),
+                                                            reinterpret_cast<LPCWSTR>(dir.utf16()), SW_SHOWNORMAL));
     if (r <= 32) {
         emit message(QStringLiteral("\"%1\" wasn't started as administrator.").arg(it.name));
         return false;
@@ -836,7 +873,7 @@ bool AppCore::launchWithArgs(const QString &id, const QString &args)
     const Item it = item(id);
     if (it.id.isEmpty() || it.category != LH::Software || isPackagedTarget(it.target) || computeStatus(it) != LH::Normal)
         return false;
-    const bool ok = QProcess::startDetached(it.target, QProcess::splitCommand(args), QFileInfo(it.target).absolutePath());
+    const bool ok = launchProgram(it.target, args);
     if (!ok) {
         emit message(QStringLiteral("Couldn't start \"%1\" with those arguments.").arg(it.name));
         return false;
@@ -1119,7 +1156,7 @@ void AppCore::refreshSoftware()
         return;
     m_scanning = true;
     emit scanningChanged();
-    m_scanWatcher.setFuture(QtConcurrent::run(&scanInstalledSoftware));
+    m_scanWatcher.setFuture(QtConcurrent::run(&scanInstalledSoftwareReport));
 }
 
 QVariantList AppCore::catalogSearch(const QString &search, int limit) const
