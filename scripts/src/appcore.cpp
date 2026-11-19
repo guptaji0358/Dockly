@@ -272,6 +272,9 @@ void AppCore::init()
     }
     if (m_db.libraryIsNew() && QFile::exists(m_dataDir + "/data.json"))
         migrateLegacyJson();
+    // Catalog rows for programs removed since the last scan must not linger until the next one. Only the hidden
+    // catalog cache is pruned (file-system check; packaged apps are re-validated by a scan); cards are untouched.
+    m_db.pruneCatalog([](const QString &t) { return isPackagedTarget(t) || QFileInfo::exists(t); });
 
     m_sites->load(m_dataDir);
     syncRunning();
@@ -306,21 +309,17 @@ void AppCore::migrateLegacyJson()
     f.close();
 
     QJsonArray keep;
-    QVector<ScannedApp> catalog;
+    // Legacy auto-detected entries are stale discovery results (exe-style names): they are dropped, not copied
+    // into the catalog; the next scan rebuilds it from the machine's current state.
     for (const QJsonValue &v : old["items"].toArray()) {
         const QJsonObject o = v.toObject();
-        if (o["autoDetected"].toBool() && !o["favorite"].toBool()) {
-            catalog.append({o["name"].toString(), o["target"].toString()});
-        } else {
+        if (!(o["autoDetected"].toBool() && !o["favorite"].toBool()))
             keep.append(o);
-        }
     }
     QJsonObject data;
     data["items"] = keep;
     data["recent"] = old["recent"];
     m_db.importAll(data);
-    if (!catalog.isEmpty())
-        m_db.replaceCatalog(catalog);
     QFile::rename(m_dataDir + "/data.json", m_dataDir + "/data.json.migrated");
 }
 
