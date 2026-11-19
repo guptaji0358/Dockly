@@ -24,6 +24,7 @@ add_library(lhcore STATIC
     ${LH_INCLUDE}/connectors.h ${LH_SRC}/connectors.cpp
     ${LH_INCLUDE}/sites.h ${LH_SRC}/sites.cpp
     ${LH_INCLUDE}/runningapps.h ${LH_SRC}/runningapps.cpp
+    ${LH_INCLUDE}/procinspect.h ${LH_SRC}/procinspect.cpp ${LH_SRC}/procinspect_attr.cpp ${LH_SRC}/procinspect_win.cpp
     ${LH_INCLUDE}/gamepad.h ${LH_SRC}/gamepad.cpp
     ${LH_INCLUDE}/perfmonitor.h ${LH_SRC}/perfmonitor.cpp
 )

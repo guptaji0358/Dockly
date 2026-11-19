@@ -19,6 +19,7 @@ qt_add_qml_module(DocklyApp
         DockWindow.qml
         QuickLauncher.qml
         dialogs/ArgsDialog.qml
+        dialogs/InspectDialog.qml
         components/Fx.qml
         components/Nebula.qml
         components/Tile.qml

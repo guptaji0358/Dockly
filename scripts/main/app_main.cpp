@@ -1,3 +1,5 @@
+#include <functional>
+#include <memory>
 #include "appcore.h"
 #include "dockguard.h"
 #include "iconimageprovider.h"
@@ -130,7 +132,8 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     QCommandLineOption dockShot("dockshot", "Save a screenshot of the opened dock and exit (diagnostics).", "file");
     QCommandLineOption launcherShot("launchershot", "Save a screenshot of the quick launcher (searching for the given text) and exit (diagnostics).", "file");
     QCommandLineOption launcherQuery("launcherquery", "Text typed into the quick launcher for --launchershot (diagnostics).", "text");
-    cli.addOptions({minimized, shot, page, ring, demo, dialog, dbl, window, dockShot, launcherShot, launcherQuery});
+    QCommandLineOption uiScript("uiscript", "Diagnostics only: steps separated by ';' (click:x,y right:x,y wait:ms shot:file quit) injected into Dockly's own main window; nothing outside it is touched.", "steps");
+    cli.addOptions({uiScript, minimized, shot, page, ring, demo, dialog, dbl, window, dockShot, launcherShot, launcherQuery});
     cli.process(app);
 
     // One Dockly per data folder: starting it again brings the running one to the front instead of
@@ -138,7 +141,7 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     const QString dir = dataDirPath();
     QDir().mkpath(dir);
     const QString instanceKey = "Dockly-" + QString::fromLatin1(QCryptographicHash::hash(dir.toUtf8(), QCryptographicHash::Md5).toHex().left(12));
-    if (!cli.isSet(shot)) {
+    if (!cli.isSet(shot) && !cli.isSet(uiScript)) {
         QLocalSocket probe;
         probe.connectToServer(instanceKey);
         if (probe.waitForConnected(250)) {
@@ -173,6 +176,9 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
             {"Task Manager", win + "/System32/Taskmgr.exe"}, {"Explorer", win + "/explorer.exe"}};
         for (const auto &s : soft)
             core->addItem(LH::Software, s.first, s.second);
+        // diagnostics only: LH_DEMO_PACKAGED="Name=AUMID;Name=AUMID" adds packaged-app cards for process-inspection testing
+        for (const QString &pair : qEnvironmentVariable("LH_DEMO_PACKAGED").split(';', Qt::SkipEmptyParts))
+            core->addItem(LH::Software, pair.section('=', 0, 0), "shell:AppsFolder\\" + pair.section('=', 1));
         const QList<QPair<QString, QString>> web = {
             {"GitHub", "https://github.com"}, {"Qt Docs", "https://doc.qt.io"}, {"YouTube", "https://youtube.com"},
             {"Wikipedia", "https://wikipedia.org"}, {"Claude", "https://claude.ai"}};
@@ -299,7 +305,7 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
         }
     });
 
-    const bool diagnostics = cli.isSet(page) || cli.isSet(ring) || cli.isSet(dialog) || cli.isSet(window);
+    const bool diagnostics = cli.isSet(page) || cli.isSet(ring) || cli.isSet(dialog) || cli.isSet(window) || cli.isSet(uiScript);
     if (cli.isSet(dockShot)) {
         const QString path = cli.value(dockShot);
         QTimer::singleShot(2000, &app, [dockWin, path, &app] {
@@ -345,6 +351,51 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
                 mouse(QEvent::MouseButtonRelease, Qt::NoButton, Qt::LeftButton);
             }
         });
+    }
+
+    if (cli.isSet(uiScript)) {
+        // Test utility: replays clicks into this process's own window and saves its own screenshots.
+        const QStringList steps = cli.value(uiScript).split(';', Qt::SkipEmptyParts);
+        auto idx = std::make_shared<int>(0);
+        auto run = std::make_shared<std::function<void()>>();
+        *run = [win, steps, idx, run, &app] {
+            if (*idx >= steps.size()) { app.quit(); return; }
+            const QString st = steps[(*idx)++].trimmed();
+            const QString cmd = st.section(':', 0, 0), arg = st.section(':', 1);
+            int delay = 400;
+            if (cmd == "wait") {
+                delay = arg.toInt();
+            } else if (cmd == "shot") {
+                win->grabWindow().save(arg);
+            } else if (cmd == "shotall") { // every visible top-level window of THIS process (popup menus are windows)
+                int n = 0;
+                for (QWindow *w : QGuiApplication::topLevelWindows())
+                    if (w->isVisible())
+                        if (auto *q = qobject_cast<QQuickWindow *>(w))
+                            q->grabWindow().save(QStringLiteral("%1_%2.png").arg(arg).arg(n++));
+            } else if (cmd == "scroll") { // scroll:x,y,dy (dy in wheel pixels, negative = down)
+                const QStringList a = arg.split(',');
+                const QPointF pos(a.value(0).toDouble(), a.value(1).toDouble());
+                QWindowSystemInterface::setSynchronousWindowSystemEvents(true);
+                QWindowSystemInterface::handleWheelEvent(win, pos, QPointF(win->mapToGlobal(pos.toPoint())),
+                                                         QPoint(0, 0), QPoint(0, a.value(2).toInt()));
+            } else if (cmd == "click" || cmd == "right") {
+                const QStringList xy = arg.split(',');
+                const QPointF pos(xy.value(0).toDouble(), xy.value(1).toDouble());
+                QWindowSystemInterface::setSynchronousWindowSystemEvents(true);
+                const QPointF local = pos; // device-independent, like Qt's own input path
+                const QPointF global = QPointF(win->mapToGlobal(pos.toPoint()));
+                const Qt::MouseButton b = cmd == "right" ? Qt::RightButton : Qt::LeftButton;
+                QWindowSystemInterface::handleMouseEvent(win, local, global, Qt::NoButton, Qt::NoButton, QEvent::MouseMove);
+                QWindowSystemInterface::handleMouseEvent(win, local, global, b, b, QEvent::MouseButtonPress);
+                QWindowSystemInterface::handleMouseEvent(win, local, global, Qt::NoButton, b, QEvent::MouseButtonRelease);
+            } else if (cmd == "quit") {
+                app.quit();
+                return;
+            }
+            QTimer::singleShot(delay, &app, [run] { (*run)(); });
+        };
+        QTimer::singleShot(2500, &app, [run] { (*run)(); });
     }
 
     if (cli.isSet(shot)) {

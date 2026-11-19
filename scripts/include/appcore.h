@@ -6,6 +6,7 @@
 #include "gamepad.h"
 #include "item.h"
 #include "perfmonitor.h"
+#include "procinspect.h"
 #include "runningapps.h"
 #include "sites.h"
 #include "softwarescanner.h"
@@ -97,6 +98,9 @@ public:
     // Background Process Guard switch of a program card (default on). Stage 1 only stores the choice; nothing is enforced yet.
     Q_INVOKABLE void setGuard(const QString &id, bool on);
     Q_INVOKABLE QVariantMap itemInfo(const QString &id) const; // includes guard (bool) and guardState: none | off | notEnforced
+    // Stage 2, read-only: finds the running processes that belong to a program card and classifies them. Async; the
+    // result arrives in processInspection(id, result). Never terminates or changes anything.
+    Q_INVOKABLE void inspectProcesses(const QString &id);
     Q_INVOKABLE void select(const QString &id);
 
     // --- launching -------------------------------------------------------
@@ -166,6 +170,7 @@ public slots:
     void saveNow();
 
 signals:
+    void processInspection(const QString &id, const QVariantMap &result);
     void itemsChanged();
     void iconsChanged();
     void scanningChanged();
@@ -241,4 +246,6 @@ private:
     QFutureWatcher<ScanReport> m_scanWatcher;
     ScanReport m_lastScan;
     QFutureWatcher<QHash<QString, int>> m_checkWatcher;
+    QFutureWatcher<ProcInspect::Inspection> m_inspectWatcher;
+    QString m_inspectId;
 };

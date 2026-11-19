@@ -1,6 +1,7 @@
 #include "appcore.h"
 #include "softwarescanner.h"
 #include "iconpack.h"
+#include "procinspect.h"
 #include "itemmodel.h"
 
 #include <QApplication>
@@ -1013,6 +1014,205 @@ private slots:
         cn->fetchGithub("not a valid name!");
         QCOMPARE(spy.count(), 1);
         QVERIFY(!spy.first().at(1).toString().isEmpty());
+    }
+
+    // ---- Stage 2: read-only process attribution (synthetic records) ----
+    static ProcInspect::ProcessRecord P(quint32 pid, quint32 ppid, quint64 created, const QString &path, bool win = false,
+                                        const QString &pkg = {})
+    {
+        ProcInspect::ProcessRecord r;
+        r.pid = pid; r.ppid = ppid; r.created = created; r.exePath = path; r.hasWindow = win; r.packageFamily = pkg;
+        r.name = path.section('\\', -1);
+        return r;
+    }
+    static const ProcInspect::Verdict &V(const ProcInspect::Inspection &i, quint32 pid)
+    {
+        for (const auto &v : i.verdicts) if (v.proc.pid == pid) return v;
+        static ProcInspect::Verdict none; return none;
+    }
+    static std::function<QString(const QString &)> pub(const QString &p)
+    {
+        return [p](const QString &) { return p; };
+    }
+
+    void procMultipleExesOfOneApp()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        auto r = attribute({P(10, 4, 100, "D:\\Acme\\acme.exe", true), P(11, 10, 110, "D:\\Acme\\helper.exe"),
+                            P(12, 10, 120, "D:\\Acme\\render.exe", true), P(13, 4, 90, "D:\\Other\\acme.exe")}, {c}, pub("Acme Inc"));
+        QCOMPARE(V(r, 10).cls, Class::Main);
+        QCOMPARE(V(r, 11).cls, Class::Unknown);              // child of the live Main: not assumed unnecessary
+        QVERIFY(V(r, 11).reason.contains("descendant"));
+        QCOMPARE(V(r, 12).cls, Class::Unknown);              // window alone does not make it Essential
+        QCOMPARE(V(r, 12).cardId, QString("a"));             // ...but it is still attributed to the card
+        QCOMPARE(V(r, 11).cardId, QString("a"));
+        // a same-card process that is NOT below Main (detached leftover) is the only kind that becomes a candidate
+        auto rd = attribute({P(10, 4, 100, "D:\\Acme\\acme.exe", true), P(14, 4, 95, "D:\\Acme\\sync.exe")}, {c}, pub("Acme Inc"));
+        QCOMPARE(V(rd, 14).cls, Class::CandidateBackground);
+        QCOMPARE(V(r, 13).cls, Class::Unknown); // same file name elsewhere: filename alone is not evidence
+        QVERIFY(V(r, 13).cardId.isEmpty());
+    }
+
+    void procInstallDirAloneIsNotEnough()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        auto r = attribute({P(20, 1, 100, "D:\\Acme\\tool.exe")}, {c}, pub("Someone Else"));
+        QCOMPARE(V(r, 20).cls, Class::Unknown);
+        QVERIFY(!V(r, 20).reason.isEmpty());
+    }
+
+    void procSharedHostIsAmbiguous()
+    {
+        using namespace ProcInspect;
+        CardRef a{"a", "Suite Writer", "D:\\Suite\\writer.exe", "D:\\Suite", "Suite Co", {}};
+        CardRef b{"b", "Suite Sheet", "D:\\Suite\\sheet.exe", "D:\\Suite", "Suite Co", {}};
+        auto r = attribute({P(30, 1, 100, "D:\\Suite\\shared_host.exe")}, {a, b}, pub("Suite Co"));
+        QCOMPARE(V(r, 30).cls, Class::Unknown);
+        QCOMPARE(V(r, 30).ambiguousCards.size(), 2);
+        QVERIFY(V(r, 30).reason.contains("Ambiguous"));
+        auto r2 = attribute({P(31, 1, 100, "C:\\Program Files\\Common Files\\host.exe")}, {a, b}, pub("Suite Co"));
+        QCOMPARE(V(r2, 31).cls, Class::Unknown);
+        auto r3 = attribute({P(32, 1, 100, "D:\\Suite\\writer.exe", true)}, {a, b}, pub("Suite Co"));
+        QCOMPARE(V(r3, 32).cardId, QString("a"));
+        QCOMPARE(V(r3, 32).cls, Class::Main);
+    }
+
+    void procDetachedProcessKeepsOwnership()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        auto r = attribute({P(40, 9999, 100, "D:\\Acme\\updater.exe")}, {c}, pub("Acme Inc"));
+        QVERIFY(!V(r, 40).parentValid);
+        QCOMPARE(V(r, 40).cls, Class::CandidateBackground);
+        QVERIFY(V(r, 40).evidence.join(" ").contains("Detached"));
+    }
+
+    void procPackagedAppUsesPackageIdentity()
+    {
+        using namespace ProcInspect;
+        QCOMPARE(packageFamilyOfAumid("Contoso.Calc_8wekyb3d8bbwe!App"), QString("Contoso.Calc_8wekyb3d8bbwe"));
+        CardRef c;
+        c.id = "p"; c.name = "Calc"; c.packageFamily = "Contoso.Calc_8wekyb3d8bbwe";
+        auto r = attribute({P(50, 1, 100, "C:\\WindowsApps\\Contoso\\Calc.exe", true, "contoso.calc_8wekyb3d8bbwe"),
+                            P(51, 1, 110, "C:\\WindowsApps\\Contoso\\Bg.exe", false, "Contoso.Calc_8wekyb3d8bbwe"),
+                            P(53, 50, 120, "C:\\WindowsApps\\Contoso\\Child.exe", false, "Contoso.Calc_8wekyb3d8bbwe"),
+                            P(52, 1, 100, "C:\\WindowsApps\\Other\\Calc.exe", true, "Other.Thing_abc")}, {c});
+        QCOMPARE(V(r, 50).cls, Class::Main);
+        QCOMPARE(V(r, 51).cls, Class::CandidateBackground);
+        QCOMPARE(V(r, 53).cls, Class::Unknown);               // child of Main
+        QCOMPARE(V(r, 52).cls, Class::Unknown);
+    }
+
+    void procPidReuseIsDetectedByCreationTime()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        auto r = attribute({P(10, 1, 500, "D:\\Acme\\acme.exe", true), P(11, 10, 100, "D:\\Acme\\helper.exe")}, {c}, pub("Acme Inc"));
+        QVERIFY(!V(r, 11).parentValid);
+        QCOMPARE(V(r, 11).cls, Class::CandidateBackground);
+        const quint32 me = quint32(QCoreApplication::applicationPid());
+        const quint64 t = creationTimeOf(me);
+        QVERIFY(t != 0);
+        QVERIFY(stillSameProcess(me, t));
+        QVERIFY(!stillSameProcess(me, t + 12345));
+    }
+
+    void procServicesAndSharedFolders()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        auto r = attribute({P(60, 1, 10, "C:\\Windows\\System32\\services.exe"), P(61, 60, 100, "D:\\Acme\\svc.exe")}, {c}, pub("Acme Inc"));
+        QCOMPARE(V(r, 61).cls, Class::Unknown);              // service child alone: neither essential nor candidate
+        QCOMPARE(V(r, 61).cardId, QString("a"));
+        QVERIFY(isSharedLocation("C:\\Windows\\System32"));
+        QVERIFY(isSharedLocation("C:\\"));
+        QVERIFY(!isSharedLocation("D:\\Acme"));
+        CardRef cmd = makeCardRef("x", "Command Prompt", "C:\\Windows\\System32\\cmd.exe");
+        QVERIFY(cmd.installDir.isEmpty());
+    }
+
+    void procEssentialNeedsDependencyEvidence()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        // launcher (no window) started the Main process: the launcher is Essential; its sibling helper is a candidate
+        auto r = attribute({P(70, 1, 100, "D:\\Acme\\launcher.exe"), P(71, 70, 110, "D:\\Acme\\acme.exe", true),
+                            P(72, 1, 105, "D:\\Acme\\sync.exe")}, {c}, pub("Acme Inc"));
+        QCOMPARE(V(r, 71).cls, Class::Main);
+        QCOMPARE(V(r, 70).cls, Class::Essential);
+        QCOMPARE(V(r, 72).cls, Class::CandidateBackground);
+        // an ancestor of a non-Main window owner is not a candidate (something visible hangs below it)
+        auto r2 = attribute({P(80, 1, 100, "D:\\Acme\\host.exe"), P(81, 80, 110, "D:\\Acme\\view.exe", true)}, {c}, pub("Acme Inc"));
+        QCOMPARE(V(r2, 80).cls, Class::Unknown);
+        QCOMPARE(V(r2, 81).cls, Class::Unknown);
+        // packaged app without a windowed process: nothing to anchor on, everything stays Unknown
+        CardRef p; p.id = "p"; p.name = "Pkg"; p.packageFamily = "X.Y_abc";
+        auto r3 = attribute({P(90, 1, 100, "C:\\WindowsApps\\X\\bg.exe", false, "X.Y_abc")}, {p});
+        QCOMPARE(V(r3, 90).cardId, QString("p"));
+        QCOMPARE(V(r3, 90).cls, Class::Unknown);
+    }
+
+    void procRealPackagedApps()
+    {
+        using namespace ProcInspect;
+        const ScanReport rep = scanInstalledSoftwareReport();
+        QVector<CardRef> cards;
+        for (const ScannedApp &a : rep.apps)
+            if (isPackagedTarget(a.target))
+                cards << makeCardRef(a.target, a.name, a.target);
+        const auto procs = collectProcesses();
+        const auto r = attribute(procs, cards);
+        int pkgProcs = 0, attributed = 0, noWindow = 0;
+        QSet<QString> cardsRunning;
+        for (const auto &v : r.verdicts) {
+            if (v.proc.packageFamily.isEmpty())
+                continue;
+            ++pkgProcs;
+            if (!v.cardId.isEmpty()) {
+                ++attributed;
+                cardsRunning.insert(v.cardId);
+                // the family on the process must equal the family of the card it was attributed to
+                for (const CardRef &c : cards)
+                    if (c.id == v.cardId)
+                        QCOMPARE(c.packageFamily.toLower(), v.proc.packageFamily.toLower());
+            }
+            qInfo().noquote() << "PKG" << v.proc.pid << v.proc.name << v.proc.packageFamily << "->"
+                              << (v.cardName.isEmpty() ? QString("(no card)") : v.cardName) << classLabel(v.cls)
+                              << (v.proc.hasWindow ? "window" : "no-window");
+        }
+        for (const QString &cid : cardsRunning) {
+            bool win = false;
+            QString nm;
+            for (const auto &v : r.verdicts)
+                if (v.cardId == cid) { nm = v.cardName; win = win || v.proc.hasWindow; }
+            if (!win)
+                ++noWindow, qInfo().noquote() << "PKG-NOWINDOW" << nm << "has processes but no visible window";
+        }
+        qInfo() << "packaged cards" << cards.size() << "packaged processes" << pkgProcs << "attributed" << attributed
+                << "cards running" << cardsRunning.size() << "running without window" << noWindow;
+    }
+
+    void procRealMachineDiscovery()
+    {
+        using namespace ProcInspect;
+        QString err;
+        QElapsedTimer t;
+        t.start();
+        const auto procs = collectProcesses(&err);
+        QVERIFY2(procs.size() > 10, qPrintable(err));
+        const quint32 me = quint32(QCoreApplication::applicationPid());
+        bool found = false;
+        for (const auto &p : procs)
+            if (p.pid == me) { found = true; QVERIFY(!p.exePath.isEmpty()); QVERIFY(p.created != 0); }
+        QVERIFY(found);
+        CardRef self = makeCardRef("me", "core_test", QCoreApplication::applicationFilePath());
+        const auto r = inspectNow({self});
+        qInfo() << "processes" << r.processCount << "in" << t.elapsed() << "ms";
+        QCOMPARE(V(r, me).cardId, QString("me"));
+        QCOMPARE(V(r, me).cls, Class::Main);
+        QVERIFY2(t.elapsed() < 3000, "process inspection should take well under 3 s");
     }
 };
 
