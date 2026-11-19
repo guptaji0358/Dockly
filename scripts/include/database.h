@@ -30,6 +30,7 @@ public:
     bool updateItem(const Item &it);
     void setIcon(const QString &id, const QString &icon);
     void setFavorite(const QString &id, bool favorite);
+    void setGuard(const QString &id, bool on); // Background Process Guard switch of a program card
     void setLastOpened(const QString &id);
     void deleteItem(const QString &id);
     QString findByNorm(int category, const QString &norm) const;

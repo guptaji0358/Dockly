@@ -94,7 +94,9 @@ public:
     // Tags: free labels on any item ("work", "client-a"). Text is split on commas / spaces; a leading # is ignored.
     Q_INVOKABLE void setItemTags(const QString &id, const QString &tagsText);
     Q_INVOKABLE QVariantList tagList(int category = -1) const; // [{tag, count}], most used first
-    Q_INVOKABLE QVariantMap itemInfo(const QString &id) const;
+    // Background Process Guard switch of a program card (default on). Stage 1 only stores the choice; nothing is enforced yet.
+    Q_INVOKABLE void setGuard(const QString &id, bool on);
+    Q_INVOKABLE QVariantMap itemInfo(const QString &id) const; // includes guard (bool) and guardState: none | off | notEnforced
     Q_INVOKABLE void select(const QString &id);
 
     // --- launching -------------------------------------------------------

@@ -15,6 +15,7 @@ struct Item {
     QString args; // command-line arguments kept from a shortcut (programs only); empty = none
     QString icon; // optional user-chosen icon image (a copy kept in the data folder); empty = automatic
     bool favorite = false;
+    bool guard = true; // Background Process Guard switch for programs; on by default, only meaningful for Software cards
     QStringList tags; // user labels, lowercase, no spaces or commas
     LH::Status status = LH::Normal; // runtime only, recomputed by validation
     QDateTime lastOpened;

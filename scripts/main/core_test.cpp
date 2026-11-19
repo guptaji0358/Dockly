@@ -762,6 +762,36 @@ private slots:
         QCOMPARE(QGuiApplication::clipboard()->text(), QString("https://qa.example"));
     }
 
+    void backgroundGuardSwitchDefaultsOnAndSurvivesBackup()
+    {
+        const QString id = core->addItem(LH::Software, "guard test", m_realFile.fileName());
+        QVERIFY(!id.isEmpty());
+        QVERIFY(core->item(id).guard); // new cards start with the guard on
+        QCOMPARE(core->itemInfo(id).value("guardState").toString(), QString("notEnforced")); // never claims protection yet
+
+        core->setGuard(id, false);
+        QVERIFY(!core->item(id).guard);
+        QCOMPARE(core->itemInfo(id).value("guardState").toString(), QString("off"));
+
+        const QString path = m_dir.path() + "/guard-backup.json";
+        QVERIFY(core->backupTo(path));
+        core->setGuard(id, true);
+        QVERIFY(core->restoreFrom(path));
+        QVERIFY(!core->item(id).guard); // the saved off state is restored
+        core->setGuard(id, true);
+
+        core->settings()->set("guardEnabled", false); // master switch overrides the card
+        QCOMPARE(core->itemInfo(id).value("guardState").toString(), QString("off"));
+        core->settings()->set("guardEnabled", true);
+
+        // older backups carry no guard key: on; only program cards have the switch
+        QVERIFY(Item::fromJson(QJsonObject{{"id", "old"}}).guard);
+        const QString web = core->addItem(LH::Web, "guard web", "https://guard.example");
+        core->setGuard(web, false);
+        QVERIFY(core->item(web).guard);
+        QCOMPARE(core->itemInfo(web).value("guardState").toString(), QString("none"));
+    }
+
     void colourThemesRetintTheSkin()
     {
         auto *s = core->settings();

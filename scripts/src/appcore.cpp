@@ -657,6 +657,15 @@ void AppCore::setItemTags(const QString &id, const QString &tagsText)
     changed();
 }
 
+void AppCore::setGuard(const QString &id, bool on)
+{
+    const Item it = item(id);
+    if (it.id.isEmpty() || it.category != LH::Software || it.guard == on)
+        return;
+    m_db.setGuard(id, on);
+    changed();
+}
+
 QVariantList AppCore::tagList(int category) const
 {
     return m_closed ? QVariantList() : m_db.tagCounts(category);
@@ -680,6 +689,11 @@ QVariantMap AppCore::itemInfo(const QString &id) const
         {"favorite", it.favorite},
         {"status", int(it.status)},
         {"memberCount", it.memberCount},
+        {"guard", it.guard},
+        // never claims protection: with the switch on it says "notEnforced" until enforcement exists and is verified
+        {"guardState", it.category != LH::Software ? QStringLiteral("none")
+                       : (!it.guard || !m_settings->boolean("guardEnabled")) ? QStringLiteral("off")
+                                                                              : QStringLiteral("notEnforced")},
     };
 }
 

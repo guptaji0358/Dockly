@@ -278,6 +278,7 @@ Item {
                     }
                     SettingCheck { key: "showRunning"; text: "Mark programs that are open with a dot" }
                     SettingCheck { key: "focusRunning"; text: "Opening a program that is already open brings its window forward" }
+                    SettingCheck { key: "guardEnabled"; text: "Background Process Guard: allow per-program switches (this version only stores them; nothing is stopped yet)" }
                     SettingCheck { key: "gamepadEnabled"; text: "Game controller can drive the ring (left stick / d-pad, A open, B back, LB + RB toggles it)" }
                     SettingCheck { key: "confirmDelete"; text: "Confirm before delete" }
                     SettingCheck { key: "checkMissingOnStartup"; text: "Check for missing items on startup" }

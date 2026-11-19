@@ -51,6 +51,7 @@ bool Database::open(const QString &dir)
     q.exec("ALTER TABLE items ADD COLUMN icon TEXT NOT NULL DEFAULT ''"); // fails harmlessly when it exists
     q.exec("ALTER TABLE items ADD COLUMN tags TEXT NOT NULL DEFAULT ''"); // comma-separated, fails harmlessly when it exists
     q.exec("ALTER TABLE items ADD COLUMN args TEXT NOT NULL DEFAULT ''"); // shortcut arguments; fails harmlessly when it exists
+    q.exec("ALTER TABLE items ADD COLUMN guard INTEGER NOT NULL DEFAULT 1"); // Background Process Guard switch (1 = on); existing cards get 1; fails harmlessly when it exists
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_cat ON items(category, name COLLATE NOCASE)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_norm ON items(category, norm)");
     q.exec("CREATE INDEX IF NOT EXISTS idx_items_fav ON items(favorite)");
@@ -102,6 +103,7 @@ static Item rowToItem(QSqlQuery &q)
     it.icon = q.value(7).toString();
     it.tags = Item::parseTags(q.value(8).toString());
     it.args = q.value(9).toString();
+    it.guard = q.value(10).toInt() != 0;
     return it;
 }
 
@@ -110,7 +112,7 @@ bool Database::getItem(const QString &id, Item &out) const
     if (!m_open)
         return {};
     QSqlQuery q(lib());
-    q.prepare("SELECT id,category,name,target,favorite,last_opened,status,icon,tags,args FROM items WHERE id=?");
+    q.prepare("SELECT id,category,name,target,favorite,last_opened,status,icon,tags,args,guard FROM items WHERE id=?");
     q.addBindValue(id);
     if (!q.exec() || !q.next())
         return false;
@@ -190,7 +192,7 @@ bool Database::insertItem(const Item &it)
     if (!m_open)
         return {};
     QSqlQuery q(lib());
-    q.prepare("INSERT INTO items(id,category,name,target,norm,favorite,last_opened,status,icon,tags,args) VALUES(?,?,?,?,?,?,?,?,?,?,?)");
+    q.prepare("INSERT INTO items(id,category,name,target,norm,favorite,last_opened,status,icon,tags,args,guard) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)");
     q.addBindValue(it.id);
     q.addBindValue(int(it.category));
     q.addBindValue(it.name);
@@ -202,6 +204,7 @@ bool Database::insertItem(const Item &it)
     q.addBindValue(it.icon.isNull() ? QStringLiteral("") : it.icon); // never bind NULL
     q.addBindValue(it.tags.isEmpty() ? QStringLiteral("") : it.tags.join(QLatin1Char(','))); // never bind NULL
     q.addBindValue(it.args.isNull() ? QStringLiteral("") : it.args);
+    q.addBindValue(it.guard ? 1 : 0);
     return q.exec();
 }
 
@@ -261,6 +264,17 @@ void Database::setIcon(const QString &id, const QString &icon)
     QSqlQuery q(lib());
     q.prepare("UPDATE items SET icon=? WHERE id=?");
     q.addBindValue(icon.isNull() ? QStringLiteral("") : icon); // never bind NULL
+    q.addBindValue(id);
+    q.exec();
+}
+
+void Database::setGuard(const QString &id, bool on)
+{
+    if (!m_open)
+        return;
+    QSqlQuery q(lib());
+    q.prepare("UPDATE items SET guard=? WHERE id=?");
+    q.addBindValue(on ? 1 : 0);
     q.addBindValue(id);
     q.exec();
 }
@@ -594,7 +608,7 @@ QJsonObject Database::exportAll() const
         return {};
     QJsonArray items;
     QSqlQuery q(lib());
-    q.exec("SELECT id,category,name,target,favorite,last_opened,status,icon,tags,args FROM items ORDER BY rowid");
+    q.exec("SELECT id,category,name,target,favorite,last_opened,status,icon,tags,args,guard FROM items ORDER BY rowid");
     while (q.next()) {
         Item it = rowToItem(q);
         if (it.category == LH::Collection)
