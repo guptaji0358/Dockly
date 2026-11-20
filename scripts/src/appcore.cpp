@@ -178,6 +178,7 @@ AppCore::AppCore(QObject *parent)
         if (m_closed)
             return;
         const ProcInspect::Inspection r = m_inspectWatcher.result();
+        m_lastInsp = r; m_lastInspId = m_inspectId; m_lastInspMs = QDateTime::currentMSecsSinceEpoch();
         QVariantList rows;
         int counts[4] = {0, 0, 0, 0};
         for (const ProcInspect::Verdict &v : r.verdicts) {
@@ -198,9 +199,18 @@ AppCore::AppCore(QObject *parent)
         }
         emit processInspection(m_inspectId, QVariantMap{
             {"id", m_inspectId}, {"name", item(m_inspectId).name}, {"error", r.error}, {"elapsedMs", r.elapsedMs},
-            {"processCount", r.processCount}, {"rows", rows},
+            {"processCount", r.processCount}, {"rows", annotateRows(m_inspectId, rows)},
+            {"closedApp", Guard::closedCardsOf(r, {m_inspectId}).contains(m_inspectId)},
             {"main", counts[0]}, {"essential", counts[1]}, {"candidate", counts[2]},
         });
+    });
+    QTimer::singleShot(3000, this, [this] { // crash recovery, only when a guard database already exists
+        if (!m_closed && QFile::exists(QDir(m_dataDir).filePath(QStringLiteral("guard.db"))))
+            guardRecover();
+    });
+    connect(&m_guardWatcher, &QFutureWatcher<QVector<Guard::ActionRecord>>::finished, this, [this] {
+        if (!m_closed)
+            finishGuardRun(m_guardWatcher.result());
     });
     connect(&m_checkWatcher, &QFutureWatcher<QHash<QString, int>>::finished, this, [this] {
         m_checking = false;

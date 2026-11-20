@@ -1,4 +1,6 @@
 #include "appcore.h"
+#include "appsettings.h"
+#include "database.h"
 #include "softwarescanner.h"
 #include "iconpack.h"
 #include "procinspect.h"
@@ -10,6 +12,8 @@
 #include <QTcpSocket>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QtTest>
@@ -791,6 +795,172 @@ private slots:
         core->setGuard(web, false);
         QVERIFY(core->item(web).guard);
         QCOMPARE(core->itemInfo(web).value("guardState").toString(), QString("none"));
+    }
+
+    // Real migration path: a library.db made by the previous schema (no guard column) is opened by Database::open.
+    void guardColumnMigrationKeepsExistingData()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString conn = "guard_migration_old_schema";
+        {
+            QSqlDatabase old = QSqlDatabase::addDatabase("QSQLITE", conn);
+            old.setDatabaseName(dir.path() + "/library.db");
+            QVERIFY(old.open());
+            QSqlQuery q(old);
+            QVERIFY(q.exec("CREATE TABLE items (id TEXT PRIMARY KEY, category INTEGER NOT NULL, name TEXT NOT NULL,"
+                           " target TEXT NOT NULL DEFAULT '', norm TEXT NOT NULL DEFAULT '', favorite INTEGER NOT NULL DEFAULT 0,"
+                           " last_opened TEXT, status INTEGER NOT NULL DEFAULT 0,"
+                           " icon TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '', args TEXT NOT NULL DEFAULT '')"));
+            QVERIFY(q.exec("CREATE TABLE members (collection_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,"
+                           " item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,"
+                           " pos INTEGER NOT NULL, PRIMARY KEY(collection_id, item_id))"));
+            QVERIFY(q.exec("INSERT INTO items(id,category,name,target,norm,favorite,tags,args) VALUES"
+                           "('sw1',0,'Old Program','C:/Apps/old.exe','c:/apps/old.exe',1,'work,tools','--fast'),"
+                           "('sw2',0,'Second Program','C:/Apps/two.exe','c:/apps/two.exe',0,'',''),"
+                           "('web1',3,'Old Site','https://old.example','https://old.example',0,'',''),"
+                           "('doc1',1,'Old Doc','C:/Docs/a.pdf','c:/docs/a.pdf',0,'',''),"
+                           "('col1',4,'Old Collection','','',0,'','')"));
+            QVERIFY(q.exec("INSERT INTO members(collection_id,item_id,pos) VALUES ('col1','sw1',0),('col1','web1',1)"));
+            QVERIFY(!q.exec("SELECT guard FROM items")); // really the old schema
+        }
+        QSqlDatabase::removeDatabase(conn);
+
+        auto verifyData = [](Database &db) {
+            QCOMPARE(db.itemCount(), 5);
+            Item a;
+            QVERIFY(db.getItem("sw1", a));
+            QCOMPARE(a.name, QString("Old Program"));
+            QCOMPARE(a.target, QString("C:/Apps/old.exe"));
+            QCOMPARE(a.args, QString("--fast"));
+            QVERIFY(a.favorite);
+            QCOMPARE(a.tags, QStringList({"tools", "work"})); // tags are read back sorted
+            Item w;
+            QVERIFY(db.getItem("web1", w));
+            QCOMPARE(w.name, QString("Old Site"));
+            QCOMPARE(w.target, QString("https://old.example"));
+            QCOMPARE(db.members("col1"), QStringList({"sw1", "web1"}));
+        };
+
+        {
+            Database db;
+            QVERIFY(db.open(dir.path())); // runs the real migration
+            QVERIFY(!db.libraryIsNew());
+            Item sw1, sw2;
+            QVERIFY(db.getItem("sw1", sw1));
+            QVERIFY(db.getItem("sw2", sw2));
+            QVERIFY(sw1.guard); // existing Software cards get guard = 1
+            QVERIFY(sw2.guard);
+            verifyData(db);
+
+            // a card the user switches off must keep that choice
+            db.setGuard("sw2", false);
+            // new rows after migration also work
+            Item added;
+            added.id = "new1";
+            added.category = LH::Software;
+            added.name = "New Program";
+            added.target = "C:/Apps/new.exe";
+            QVERIFY(db.insertItem(added));
+            Item got;
+            QVERIFY(db.getItem("new1", got));
+            QVERIFY(got.guard);
+        }
+        // repeated migration: reopen twice; nothing fails, nothing is reset or corrupted
+        for (int round = 0; round < 2; ++round) {
+            Database db;
+            QVERIFY(db.open(dir.path()));
+            QCOMPARE(db.itemCount(), 6);
+            Item sw1, sw2;
+            QVERIFY(db.getItem("sw1", sw1));
+            QVERIFY(db.getItem("sw2", sw2));
+            QVERIFY(sw1.guard);
+            QVERIFY(!sw2.guard);
+            Item a;
+            QVERIFY(db.getItem("sw1", a));
+            QCOMPARE(a.args, QString("--fast"));
+            QCOMPARE(db.members("col1"), QStringList({"sw1", "web1"}));
+        }
+        {
+            const QString c2 = "guard_migration_check";
+            {
+                QSqlDatabase chk = QSqlDatabase::addDatabase("QSQLITE", c2);
+                chk.setDatabaseName(dir.path() + "/library.db");
+                QVERIFY(chk.open());
+                QSqlQuery q(chk);
+                QVERIFY(q.exec("PRAGMA integrity_check") && q.next());
+                QCOMPARE(q.value(0).toString(), QString("ok"));
+                QVERIFY(q.exec("SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='guard'") && q.next());
+                QCOMPARE(q.value(0).toInt(), 1); // the column was added exactly once
+            }
+            QSqlDatabase::removeDatabase(c2);
+        }
+    }
+
+    void guardMasterSwitchPersists()
+    {
+        QCOMPARE(AppSettings::defaults().value("guardEnabled").toBool(), true); // fresh installation
+        QCOMPARE(AppSettings::defaults().value("guardEnforce").toBool(), false);
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.path() + "/settings.json";
+
+        AppSettings fresh;
+        QVERIFY(fresh.boolean("guardEnabled"));
+        QVERIFY(!AppSettings().load(path)); // nothing saved yet: a fresh install keeps the default
+
+        for (bool value : {false, true, false}) {
+            AppSettings a;
+            a.set("guardEnabled", value);
+            QVERIFY(a.save(path));
+            AppSettings b; // a new object, as after a restart
+            QVERIFY(b.load(path));
+            QCOMPARE(b.boolean("guardEnabled"), value);
+        }
+        // a settings file from before the switch existed falls back to the default (on)
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        f.write("{\"theme\":\"light\"}");
+        f.close();
+        AppSettings old;
+        QVERIFY(old.load(path));
+        QVERIFY(old.boolean("guardEnabled"));
+    }
+
+    void guardCardStatesAreIndependentOfMasterAndBackedUp()
+    {
+        QFile one(m_dir.path() + "/indep-on.exe"), two(m_dir.path() + "/indep-off.exe");
+        QVERIFY(one.open(QIODevice::WriteOnly) && two.open(QIODevice::WriteOnly));
+        one.close();
+        two.close();
+        const QString on = core->addItem(LH::Software, "guard indep on", one.fileName());
+        const QString off = core->addItem(LH::Software, "guard indep off", two.fileName());
+        QVERIFY(!on.isEmpty());
+        QVERIFY(!off.isEmpty());
+        QVERIFY(on != off);
+        QVERIFY(core->item(on).guard);
+        core->setGuard(off, false);
+
+        core->settings()->set("guardEnabled", false); // master switch must not rewrite the cards
+        QVERIFY(core->item(on).guard);
+        QVERIFY(!core->item(off).guard);
+        core->settings()->set("guardEnabled", true);
+        QVERIFY(core->item(on).guard);
+        QVERIFY(!core->item(off).guard);
+
+        const QString path = m_dir.path() + "/guard-indep-backup.json";
+        QVERIFY(core->backupTo(path));
+        core->setGuard(on, false);
+        core->setGuard(off, true);
+        QVERIFY(core->restoreFrom(path));
+        QVERIFY(core->item(on).guard);
+        QVERIFY(!core->item(off).guard);
+
+        // only Software cards have a switch: a Document stays on and reports no guard state
+        const QString doc = core->addItem(LH::Document, "guard doc", m_realFile.fileName());
+        core->setGuard(doc, false);
+        QVERIFY(core->item(doc).guard);
+        QCOMPARE(core->itemInfo(doc).value("guardState").toString(), QString("none"));
     }
 
     void colourThemesRetintTheSkin()

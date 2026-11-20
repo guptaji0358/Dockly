@@ -4,6 +4,7 @@
 #include "connectors.h"
 #include "database.h"
 #include "gamepad.h"
+#include "guardstartup.h"
 #include "item.h"
 #include "perfmonitor.h"
 #include "procinspect.h"
@@ -15,6 +16,7 @@
 #include <QCache>
 #include <QFileIconProvider>
 #include <QFutureWatcher>
+#include <memory>
 #include <QHash>
 #include <QMultiHash>
 #include <QIcon>
@@ -101,6 +103,23 @@ public:
     // Stage 2, read-only: finds the running processes that belong to a program card and classifies them. Async; the
     // result arrives in processInspection(id, result). Never terminates or changes anything.
     Q_INVOKABLE void inspectProcesses(const QString &id);
+
+    // ---- Background Process Guard, Stages 3.2-3.4 / 3.6 (appcore_guard.cpp) ----
+    // Nothing runs in the background: enforcement happens only when the user presses a button, on the most
+    // recent inspection, and every process is re-verified (pid + creation time + exe) right before acting.
+    Q_INVOKABLE QVariantMap guardInfo(const QString &id);
+    Q_INVOKABLE void guardSetAllowed(const QString &id, const QString &exePath, const QString &mode, bool on); // mode: closed | open-lower | open-force
+    Q_INVOKABLE void guardSetClosedPolicy(const QString &id, int graceMs, bool allowForce);
+    Q_INVOKABLE void guardSetOpenPolicy(const QString &id, bool enabled, bool forceAcknowledged);
+    Q_INVOKABLE void guardRunClosed(const QString &id);   // user-triggered closed-app enforcement
+    Q_INVOKABLE void guardRunOpen(const QString &id);     // user-triggered open-app soft controls
+    Q_INVOKABLE QStringList guardRecover();               // crash recovery: planned startup rows + pending soft controls
+    Q_INVOKABLE QVariantList startupRows();
+    Q_INVOKABLE QVariantMap startupDisable(int source, const QString &name);
+    Q_INVOKABLE QVariantMap startupRestore(double entryId);
+    Q_INVOKABLE QVariantList startupRestoreAll();
+    Q_INVOKABLE QVariantList startupLedger();
+    Q_INVOKABLE QStringList startupCheck();
     Q_INVOKABLE void select(const QString &id);
 
     // --- launching -------------------------------------------------------
@@ -171,6 +190,7 @@ public slots:
 
 signals:
     void processInspection(const QString &id, const QVariantMap &result);
+    void guardActions(const QString &id, const QVariantList &records); // outcomes of a user-triggered run
     void itemsChanged();
     void iconsChanged();
     void scanningChanged();
@@ -248,4 +268,18 @@ private:
     QFutureWatcher<QHash<QString, int>> m_checkWatcher;
     QFutureWatcher<ProcInspect::Inspection> m_inspectWatcher;
     QString m_inspectId;
+    ProcInspect::Inspection m_lastInsp;      // most recent inspection, kept in memory only
+    QString m_lastInspId;
+    qint64 m_lastInspMs = 0;
+    Guard::GuardStore m_gstore;
+    std::unique_ptr<Guard::StartupBackend> m_sbe;
+    QFutureWatcher<QVector<Guard::ActionRecord>> m_guardWatcher;
+    QString m_guardRunId;
+    bool ensureGuardStore();
+    QVector<ProcInspect::CardRef> softwareCardRefs() const;
+    Guard::Policy buildGuardPolicy() const;
+    QHash<QString, Guard::OpenPolicy> buildOpenPolicies() const;
+    QHash<QString, Guard::ClosedPolicy> buildClosedPolicies() const;
+    QVariantList annotateRows(const QString &cardId, const QVariantList &rows);
+    void finishGuardRun(const QVector<Guard::ActionRecord> &r);
 };

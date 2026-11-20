@@ -18,6 +18,8 @@ Last full pass: 2026-11-19 (initial analysis; not every `.qml` file was read lin
 | [software-scanner.md](software-scanner.md) | How installed programs are discovered, merged, named |
 | [build-test-workflow.md](build-test-workflow.md) | Build, deploy, tests, commit routine, repo conventions |
 | [process-inspection.md](process-inspection.md) | Stage 2 read-only process discovery, attribution, Inspect dialog |
+| [guard-dryrun.md](guard-dryrun.md) | Stage 3.1 dry-run engine, recovery ledger, polling limits |
+| [guard-enforcement.md](guard-enforcement.md) | Stage 3.2-3.4/3.6 executor, startup management, soft controls |
 | [known-issues.md](known-issues.md) | Verified limits, doc/code conflicts, unverified areas |
 
 ## Task shortcuts

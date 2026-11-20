@@ -1,0 +1,165 @@
+/****************************************************************************
+** Meta object code from reading C++ file 'guard_test.cpp'
+**
+** Created by: The Qt Meta Object Compiler version 69 (Qt 6.12.0)
+**
+** WARNING! All changes made in this file will be lost!
+*****************************************************************************/
+
+#include <QtCore/qmetatype.h>
+
+#include <QtCore/qtmochelpers.h>
+
+#include <memory>
+
+
+#include <QtCore/qxptype_traits.h>
+#if !defined(Q_MOC_OUTPUT_REVISION)
+#error "The header file 'guard_test.cpp' doesn't include <QObject>."
+#elif Q_MOC_OUTPUT_REVISION != 69
+#error "This file was generated using the moc from 6.12.0. It"
+#error "cannot be used with the include files from this version of Qt."
+#error "(The moc has changed too much.)"
+#endif
+
+#ifndef Q_CONSTINIT
+#define Q_CONSTINIT
+#endif
+
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_DEPRECATED
+QT_WARNING_DISABLE_GCC("-Wuseless-cast")
+namespace {
+struct qt_meta_tag_ZN9GuardTestE_t {};
+} // unnamed namespace
+
+template <> constexpr inline auto GuardTest::qt_create_metaobjectdata<qt_meta_tag_ZN9GuardTestE_t>()
+{
+    namespace QMC = QtMocConstants;
+    QtMocHelpers::StringRefStorage qt_stringData {
+        "GuardTest",
+        "candidateWithAllGatesIsOnlyProposed",
+        "",
+        "candidateIsNotAuthorisation",
+        "terminateDeniedBlocks",
+        "session0AndOtherSessionsAndMissingFactsAreProtected",
+        "inaccessibleProcessWithoutPathStaysUntouched",
+        "unknownProcessesRemainUntouched",
+        "ambiguousSharedAttributionIsProtected",
+        "gracePeriodAndIdentity",
+        "pidReuseIsDetected",
+        "removedEntry",
+        "LedgerEntry",
+        "restoreConflictDetection",
+        "packagedStartupIsManagedByWindows",
+        "ledgerSchemaCreatesAndRejectsUnsafeSources",
+        "pollingOverhead",
+        "realMachineDryRunTouchesNothing"
+    };
+
+    QtMocHelpers::UintData qt_methods {
+        // Slot 'candidateWithAllGatesIsOnlyProposed'
+        QtMocHelpers::SlotData<void()>(1, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'candidateIsNotAuthorisation'
+        QtMocHelpers::SlotData<void()>(3, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'terminateDeniedBlocks'
+        QtMocHelpers::SlotData<void()>(4, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'session0AndOtherSessionsAndMissingFactsAreProtected'
+        QtMocHelpers::SlotData<void()>(5, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'inaccessibleProcessWithoutPathStaysUntouched'
+        QtMocHelpers::SlotData<void()>(6, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'unknownProcessesRemainUntouched'
+        QtMocHelpers::SlotData<void()>(7, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'ambiguousSharedAttributionIsProtected'
+        QtMocHelpers::SlotData<void()>(8, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'gracePeriodAndIdentity'
+        QtMocHelpers::SlotData<void()>(9, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'pidReuseIsDetected'
+        QtMocHelpers::SlotData<void()>(10, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'removedEntry'
+        QtMocHelpers::SlotData<LedgerEntry()>(11, 2, QMC::AccessPrivate, 0x80000000 | 12),
+        // Slot 'restoreConflictDetection'
+        QtMocHelpers::SlotData<void()>(13, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'packagedStartupIsManagedByWindows'
+        QtMocHelpers::SlotData<void()>(14, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'ledgerSchemaCreatesAndRejectsUnsafeSources'
+        QtMocHelpers::SlotData<void()>(15, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'pollingOverhead'
+        QtMocHelpers::SlotData<void()>(16, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'realMachineDryRunTouchesNothing'
+        QtMocHelpers::SlotData<void()>(17, 2, QMC::AccessPrivate, QMetaType::Void),
+    };
+    QtMocHelpers::UintData qt_properties {
+    };
+    QtMocHelpers::UintData qt_enums {
+    };
+    return QtMocHelpers::metaObjectData<GuardTest, qt_meta_tag_ZN9GuardTestE_t>(QMC::MetaObjectFlag{}, qt_stringData,
+            qt_methods, qt_properties, qt_enums);
+}
+Q_CONSTINIT const QMetaObject GuardTest::staticMetaObject = { {
+    QMetaObject::SuperData::link<QObject::staticMetaObject>(),
+    qt_staticMetaObjectStaticContent<qt_meta_tag_ZN9GuardTestE_t>.stringdata,
+    qt_staticMetaObjectStaticContent<qt_meta_tag_ZN9GuardTestE_t>.data,
+    qt_static_metacall,
+    nullptr,
+    qt_staticMetaObjectRelocatingContent<qt_meta_tag_ZN9GuardTestE_t>.metaTypes,
+    nullptr
+} };
+
+void GuardTest::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, void **_a)
+{
+    auto *_t = static_cast<GuardTest *>(_o);
+    if (_c == QMetaObject::InvokeMetaMethod) {
+        switch (_id) {
+        case 0: _t->candidateWithAllGatesIsOnlyProposed(); break;
+        case 1: _t->candidateIsNotAuthorisation(); break;
+        case 2: _t->terminateDeniedBlocks(); break;
+        case 3: _t->session0AndOtherSessionsAndMissingFactsAreProtected(); break;
+        case 4: _t->inaccessibleProcessWithoutPathStaysUntouched(); break;
+        case 5: _t->unknownProcessesRemainUntouched(); break;
+        case 6: _t->ambiguousSharedAttributionIsProtected(); break;
+        case 7: _t->gracePeriodAndIdentity(); break;
+        case 8: _t->pidReuseIsDetected(); break;
+        case 9: { LedgerEntry _r = _t->removedEntry();
+            if (_a[0]) *reinterpret_cast<LedgerEntry*>(_a[0]) = std::move(_r); }  break;
+        case 10: _t->restoreConflictDetection(); break;
+        case 11: _t->packagedStartupIsManagedByWindows(); break;
+        case 12: _t->ledgerSchemaCreatesAndRejectsUnsafeSources(); break;
+        case 13: _t->pollingOverhead(); break;
+        case 14: _t->realMachineDryRunTouchesNothing(); break;
+        default: ;
+        }
+    }
+}
+
+const QMetaObject *GuardTest::metaObject() const
+{
+    return QObject::d_ptr->metaObject ? QObject::d_ptr->dynamicMetaObject() : &staticMetaObject;
+}
+
+void *GuardTest::qt_metacast(const char *_clname)
+{
+    if (!_clname) return nullptr;
+    if (!strcmp(_clname, qt_staticMetaObjectStaticContent<qt_meta_tag_ZN9GuardTestE_t>.strings))
+        return static_cast<void*>(this);
+    return QObject::qt_metacast(_clname);
+}
+
+int GuardTest::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
+{
+    _id = QObject::qt_metacall(_c, _id, _a);
+    if (_id < 0)
+        return _id;
+    if (_c == QMetaObject::InvokeMetaMethod) {
+        if (_id < 15)
+            qt_static_metacall(this, _c, _id, _a);
+        _id -= 15;
+    }
+    if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
+        if (_id < 15)
+            *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
+        _id -= 15;
+    }
+    return _id;
+}
+QT_WARNING_POP

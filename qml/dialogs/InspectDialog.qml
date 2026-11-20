@@ -12,10 +12,15 @@ AppDialog {
     property bool showOthers: false
     property var shown: []
     property var sel: null
+    property var info: ({})
+    property var lastRun: []
+    property string runNote: ""
+    function refreshInfo() { info = core.guardInfo(itemId) }
+    function roleColor(k) { return k === "protected" ? "#3fb950" : k === "eligible" ? "#d29922" : dlg.th.subtext }
     width: Math.min(900, (Overlay.overlay ? Overlay.overlay.width : 900) - 40)
 
     function openFor(id, name) {
-        itemId = id; itemName = name; result = null; sel = null; shown = []
+        itemId = id; itemName = name; result = null; sel = null; shown = []; lastRun = []; runNote = ""; refreshInfo()
         title = "Inspect processes: " + name
         open()
         core.inspectProcesses(id)
@@ -41,6 +46,13 @@ AppDialog {
             if (id !== dlg.itemId) return
             dlg.result = r
             dlg.rebuild()
+            dlg.refreshInfo()
+        }
+        function onGuardActions(id, recs) {
+            if (id !== dlg.itemId) return
+            dlg.lastRun = recs
+            dlg.runNote = recs.length === 0 ? "Nothing was eligible. Nothing was done." : ""
+            dlg.refreshInfo()
         }
     }
 
@@ -83,7 +95,8 @@ AppDialog {
                 spacing: 10
                 Text { text: modelData.name; color: dlg.th.text; elide: Text.ElideRight; Layout.preferredWidth: 220 }
                 Text { text: "PID " + modelData.pid + " / parent " + modelData.ppid; color: dlg.th.subtext; Layout.preferredWidth: 170 }
-                Text { text: modelData.classLabel; color: dlg.colorFor(modelData.classKey); font.bold: true; Layout.preferredWidth: 140 }
+                Text { text: modelData.classLabel; color: dlg.colorFor(modelData.classKey); font.bold: true; Layout.preferredWidth: 130 }
+                Text { text: modelData.roleLabel || "-"; color: dlg.roleColor(modelData.role); Layout.preferredWidth: 150; elide: Text.ElideRight }
                 Text { text: modelData.cardName !== "" ? modelData.cardName : (modelData.ambiguous.length ? "ambiguous" : "-"); color: dlg.th.subtext; elide: Text.ElideRight; Layout.fillWidth: true }
             }
             MouseArea { anchors.fill: parent; onClicked: dlg.sel = modelData }
@@ -114,6 +127,67 @@ AppDialog {
                    text: dlg.sel && dlg.sel.evidence.length ? "Evidence:\n - " + dlg.sel.evidence.join("\n - ") : "Evidence: none" }
             Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: dlg.th.text
                    text: dlg.sel ? "Why: " + dlg.sel.reason : "" }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: dlg.th.text; visible: dlg.sel && !!dlg.sel.roleWhy
+                   text: dlg.sel ? "Guard role: " + dlg.sel.roleLabel + ". " + dlg.sel.roleWhy : "" }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: dlg.th.subtext; visible: dlg.sel && !!dlg.sel.proposal
+                   text: dlg.sel ? "Proposal (a plan only, nothing has been done): " + dlg.sel.proposal : "" }
+            Flow {
+                Layout.fillWidth: true; spacing: 12
+                visible: dlg.sel && dlg.sel.canAllow === true
+                CheckBox { text: "Allow stopping when the program is closed"; checked: dlg.sel ? dlg.sel.allowedClosed : false
+                           onToggled: { core.guardSetAllowed(dlg.itemId, dlg.sel.exePath, "closed", checked); core.inspectProcesses(dlg.itemId) }
+                           contentItem: Text { text: parent.text; leftPadding: parent.indicator.width + 8; color: dlg.th.text } }
+                CheckBox { text: "Lower priority while open"; checked: dlg.sel ? dlg.sel.allowedLower : false
+                           onToggled: { core.guardSetAllowed(dlg.itemId, dlg.sel.exePath, "open-lower", checked); core.inspectProcesses(dlg.itemId) }
+                           contentItem: Text { text: parent.text; leftPadding: parent.indicator.width + 8; color: dlg.th.text } }
+                CheckBox { text: "Force stop while open (may break the program)"; checked: dlg.sel ? dlg.sel.allowedForce : false
+                           onToggled: { core.guardSetAllowed(dlg.itemId, dlg.sel.exePath, "open-force", checked); core.inspectProcesses(dlg.itemId) }
+                           contentItem: Text { text: parent.text; leftPadding: parent.indicator.width + 8; color: dlg.th.text } }
+            }
+        }
+    }
+    Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: guardCol.implicitHeight + 20
+        radius: 8
+        color: Qt.rgba(dlg.th.text.r, dlg.th.text.g, dlg.th.text.b, 0.05)
+        ColumnLayout {
+            id: guardCol
+            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10 }
+            spacing: 6
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: dlg.th.text; font.bold: true
+                   text: !dlg.info.available ? "Guard data unavailable"
+                         : !dlg.info.master ? "Guard is OFF (master switch). Nothing will be stopped or changed."
+                         : !dlg.info.cardOn ? "Guard is OFF for this program. Nothing will be stopped or changed."
+                         : "Guard is ON for this program. Actions run only when you press a button below, on this inspection." }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: dlg.th.subtext
+                   text: "The program is " + (dlg.result && dlg.result.closedApp ? "closed" : "open") + ". "
+                         + (dlg.info.allowedClosed || 0) + " executable(s) on the closed-app allow-list. Dockly cannot prevent a program from starting again (polling has gaps; launchers and services may restart it)."
+                         + (dlg.info.pendingSoft > 0 ? " " + dlg.info.pendingSoft + " priority change(s) can be undone." : "") }
+            Flow {
+                Layout.fillWidth: true; spacing: 12
+                CheckBox { text: "Open-app management (soft controls on programs you selected)"; checked: !!dlg.info.openEnabled
+                           onToggled: { core.guardSetOpenPolicy(dlg.itemId, checked, !!dlg.info.forceAck); dlg.refreshInfo(); core.inspectProcesses(dlg.itemId) }
+                           contentItem: Text { text: parent.text; leftPadding: parent.indicator.width + 8; color: dlg.th.text } }
+                CheckBox { text: "I understand force stop can break the program"; checked: !!dlg.info.forceAck
+                           onToggled: { core.guardSetOpenPolicy(dlg.itemId, !!dlg.info.openEnabled, checked); dlg.refreshInfo(); core.inspectProcesses(dlg.itemId) }
+                           contentItem: Text { text: parent.text; leftPadding: parent.indicator.width + 8; color: dlg.th.text } }
+                CheckBox { text: "Closed app: force stop if it ignores close (separate policy)"; checked: !!dlg.info.allowForce
+                           onToggled: { core.guardSetClosedPolicy(dlg.itemId, dlg.info.graceMs, checked); dlg.refreshInfo() }
+                           contentItem: Text { text: parent.text; leftPadding: parent.indicator.width + 8; color: dlg.th.text } }
+            }
+            RowLayout {
+                spacing: 8
+                AppButton { text: "Run closed-app policy now"; enabled: !!(dlg.result && dlg.result.closedApp); onClicked: { dlg.lastRun = []; dlg.runNote = "Working..."; core.guardRunClosed(dlg.itemId) } }
+                AppButton { text: "Apply open-app controls now"; enabled: !!(dlg.result && !dlg.result.closedApp); onClicked: { dlg.lastRun = []; dlg.runNote = "Working..."; core.guardRunOpen(dlg.itemId) } }
+            }
+            Text { Layout.fillWidth: true; wrapMode: Text.Wrap; color: dlg.th.text; visible: dlg.runNote !== ""; text: dlg.runNote }
+            Repeater {
+                model: dlg.lastRun
+                Text { required property var modelData; Layout.fillWidth: true; wrapMode: Text.Wrap
+                       color: modelData.acted ? "#3fb950" : dlg.th.subtext
+                       text: (modelData.acted ? "DONE: " : "NOT DONE: ") + (modelData.process ? modelData.process + " - " : "") + modelData.outcome + ". " + modelData.explanation }
+            }
         }
     }
     RowLayout {

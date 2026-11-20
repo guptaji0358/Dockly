@@ -810,8 +810,8 @@ ApplicationWindow {
         Entry {
             readonly property bool applies: win.ctx.category === LH.Software
             readonly property bool on: win.ctx.guard !== false
-            // not checkable (see "Open at startup"); the state text never claims protection that is not enforced yet
-            text: on ? "✓  Prevent Background Processes: ON" : "Prevent Background Processes: OFF"
+            // not checkable (see "Open at startup"); the state text never claims continuous protection: actions run only on request
+            text: on ? "✓  Background Process Guard: ON (runs only when you ask)" : "Background Process Guard: OFF"
             visible: applies
             height: applies ? implicitHeight : 0
             onTriggered: core.setGuard(win.ctx.id, !on)

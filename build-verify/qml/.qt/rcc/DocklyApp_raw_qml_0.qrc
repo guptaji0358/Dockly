@@ -1,0 +1,42 @@
+<RCC>
+  <qresource prefix="/qt/qml/DocklyUI/">
+    <file alias="Main.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/Main.qml</file>
+    <file alias="DockWindow.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/DockWindow.qml</file>
+    <file alias="QuickLauncher.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/QuickLauncher.qml</file>
+    <file alias="dialogs/ArgsDialog.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/dialogs/ArgsDialog.qml</file>
+    <file alias="dialogs/InspectDialog.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/dialogs/InspectDialog.qml</file>
+    <file alias="components/Fx.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/Fx.qml</file>
+    <file alias="components/Nebula.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/Nebula.qml</file>
+    <file alias="components/Tile.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/Tile.qml</file>
+    <file alias="components/ItemSpace.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/ItemSpace.qml</file>
+    <file alias="components/Ring.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/Ring.qml</file>
+    <file alias="components/Glass.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/Glass.qml</file>
+    <file alias="components/OrbButton.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/OrbButton.qml</file>
+    <file alias="components/HudField.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/HudField.qml</file>
+    <file alias="components/AppButton.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/AppButton.qml</file>
+    <file alias="dialogs/AppDialog.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/dialogs/AppDialog.qml</file>
+    <file alias="dialogs/ItemDialog.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/dialogs/ItemDialog.qml</file>
+    <file alias="dialogs/PickDialog.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/dialogs/PickDialog.qml</file>
+    <file alias="dialogs/ChoiceDialog.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/dialogs/ChoiceDialog.qml</file>
+    <file alias="components/Card.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/Card.qml</file>
+    <file alias="components/Icon.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/Icon.qml</file>
+    <file alias="components/SiteIcon.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/SiteIcon.qml</file>
+    <file alias="components/ViewToolbar.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/ViewToolbar.qml</file>
+    <file alias="components/DetailPanel.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/DetailPanel.qml</file>
+    <file alias="dialogs/PickSoftwareDialog.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/dialogs/PickSoftwareDialog.qml</file>
+    <file alias="components/ItemGrid.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/ItemGrid.qml</file>
+    <file alias="pages/HomePage.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/pages/HomePage.qml</file>
+    <file alias="pages/CategoryPage.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/pages/CategoryPage.qml</file>
+    <file alias="pages/CollectionsPage.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/pages/CollectionsPage.qml</file>
+    <file alias="pages/SitesPage.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/pages/SitesPage.qml</file>
+    <file alias="dialogs/SiteDialog.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/dialogs/SiteDialog.qml</file>
+    <file alias="dialogs/SiteIconPromptDialog.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/dialogs/SiteIconPromptDialog.qml</file>
+    <file alias="pages/ConnectorsPage.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/pages/ConnectorsPage.qml</file>
+    <file alias="dialogs/ConnectorPicker.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/dialogs/ConnectorPicker.qml</file>
+    <file alias="pages/SettingsPage.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/pages/SettingsPage.qml</file>
+    <file alias="components/SettingGroup.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/SettingGroup.qml</file>
+    <file alias="components/SettingCheck.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/SettingCheck.qml</file>
+    <file alias="components/SettingCombo.qml">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml/components/SettingCombo.qml</file>
+  </qresource>
+</RCC>
+

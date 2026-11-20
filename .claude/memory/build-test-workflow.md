@@ -24,13 +24,17 @@ build.bat clean                # wipe build and dist first (also: clean nodeploy
 
 ## Tests
 
-`core_test` (QtTest, `scripts/main/core_test.cpp`, ~990 lines, ~45 cases) is built with the
+`guard_test` (16) and `guard3_test` (19) are separate executables; `core_test` (QtTest, `scripts/main/core_test.cpp`, ~1390 lines, 58 test cases plus `initTestCase`) is built with the
 project and registered via `add_test`. Run `build\core_test.exe` (needs the Qt DLLs on PATH) or
 `ctest` in `build`. Groups: items/dedupe/status/collections, scanner and naming (synthetic and
 real-machine), catalog, backup/restore, drag-drop routing, quick search ranking and `#` filters,
-running apps, colour themes, icon pack, search escaping, bridge security, bookmarks, sites.
+running apps, colour themes, icon pack, search escaping, bridge security, bookmarks, sites,
+process inspection, Background Process Guard (card switch, master switch persistence, and the
+SQLite `guard` column migration from an old-schema `library.db`).
 `initTestCase` sets `LH_DATA_DIR` to a temp dir, so tests never touch the real profile.
-The tests were not executed during this memory pass.
+Verification status: Stage 2 (process inspection, guard UI, guard persistence/migration tests) was
+verified and accepted by the user. This memory pass did not re-run the suite; exact pass counts
+are not recorded here.
 
 ## Commit routine (project `.claude/CLAUDE.md`)
 

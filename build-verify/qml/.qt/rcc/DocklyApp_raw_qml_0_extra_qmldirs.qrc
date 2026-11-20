@@ -1,0 +1,8 @@
+<RCC>
+  <qresource prefix="/qt/qml/DocklyUI/">
+    <file alias="dialogs/qmldir">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/build-verify/qml/dialogs/qmldir</file>
+    <file alias="components/qmldir">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/build-verify/qml/components/qmldir</file>
+    <file alias="pages/qmldir">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/build-verify/qml/pages/qmldir</file>
+  </qresource>
+</RCC>
+

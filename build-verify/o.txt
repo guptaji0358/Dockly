@@ -1,0 +1,27 @@
+********* Start testing of Guard3Test *********
+Config: Using QtTest library 6.12.0, Qt 6.12.0 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 15.1.0), windows 11
+PASS   : Guard3Test::initTestCase()
+PASS   : Guard3Test::gracefulCloseNeverForces()
+PASS   : Guard3Test::noSilentFallbackToForce()
+PASS   : Guard3Test::forceOnlyWithExplicitPolicyAfterGrace()
+PASS   : Guard3Test::identityChangeFailsSafe()
+PASS   : Guard3Test::openProgramAndDisabledSwitchesAreNeverActedOn()
+PASS   : Guard3Test::unknownAndSharedProcessesAreNotTouched()
+PASS   : Guard3Test::openAppDefaultsToObservation()
+PASS   : Guard3Test::openAppOnlyUserSelectedAndReversible()
+PASS   : Guard3Test::forceStopNeedsAcknowledgementAndWindowedHelpersStayProtected()
+PASS   : Guard3Test::inaccessibleProcessIsNotReportedAsExited()
+PASS   : Guard3Test::openAppOutcomesAreDistinctAndUntouched()
+PASS   : Guard3Test::gracefulWaitDoesNotMistakeDeniedAccessForExit()
+PASS   : Guard3Test::applyOpenValidatesForceAckIndependently()
+PASS   : Guard3Test::startupRequiresConsentAndRefusesAmbiguous()
+PASS   : Guard3Test::disableAndRestoreRoundTrip()
+PASS   : Guard3Test::originalIsProtectedAtRest()
+PASS   : Guard3Test::conflictsPreserveNewerState()
+PASS   : Guard3Test::restoreAllAndDisableFailure()
+PASS   : Guard3Test::crashRecoveryResolvesPlannedRows()
+PASS   : Guard3Test::actionLogHoldsNoStartupValuesOrCommandLines()
+PASS   : Guard3Test::realIsolatedRegistryAndFolderBackend()
+PASS   : Guard3Test::cleanupTestCase()
+Totals: 23 passed, 0 failed, 0 skipped, 0 blacklisted, 470ms
+********* Finished testing of Guard3Test *********
