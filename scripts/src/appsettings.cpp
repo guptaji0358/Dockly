@@ -16,7 +16,6 @@ QVariantMap AppSettings::defaults()
         {"minimizeToTray", false},
         {"theme", "dark"},        // light | dark | system
         {"style", "neon"},        // neon | playful | editorial
-        {"navigation", "sidebar"}, // sidebar | dock
         {"accent", ""},           // empty = the skin's own accent
         {"palette", "default"},   // default | ocean | forest | sunset | rose | violet | graphite : colour theme layered on the skin
         {"launcherEnabled", true}, // quick launcher: a type-to-launch box opened from anywhere

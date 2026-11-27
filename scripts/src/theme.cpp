@@ -42,7 +42,7 @@ Theme::Theme(AppSettings *settings, QObject *parent)
     : QObject(parent), m_settings(settings)
 {
     connect(settings, &AppSettings::changed, this, [this](const QString &key) {
-        if (key == "theme" || key == "accent" || key == "style" || key == "navigation" || key == "palette")
+        if (key == "theme" || key == "accent" || key == "style" || key == "palette")
             update();
     });
     if (auto *hints = QGuiApplication::styleHints())
@@ -55,7 +55,6 @@ void Theme::update()
     m_style = m_settings->text("style");
     if (m_style != "playful" && m_style != "editorial")
         m_style = "neon";
-    m_dock = m_settings->text("navigation") == "dock";
 
     const QString mode = m_settings->text("theme");
     if (mode == "dark")

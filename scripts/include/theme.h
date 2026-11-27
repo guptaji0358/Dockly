@@ -12,7 +12,6 @@ class Theme : public QObject
     Q_OBJECT
     Q_PROPERTY(QString style READ style NOTIFY changed)
     Q_PROPERTY(bool dark READ dark NOTIFY changed)
-    Q_PROPERTY(bool dock READ dock NOTIFY changed)
     Q_PROPERTY(int radius READ radius NOTIFY changed)
     Q_PROPERTY(int borderWidth READ borderWidth NOTIFY changed)
     Q_PROPERTY(bool glow READ glow NOTIFY changed)
@@ -36,7 +35,6 @@ public:
 
     QString style() const { return m_style; }
     bool dark() const { return m_dark; }
-    bool dock() const { return m_dock; }
     int radius() const { return m_radius; }
     int borderWidth() const { return m_borderWidth; }
     bool glow() const { return m_glow; }
@@ -72,7 +70,6 @@ private:
     AppSettings *m_settings;
     QString m_style = "neon";
     bool m_dark = true;
-    bool m_dock = false;
     int m_radius = 14;
     int m_borderWidth = 1;
     bool m_glow = false;
