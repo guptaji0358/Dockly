@@ -1,6 +1,0 @@
-<RCC>
-  <qresource prefix="/qt/qml/DocklyUI">
-    <file alias="shaders/aurora.frag.qsb">C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/build-verify/qml/.qsb/shaders/aurora.frag.qsb</file>
-  </qresource>
-</RCC>
-

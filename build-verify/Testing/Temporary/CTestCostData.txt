@@ -1,4 +1,0 @@
-core_test 3 2.83863
-guard_test 3 0.540363
-guard3_test 2 0.28989
----

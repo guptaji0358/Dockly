@@ -1,6 +1,0 @@
-# CMake generated Testfile for 
-# Source directory: C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/qml
-# Build directory: C:/Users/lenovo/OneDrive/Desktop/projects/Dockly/build-verify/qml
-# 
-# This file includes the relevant testing commands required for 
-# testing this directory and lists subdirectories to be tested as well.
