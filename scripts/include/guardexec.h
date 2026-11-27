@@ -67,7 +67,6 @@ struct ActionRecord {
     quint64 created = 0;
     Outcome outcome = Outcome::Skipped;
     bool acted = false;       // the process really changed state
-    bool dryRunOnly = false;  // true when this record is a proposal, never claimed as done
     int priorClass = 0;       // SoftApplied: priority class to put back
     QString exePath;          // for soft-control revert identity checks
     QString explanation;
