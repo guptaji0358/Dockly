@@ -3,9 +3,7 @@
 #include "guardexec.h"
 #include "guardledger.h"
 
-#include <QHash>
 #include <QSqlDatabase>
-#include <QVariantMap>
 
 // Stage 3.3 / 3.6: persistent guard state in one SQLite file (separate from library.db), scoped to the
 // current Windows user: original startup values are DPAPI-protected, so the file is useless to another
