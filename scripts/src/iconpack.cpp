@@ -64,7 +64,6 @@ QByteArray svgFor(const QString &name, const QColor &color)
 namespace IconPack {
 
 QStringList names() { return markup().keys(); }
-bool has(const QString &name) { return markup().contains(name); }
 
 QPixmap pixmap(const QString &name, int px, const QColor &color)
 {
@@ -86,11 +85,6 @@ QPixmap pixmap(const QString &name, int px, const QColor &color)
     }
     cache.insert(key, new QPixmap(pm), qMax(1, px * px * 4 / 1024));
     return pm;
-}
-
-QIcon icon(const QString &name, const QColor &color, int px)
-{
-    return QIcon(pixmap(name, px, color));
 }
 
 } // namespace IconPack
