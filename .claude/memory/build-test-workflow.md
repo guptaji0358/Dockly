@@ -24,7 +24,7 @@ build.bat clean                # wipe build and dist first (also: clean nodeploy
 
 ## Tests
 
-`guard_test` (16) and `guard3_test` (19) are separate executables; `core_test` (QtTest, `scripts/main/core_test.cpp`, ~1390 lines, 58 test cases plus `initTestCase`) is built with the
+`guard_test` (16) and `guard3_test` (19) are separate executables; `core_test` (QtTest, `scripts/main/core_test.cpp`, ~1390 lines, 57 test cases plus `initTestCase`) is built with the
 project and registered via `add_test`. Run `build\core_test.exe` (needs the Qt DLLs on PATH) or
 `ctest` in `build`. Groups: items/dedupe/status/collections, scanner and naming (synthetic and
 real-machine), catalog, backup/restore, drag-drop routing, quick search ranking and `#` filters,
@@ -58,4 +58,12 @@ folder, scanner tests, dynamic software names.
 
 - `.claude/CLAUDE.md` says `build.bat` does a clean rebuild; the real `build.bat` is incremental
   and cleans only with the `clean` argument (known-issues.md).
-- `build-stale-LH/` is an ignored leftover build folder.
+- Any `build-*/` folder is ignored; never commit build output. A `build/` configured under another
+  path makes CMake refuse to configure: delete `build/` and rebuild.
+- `build\Dockly.exe` is only the loader and needs `resources\` beside it (use `dist\` or a copy).
+
+## Kept on purpose although the app does not call them (2026-11-27)
+
+`Guard::diffSnapshots`, `ProcInspect::stillSameProcess` (polling design, tested), settings key
+`guardEnforce` (reserved, tested), `DryRunReport::executedAnything`, `Database::itemCount` and
+`AppCore::lastScanReport` (test hooks), diagnostic CLI flags, legacy data migration.

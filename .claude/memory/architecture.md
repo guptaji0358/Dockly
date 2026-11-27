@@ -12,7 +12,7 @@ qml/                  Qt Quick frontend, built into DocklyApp.dll as QML module 
   components/ dialogs/ pages/ shaders/aurora.frag
 connectors/browser/   Chrome/Edge MV3 extension (copied next to the build output)
 build.bat             wrapper around scripts/build.ps1 + commit/push + launch
-build/  dist/         build output / deployed copy (both git-ignored); build-stale-*/ ignored too
+build/  dist/         build output / deployed copy (both git-ignored); any build-*/ ignored too
 ```
 
 ## CMake targets
