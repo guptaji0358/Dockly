@@ -36,8 +36,6 @@ class DockGuard : public QObject
     // program names (e.g. "blender.exe") that get the calm treatment when maximised: the dock stays away
     // and needs a longer, deliberate rest on the edge, since their timelines and panels sit at the screen edge
     Q_PROPERTY(QStringList calmApps READ calmApps WRITE setCalmApps NOTIFY calmAppsChanged)
-    Q_PROPERTY(bool fullscreen READ fullscreen NOTIFY fullscreenChanged)
-    Q_PROPERTY(bool revealed READ revealed NOTIFY revealedChanged)
     // true while the dock should be on screen: no full-screen app, or the pointer asked for it
     Q_PROPERTY(bool dockVisible READ dockVisible NOTIFY dockVisibleChanged)
 public:
@@ -65,8 +63,6 @@ public:
     double proximity() const { return m_proximity; }
     QStringList calmApps() const { return m_calmApps; }
     void setCalmApps(const QStringList &names);
-    bool fullscreen() const { return m_fullscreen; }
-    bool revealed() const { return m_revealed; }
     bool dockVisible() const { return !m_fullscreen || m_revealed; }
 
 signals:
@@ -80,8 +76,6 @@ signals:
     void idleChanged();
     void proximityChanged();
     void calmAppsChanged();
-    void fullscreenChanged();
-    void revealedChanged();
     void dockVisibleChanged();
 
 private:

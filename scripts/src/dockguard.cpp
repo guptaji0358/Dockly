@@ -151,14 +151,8 @@ void DockGuard::update(bool fullscreen, bool revealed)
     if (!fullscreen)
         revealed = false;
     const bool before = dockVisible();
-    if (m_fullscreen != fullscreen) {
-        m_fullscreen = fullscreen;
-        emit fullscreenChanged();
-    }
-    if (m_revealed != revealed) {
-        m_revealed = revealed;
-        emit revealedChanged();
-    }
+    m_fullscreen = fullscreen;
+    m_revealed = revealed;
     if (before != dockVisible())
         emit dockVisibleChanged();
 }
