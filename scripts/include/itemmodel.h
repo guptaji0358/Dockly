@@ -7,7 +7,7 @@
 
 class AppCore;
 
-// Filtered, sorted view over AppCore's items. Shared by both frontends.
+// Filtered, sorted view over AppCore's items.
 class ItemModel : public QAbstractListModel
 {
     Q_OBJECT

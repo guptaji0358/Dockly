@@ -30,7 +30,7 @@
 class QNetworkAccessManager;
 
 // Owns settings, the SQLite databases, launching and validation.
-// Both frontends talk only to this class and ItemModel. Only a small row cache lives in
+// The QML interface talks to this class and ItemModel. Only a small row cache lives in
 // RAM; everything else is queried from SQLite on demand.
 class AppCore : public QObject
 {
@@ -177,7 +177,7 @@ public:
     Q_INVOKABLE QString aboutText() const;
     Q_INVOKABLE QString dataFolder() const { return m_dataDir; }
 
-    // --- native dialogs (used by QML; widgets use their own with a parent)
+    // --- native dialogs (used by QML)
     Q_INVOKABLE QString fileFilter(int category) const;
     Q_INVOKABLE QStringList pickFiles(const QString &title, const QString &filter, bool multiple);
     Q_INVOKABLE QString pickSaveFile(const QString &title, const QString &path, const QString &filter);
