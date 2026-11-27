@@ -37,7 +37,6 @@ Last full pass: 2026-11-19 (initial analysis; not every `.qml` file was read lin
   (architecture.md -> core-modules.md -> qml-frontend.md).
 - Settings keys are shared by C++ (`AppSettings`) and QML (`core.settings.values.<key>`).
 
-## Not part of this memory
+## Cleanup history
 
-`.claude/memory/SKILL.md` is an unrelated Selenium run log (a Tindog bot), not a skill and not
-project memory. Leave it alone unless the user decides what to do with it.
+2026-11-27: dead-code cleanup (build-test-workflow.md lists what is kept on purpose).
