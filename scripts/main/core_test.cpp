@@ -124,18 +124,6 @@ private slots:
         QVERIFY(!looksLikeNoise("Setuptools GUI Studio", "C:/x/foo.exe"));
     }
 
-    void mainExeIsRanked()
-    {
-        QCOMPARE(pickMainExe("Notepad++", {"notepad++.exe", "updater.exe", "uninstall.exe"}), QString("notepad++.exe"));
-        QCOMPARE(pickMainExe("My App", {"crashhandler.exe", "myapp.exe", "unins000.exe"}), QString("myapp.exe"));
-        // exact beats partial; a helper only wins when nothing else matches
-        QCOMPARE(pickMainExe("Foo", {"foobar.exe", "foo.exe"}), QString("foo.exe"));
-        QCOMPARE(pickMainExe("Foo", {"fooupdater.exe", "foolauncher.exe"}), QString("foolauncher.exe"));
-        QCOMPARE(pickMainExe("Foo", {"fooupdater.exe"}), QString("fooupdater.exe"));
-        QVERIFY(pickMainExe("Foo", {"bar.exe", "unins000.exe"}).isEmpty());
-        QVERIFY(pickMainExe({}, {"foo.exe"}).isEmpty());
-    }
-
     void packagedTargetsAreRecognised()
     {
         QVERIFY(isPackagedTarget("shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"));

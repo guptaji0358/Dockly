@@ -108,11 +108,6 @@ ExeInfo executableInfo(const QString &exePath);
 // Returns an empty string when the value holds no .exe path.
 QString exeFromRegistryValue(const QString &value);
 
-// Picks the likeliest main executable for a product from the exe file names found in its install
-// folder (exact name match first, then partial; updaters/helpers/installers only as a last resort).
-// Returns an empty string when nothing matches.
-QString pickMainExe(const QString &displayName, const QStringList &exeFileNames);
-
 // True for uninstallers, installers, readmes, help shortcuts and the like.
 bool looksLikeNoise(const QString &name, const QString &target);
 
