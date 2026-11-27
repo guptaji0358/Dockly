@@ -37,7 +37,6 @@ public:
     // {id?, name, hosts, groupBy, autoFile, icon, color, pickedImage? (file to copy in), removeImage?}
     Q_INVOKABLE bool saveSite(const QVariantMap &site);
     Q_INVOKABLE void removeSite(const QString &id);
-    Q_INVOKABLE void resetPresets();                      // adds back any missing preset
 
     // loose web links that match a site but sit in no group yet, and a one-click tidy-up
     Q_INVOKABLE int looseCount() const;
@@ -62,7 +61,7 @@ private:
 
     void save() const;
     void applyImage(Site &s, const QVariantMap &in) const;
-    void seedPresets(bool onlyMissing);
+    void seedPresets();
     int siteForUrl(const QString &url, QString *matchedHost = nullptr) const;
     QString groupNameFor(const Site &s, const QString &url, const QString &matchedHost) const;
     int siteOfCollection(const QString &collectionId) const;

@@ -64,13 +64,10 @@ QString Sites::normalizeHost(const QString &sIn)
 // Storage
 // ---------------------------------------------------------------------------
 
-void Sites::seedPresets(bool onlyMissing)
+void Sites::seedPresets()
 {
     for (const Preset &p : kPresets) {
         const QString id = QString::fromLatin1(p.id);
-        const bool have = std::any_of(m_sites.cbegin(), m_sites.cend(), [&](const Site &s) { return s.id == id; });
-        if (have && onlyMissing)
-            continue;
         Site s;
         s.id = id;
         s.name = QString::fromLatin1(p.name);
@@ -116,7 +113,7 @@ void Sites::load(const QString &dir)
         if (root.contains("sites"))
             return;
     }
-    seedPresets(false);
+    seedPresets();
     save();
 }
 
@@ -432,13 +429,6 @@ void Sites::removeSite(const QString &id)
             m_sites.removeAt(i);
             break;
         }
-    save();
-    emit changed();
-}
-
-void Sites::resetPresets()
-{
-    seedPresets(true);
     save();
     emit changed();
 }
