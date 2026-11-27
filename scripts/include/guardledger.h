@@ -34,7 +34,6 @@ struct StartupEntry {
 struct StartupPlan {
     bool actionable = false;
     bool managedByWindows = false;
-    QString proposal;   // e.g. "remove Run value, record original in ledger"
     QString reason;
 };
 StartupPlan planStartup(const StartupEntry &e);

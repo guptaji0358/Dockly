@@ -41,12 +41,10 @@ StartupPlan planStartup(const StartupEntry &e)
         break;
     case StartupSource::RunKeyHkcu:
         p.actionable = e.present;
-        p.proposal = QStringLiteral("Remove the HKCU Run value and record its original in the ledger (documented API only)");
         p.reason = e.present ? QStringLiteral("User-writable, restorable.") : QStringLiteral("Entry not present.");
         break;
     case StartupSource::StartupFolder:
         p.actionable = e.present;
-        p.proposal = QStringLiteral("Move the shortcut out of the Startup folder and record it in the ledger");
         p.reason = e.present ? QStringLiteral("User-writable, restorable.") : QStringLiteral("Entry not present.");
         break;
     }
