@@ -73,11 +73,11 @@ void Theme::update()
         if (m_dark) {
             m_bg = "#060913"; m_surface = "#0d1325"; m_card = "#0f1830"; m_cardHover = "#16264d";
             m_text = "#e6f3ff"; m_subtext = "#7f93b8"; m_border = "#1f3a6b";
-            m_sidebar = "#04060d"; m_sidebarText = "#8fb4e8"; defaultAccent = "#00b8d9";
+            defaultAccent = "#00b8d9";
         } else {
             m_bg = "#e9f1ff"; m_surface = "#ffffff"; m_card = "#ffffff"; m_cardHover = "#dcebff";
             m_text = "#0b1b3a"; m_subtext = "#5a6f95"; m_border = "#b9cdf0";
-            m_sidebar = "#0b1b3a"; m_sidebarText = "#bcd4ff"; defaultAccent = "#0a6cff";
+            defaultAccent = "#0a6cff";
         }
     } else if (m_style == "playful") {
         m_radius = 22; m_borderWidth = 0; m_glow = false; m_tinted = true; m_hardShadow = false;
@@ -85,11 +85,9 @@ void Theme::update()
         if (m_dark) {
             m_bg = "#1b1233"; m_surface = "#261a47"; m_card = "#2f2158"; m_cardHover = "#3b2a6e";
             m_text = "#fff4ff"; m_subtext = "#bba8e8"; m_border = "#3b2a6e";
-            m_sidebar = "#120a26"; m_sidebarText = "#d7c8ff";
         } else {
             m_bg = "#fff6e8"; m_surface = "#ffffff"; m_card = "#ffffff"; m_cardHover = "#ffe9d0";
             m_text = "#2b1b3d"; m_subtext = "#8a6f99"; m_border = "#ffd9b0";
-            m_sidebar = "#2b1b3d"; m_sidebarText = "#ffd9ee";
         }
         defaultAccent = "#ff5d8f";
     } else { // editorial
@@ -98,11 +96,9 @@ void Theme::update()
         if (m_dark) {
             m_bg = "#121212"; m_surface = "#1a1a1a"; m_card = "#1a1a1a"; m_cardHover = "#2a2a2a";
             m_text = "#f2efe6"; m_subtext = "#a29d8f"; m_border = "#f2efe6";
-            m_sidebar = "#000000"; m_sidebarText = "#f2efe6";
         } else {
             m_bg = "#f2efe6"; m_surface = "#fffdf7"; m_card = "#fffdf7"; m_cardHover = "#ffe9a8";
             m_text = "#111111"; m_subtext = "#5c584d"; m_border = "#111111";
-            m_sidebar = "#111111"; m_sidebarText = "#f2efe6";
         }
         defaultAccent = "#ff3b1f";
     }
@@ -114,12 +110,12 @@ void Theme::update()
         auto hsl = [h](qreal sat, qreal l) { return QColor::fromHslF(h, qBound(0.0, sat, 1.0), l); };
         if (m_dark) {
             m_bg = hsl(s * 0.55, 0.065); m_surface = hsl(s * 0.50, 0.105); m_card = hsl(s * 0.50, 0.125);
-            m_cardHover = hsl(s * 0.55, 0.19); m_sidebar = hsl(s * 0.55, 0.045); m_sidebarText = hsl(s * 0.8, 0.78);
+            m_cardHover = hsl(s * 0.55, 0.19);
             if (m_style != "editorial")
                 m_border = hsl(s * 0.55, 0.26);
         } else {
             m_bg = hsl(s * 0.9, 0.95); m_surface = hsl(s * 0.5, 0.995); m_card = m_surface;
-            m_cardHover = hsl(s * 0.9, 0.89); m_sidebar = hsl(s * 0.6, 0.16); m_sidebarText = hsl(s * 0.9, 0.86);
+            m_cardHover = hsl(s * 0.9, 0.89);
             if (m_style != "editorial")
                 m_border = hsl(s * 0.6, 0.8);
         }

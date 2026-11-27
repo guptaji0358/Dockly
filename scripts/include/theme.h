@@ -27,8 +27,6 @@ class Theme : public QObject
     Q_PROPERTY(QColor text READ text NOTIFY changed)
     Q_PROPERTY(QColor subtext READ subtext NOTIFY changed)
     Q_PROPERTY(QColor border READ border NOTIFY changed)
-    Q_PROPERTY(QColor sidebar READ sidebar NOTIFY changed)
-    Q_PROPERTY(QColor sidebarText READ sidebarText NOTIFY changed)
     Q_PROPERTY(QColor warning READ warning NOTIFY changed)
     Q_PROPERTY(QColor missing READ missing NOTIFY changed)
     Q_PROPERTY(QColor favorite READ favorite NOTIFY changed)
@@ -53,8 +51,6 @@ public:
     QColor text() const { return m_text; }
     QColor subtext() const { return m_subtext; }
     QColor border() const { return m_border; }
-    QColor sidebar() const { return m_sidebar; }
-    QColor sidebarText() const { return m_sidebarText; }
     QColor warning() const { return m_warning; }
     QColor missing() const { return m_missing; }
     QColor favorite() const { return m_favorite; }
@@ -84,5 +80,5 @@ private:
     bool m_hardShadow = false;
     QString m_headingFont;
     QColor m_accent, m_bg, m_surface, m_card, m_cardHover, m_text, m_subtext, m_border;
-    QColor m_sidebar, m_sidebarText, m_warning, m_missing, m_favorite;
+    QColor m_warning, m_missing, m_favorite;
 };
