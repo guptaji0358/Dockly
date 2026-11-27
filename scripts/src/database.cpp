@@ -2,7 +2,6 @@
 
 #include <algorithm>
 
-#include <QDir>
 #include <QFile>
 #include <QJsonArray>
 #include <QSet>

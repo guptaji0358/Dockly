@@ -16,7 +16,6 @@
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QMessageBox>
-#include <QMouseEvent>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
