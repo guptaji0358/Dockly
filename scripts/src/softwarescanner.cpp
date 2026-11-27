@@ -1051,8 +1051,3 @@ ScanReport scanInstalledSoftwareReport()
     rep.elapsedMs = timer.elapsed();
     return rep;
 }
-
-QVector<ScannedApp> scanInstalledSoftware()
-{
-    return scanInstalledSoftwareReport().apps;
-}
