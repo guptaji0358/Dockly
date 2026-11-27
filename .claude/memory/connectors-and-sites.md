@@ -40,7 +40,7 @@ Placement values sent to `/add`: `""` follow site rules, `"__none__"` leave loos
 
 - A Site = {id, name, hosts[], groupBy (one group | first folder | subdomain), autoFile, icon,
   color, optional own image}. Presets are seeded on first run (GitHub is one; README also names
-  ChatGPT, Claude, YouTube); `resetPresets()` re-adds missing ones.
+  ChatGPT, Claude, YouTube).
 - New web shortcuts matching a site are filed into a **group** (an ordinary collection, see
   `isSiteGroup`) by `autoFile(itemId)`. Disable per site (`autoFile`) or globally via
   `AppCore::setAutoFile(false)`.

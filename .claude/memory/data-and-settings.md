@@ -28,8 +28,8 @@ Only keys present in `defaults()` can be set; a new setting needs an entry there
 - **General**: `startWithWindows`, `minimizeToTray`, `defaultTab` (home|software|custom),
   `language` (English only), `defaultBrowser` (empty = system), `confirmDelete`,
   `checkMissingOnStartup`, `recentEnabled`, `maxRecent` (12).
-- **Look**: `theme` (light|dark|system), `style` (neon|playful|editorial), `navigation`
-  (sidebar|dock), `accent`, `palette`, `cardSize`, `viewStyle` (grid|list|compact), `layoutMode`
+- **Look**: `theme` (light|dark|system), `style` (neon|playful|editorial),
+  `accent`, `palette`, `cardSize`, `viewStyle` (grid|list|compact), `layoutMode`
   (hex|orbit|grid), `animations`, `floatingTiles`.
 - **Performance**: `gpuLevel` (low|balanced|high), `graphicsApi` (default **software**; opengl|d3d11|
   software, needs restart), `pauseWhenInactive`, `memoryIdleTrim` (30 s), `liteMode`, `liteAuto`,

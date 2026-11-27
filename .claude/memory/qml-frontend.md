@@ -50,7 +50,7 @@ Web, parameterised by category), `CollectionsPage`, `SitesPage`, `ConnectorsPage
 - Page unloading: `Main.qml` keeps `visited`; `core.memoryTrimmed` resets it to the current tab.
 - Search box supports `#software`, `#docs`/`#documents`, `#media`/`#entertainment`, `#links`/`#web`,
   `#workspaces`/`#collections`, plus user tags (`userTags` from `core.tagList(-1)`).
-- Keyboard: `Ctrl+Space`/`F2` ring, `/` or `Ctrl+F` search, `Ctrl+1..9` tabs (one per tab in `Main.qml`), `F2` edit card
+- Keyboard: `Ctrl+Space`/`F2` ring, `/` or `Ctrl+F` search, `Ctrl+1..8` tabs (9 tabs; Settings has no shortcut), `F2` edit card
   (README), `Enter`/double-click opens an item.
 
 ## Unverified

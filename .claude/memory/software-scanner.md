@@ -22,7 +22,7 @@ chooses which become cards. Nothing is scanned at startup. Triggered by `AppCore
 ## Key helpers (pure, unit-tested)
 
 - `looksLikeNoise(name, target)` (whole-word matching), `looksLikeInstallerExe`.
-- `pickMainExe`, `findMainExeInDir` - file names and version info only, **never file size**.
+- `findMainExeInDir` - file names and version info only, **never file size**.
 - `exeFromRegistryValue` (+ args overload), `expandEnvironment` (undefined variable => unusable).
 - `resolveShortcut(.lnk)` -> {target, args, workDir}; args are preserved on cards.
 - Naming: `NameCandidate` + `rankNames` choose by generic quality signals (`nameQuality`), not
@@ -49,4 +49,3 @@ runs against the real machine, so its result depends on the installed software.
 
 - Same exe with different shortcut arguments stays as separate catalog/card entries.
 - Deleting a card never removes the catalog entry.
-- README still says "reads only the Start Menu shortcut folders" - outdated (see known-issues.md).
