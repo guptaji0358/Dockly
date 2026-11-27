@@ -4,7 +4,6 @@
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QHash>
-#include <QSet>
 
 namespace ProcInspect {
 

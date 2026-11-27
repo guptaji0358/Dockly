@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QDateTime>
 #include <QString>
 #include <QStringList>
 #include <QVector>

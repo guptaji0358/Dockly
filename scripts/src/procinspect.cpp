@@ -2,10 +2,7 @@
 #include "softwarescanner.h"
 
 #include <QDir>
-#include <QElapsedTimer>
 #include <QFileInfo>
-#include <QHash>
-#include <QSet>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
