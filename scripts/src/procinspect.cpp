@@ -39,14 +39,6 @@ static QString norm(const QString &p)
     return QDir::toNativeSeparators(QDir::cleanPath(p)).toLower();
 }
 
-static bool isUnder(const QString &path, const QString &dir)
-{
-    if (path.isEmpty() || dir.isEmpty())
-        return false;
-    const QString d = norm(dir);
-    return norm(path).startsWith(d.endsWith(QLatin1Char('\\')) ? d : d + QLatin1Char('\\'));
-}
-
 bool isSharedLocation(const QString &dir)
 {
     if (dir.trimmed().isEmpty())
