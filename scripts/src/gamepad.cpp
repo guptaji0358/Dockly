@@ -53,10 +53,6 @@ void Gamepad::setEnabled(bool on)
         m_timer.start();
     } else {
         m_timer.stop();
-        if (m_connected) {
-            m_connected = false;
-            emit connectedChanged();
-        }
     }
     emit enabledChanged();
 }
@@ -83,16 +79,12 @@ void Gamepad::poll()
         if (m_user < 0)
             return;
         m_buttons = p.gamepad.buttons;
-        m_connected = true;
-        emit connectedChanged();
     }
 
     PadPacket p{};
     if (getState(DWORD(m_user), &p) != ERROR_SUCCESS) { // unplugged
         m_user = -1;
         m_buttons = 0;
-        m_connected = false;
-        emit connectedChanged();
         return;
     }
     const WORD now = p.gamepad.buttons;

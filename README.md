@@ -4,16 +4,17 @@ A launcher / hub / shortcut plate for Windows, built with C++17 and Qt 6 (Qt Qui
 One core library, one frontend (`Dockly.exe`):
 
 ```
-scripts/  C++ code: include/ (headers), src/ (.cpp), main/ (entry points); build.ps1 / build.bat
-qml/      Qt Quick frontend: honeycomb / orbit / grid layouts, radial ring, GLSL aurora shader
-          core = SQLite, settings, launching, tray, theme (static lib); main/core_test.cpp = QtTest tests
+scripts/  C++ code: include/ (headers), src/ (.cpp), main/ (entry points and QtTest tests), build.ps1
+          core logic (SQLite, settings, launching, tray, theme ...) builds into the static lib lhcore
+qml/      Qt Quick frontend (DocklyApp.dll): honeycomb / orbit / grid layouts, radial ring, GLSL aurora shader
+build.bat build, deploy, commit and launch
 ```
 
 ## Interface
 
 - **Honeycomb / Orbit / Classic grid** - switch from the top bar. Honeycomb and orbit are pan (drag) and zoom (wheel) maps of floating glass hexagons that tilt toward the pointer.
 - **Radial ring** - the glowing orb (or `Ctrl+Space`, `F2`, middle click) opens a ring: sections on the inner ring, favourites on the outer one.
-- **Search** - `/` or `Ctrl+F`; `Ctrl+1..7` jump between hubs.
+- **Search** - `/` or `Ctrl+F`; `Ctrl+1..8` jump to the first eight tabs.
 - **Quick launcher** - `Alt+Space` (system-wide, changeable in Settings > General) opens a type-to-launch box over whatever you are doing. Best matches first, favourites win ties; empty box shows recents and favourites. `Enter` opens, `Ctrl+Enter` shows in folder, `Esc` closes.
 - **Workspaces** - a collection opens everything in it, one item after another (spacing in Settings > Items). Right-click a collection > *Open at startup* to launch it when Dockly starts.
 - **Quick actions** - right-click a program: *Run as Administrator*, *Run with Arguments...*; any item: *Copy Path / Link*.
@@ -48,7 +49,7 @@ The **Sites** tab keeps links to the websites you use most (GitHub, ChatGPT, Cla
 ## Build
 
 ```powershell
-.\scripts\build.ps1            # build both apps into .\build
+.\scripts\build.ps1            # build into .\build
 .\scripts\build.ps1 -Deploy    # also copy Qt runtime into .\dist (runs on any PC)
 ```
 
@@ -76,8 +77,9 @@ catalog instead of becoming cards; the old file is renamed `data.json.migrated`)
 ## Software: hidden catalog, you choose what becomes a card
 
 * Nothing is scanned at startup and detected programs are **not shown**.
-* **Scan this PC** (Software tab or the Add Software dialog) reads only the Start Menu shortcut
-  folders — it never walks whole drives — and stores the result in `catalog.db`.
+* **Scan this PC** (Software tab or the Add Software dialog) reads the Windows Apps folder, Start Menu
+  shortcuts and the Uninstall / App Paths registry keys (it never walks whole drives) and stores
+  the result in `catalog.db`.
 * **Add Software** opens a searchable list of that catalog (tick the ones you want) or lets you
   browse for any `.exe`. Only ticked programs become cards.
 * Deleting a card removes just the card; the program stays in the catalog.
@@ -92,7 +94,7 @@ catalog instead of becoming cards; the old file is renamed `data.json.migrated`)
 
 * **Three skins** (Settings -> Appearance): *Neon* (glow), *Playful* (tinted rounded tiles),
   *Editorial* (thick outlines, hard shadows, serif headings), each in light or dark.
-* **Icon-only navigation**: a slim rail (or a floating dock) with tooltips; `Ctrl+1..7` jump to a tab.
+* **Ring navigation**: the orb opens the radial ring; `Ctrl+1..8` jump to a tab.
 * **View toolbar** next to the search box on every page: Grid / List / Compact switch and a
   card-size slider (these moved out of Settings).
 * **Custom SVG icons**: the whole icon set (navigation, toolbar, card buttons, warnings, the

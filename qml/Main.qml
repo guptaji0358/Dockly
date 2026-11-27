@@ -146,8 +146,6 @@ ApplicationWindow {
     function pickExisting(collectionId) { pickDialog.openFor(collectionId) }
     function ask(title, text, labels, callback, dangerIndex) { choice.ask(title, text, labels, callback, dangerIndex) }
 
-    function goTo(i) { tab = i }
-
     // ---- window behaviour -----------------------------------------------
 
     onClosing: close => {
@@ -174,6 +172,20 @@ ApplicationWindow {
             ring.opened = true
         if (startDialog === "panel")
             core.select(diagModel.idAt(0))
+        if (startDialog.indexOf("menu:") === 0) {   // diagnostic: open a card's context menu (use with --uiscript shotall)
+            const want = startDialog.substring(5)
+            if (want.charAt(0) === "#") { diagMenu.id = want.substring(1); diagMenu.start() }   // menu:#<card id>: any category
+            else for (let i = 0; i < diagModel.count; ++i)
+                if (core.itemInfo(diagModel.idAt(i)).name === want) { diagMenu.id = diagModel.idAt(i); diagMenu.start(); break }
+        }
+        if (startDialog.indexOf("inspect") === 0) {   // diagnostic: inspect[-all][:Card name] (default card: first program)
+            const want = startDialog.indexOf(":") > 0 ? startDialog.substring(startDialog.indexOf(":") + 1) : ""
+            let id = diagModel.idAt(0)
+            for (let i = 0; i < diagModel.count; ++i)
+                if (core.itemInfo(diagModel.idAt(i)).name === want) id = diagModel.idAt(i)
+            inspectDialog.showOthers = startDialog.indexOf("inspect-all") === 0
+            inspectDialog.openFor(id, core.itemInfo(id).name)
+        }
         if (startDialog === "software") {
             core.refreshSoftware()
             softwareDialog.openPicker()
@@ -184,6 +196,13 @@ ApplicationWindow {
             const d = core.settings.values.defaultTab
             tab = d === "software" ? 1 : (d === "custom" ? 5 : 0)
         }
+    }
+
+    Timer {   // diagnostic only (--dialog menu:<Card>): opens the card menu once the window has laid out
+        id: diagMenu
+        property string id
+        interval: 900
+        onTriggered: { ctxMenu.popupType = Popup.Item; win.showMenu(id, "") }
     }
 
     Connections {
@@ -718,7 +737,7 @@ ApplicationWindow {
     // menu rows drawn by hand so the text is always readable in every skin (the stock rows follow the OS palette)
     component Entry: MenuItem {
         id: e
-        implicitWidth: 250
+        implicitWidth: 310
         implicitHeight: 36
         leftPadding: 16
         rightPadding: 16
@@ -743,6 +762,8 @@ ApplicationWindow {
 
     component Styled: Menu {
         padding: 6
+        // explicit width: the width derived from the custom rows collapsed to just the padding, hiding every entry
+        implicitWidth: 310 + leftPadding + rightPadding
         background: Rectangle {
             color: win.th.surface
             border.color: win.th.border
@@ -783,6 +804,22 @@ ApplicationWindow {
             visible: applies
             height: applies ? implicitHeight : 0
             onTriggered: core.launchAsAdmin(win.ctx.id)
+        }
+        Entry {
+            readonly property bool applies: win.ctx.category === LH.Software
+            readonly property bool on: win.ctx.guard !== false
+            // not checkable (see "Open at startup"); the state text never claims continuous protection: actions run only on request
+            text: on ? "✓  Background Process Guard: ON (runs only when you ask)" : "Background Process Guard: OFF"
+            visible: applies
+            height: applies ? implicitHeight : 0
+            onTriggered: core.setGuard(win.ctx.id, !on)
+        }
+        Entry {
+            readonly property bool applies: win.ctx.category === LH.Software
+            text: "Inspect Processes..."
+            visible: applies
+            height: applies ? implicitHeight : 0
+            onTriggered: inspectDialog.openFor(win.ctx.id, win.ctx.name)
         }
         Entry {
             readonly property bool applies: win.ctx.category === LH.Software
@@ -885,4 +922,5 @@ ApplicationWindow {
     }
     ChoiceDialog { id: choice }
     ArgsDialog { id: argsDialog }
+    InspectDialog { id: inspectDialog }
 }

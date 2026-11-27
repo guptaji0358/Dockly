@@ -278,9 +278,66 @@ Item {
                     }
                     SettingCheck { key: "showRunning"; text: "Mark programs that are open with a dot" }
                     SettingCheck { key: "focusRunning"; text: "Opening a program that is already open brings its window forward" }
+                    SettingCheck { key: "guardEnabled"; text: "Background Process Guard master switch (actions run only when you press a button in Inspect Processes)" }
                     SettingCheck { key: "gamepadEnabled"; text: "Game controller can drive the ring (left stick / d-pad, A open, B back, LB + RB toggles it)" }
                     SettingCheck { key: "confirmDelete"; text: "Confirm before delete" }
                     SettingCheck { key: "checkMissingOnStartup"; text: "Check for missing items on startup" }
+                }
+
+                SettingGroup {
+                    title: "Startup management (optional)"
+                    id: startupGroup
+                    property var rows: []
+                    property var ledger: []
+                    property string note: ""
+                    function reload() { rows = core.startupRows(); ledger = core.startupLedger() }
+                    Component.onCompleted: if (core.settings.values.startupManagement) reload()
+                    Text {
+                        Layout.fillWidth: true; wrapMode: Text.Wrap; color: "#d29922"
+                        text: "Off by default and separate from the process guard. When enabled, Dockly can disable a program's per-user startup entry "
+                              + "(HKCU Run or your Startup folder) and keeps its original value, encrypted for your Windows account only, so it can be restored. "
+                              + "The value may contain launch arguments; Dockly never displays or logs it. Machine-wide entries, scheduled tasks, services and "
+                              + "Store apps are never touched (manage those in Windows Settings > Apps > Startup). If you or another program changes an entry "
+                              + "after Dockly disabled it, restore reports a conflict and keeps your newer state."
+                    }
+                    SettingCheck { key: "startupManagement"; text: "I understand, allow Dockly to manage per-user startup entries" }
+                    Connections { target: core.settings; function onValuesChanged() { if (core.settings.values.startupManagement) startupGroup.reload() } }
+                    Text { visible: startupGroup.note !== ""; Layout.fillWidth: true; wrapMode: Text.Wrap; color: "#58a6ff"; text: startupGroup.note }
+                    Repeater {
+                        model: core.settings.values.startupManagement ? startupGroup.rows : []
+                        delegate: RowLayout {
+                            required property var modelData
+                            Layout.fillWidth: true; spacing: 10
+                            Text { Layout.preferredWidth: 220; elide: Text.ElideRight; color: "#e6e6e6"; text: modelData.name + " (" + modelData.sourceLabel + ")" }
+                            Text { Layout.fillWidth: true; elide: Text.ElideRight; color: "#9aa0a6"
+                                   text: modelData.status === "available" ? "Belongs to " + modelData.cardName : modelData.why }
+                            Button {
+                                text: "Disable"; enabled: modelData.status === "available"
+                                onClicked: { const r = core.startupDisable(modelData.source, modelData.name); startupGroup.note = r.message; startupGroup.reload() }
+                            }
+                        }
+                    }
+                    Text { visible: core.settings.values.startupManagement; color: "#9aa0a6"; text: "Disabled by Dockly:" }
+                    Repeater {
+                        model: core.settings.values.startupManagement ? startupGroup.ledger : []
+                        delegate: RowLayout {
+                            required property var modelData
+                            Layout.fillWidth: true; spacing: 10
+                            Text { Layout.preferredWidth: 220; elide: Text.ElideRight; color: "#e6e6e6"; text: modelData.name + " (" + modelData.card + ")" }
+                            Text { Layout.fillWidth: true; color: "#9aa0a6"; text: modelData.state }
+                            Button {
+                                text: "Restore"; visible: modelData.state === "applied"
+                                onClicked: { const r = core.startupRestore(modelData.id); startupGroup.note = (r.conflict ? "CONFLICT: " : "") + r.message; startupGroup.reload() }
+                            }
+                        }
+                    }
+                    RowLayout {
+                        visible: core.settings.values.startupManagement; spacing: 8
+                        Button { text: "Restore all"; onClicked: { const r = core.startupRestoreAll(); let ok = 0, c = 0; for (const x of r) { if (x.ok) ok++; else if (x.conflict) c++ }
+                                 startupGroup.note = ok + " restored, " + c + " conflict(s) kept as you left them."; startupGroup.reload() } }
+                        Button { text: "Check consistency"; onClicked: { const p = core.startupCheck(); startupGroup.note = p.length ? p.join(" | ") : "Ledger is consistent."
+                                 } }
+                    }
                 }
 
                 SettingGroup {

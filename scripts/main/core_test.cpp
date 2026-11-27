@@ -1,6 +1,9 @@
 #include "appcore.h"
+#include "appsettings.h"
+#include "database.h"
 #include "softwarescanner.h"
 #include "iconpack.h"
+#include "procinspect.h"
 #include "itemmodel.h"
 
 #include <QApplication>
@@ -9,6 +12,8 @@
 #include <QTcpSocket>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QTemporaryFile>
 #include <QtTest>
@@ -117,18 +122,6 @@ private slots:
         QVERIFY(!looksLikeNoise("Helpdesk Pro", "C:/x/foo.exe"));
         QVERIFY(!looksLikeNoise("Manualist", "C:/x/foo.exe"));
         QVERIFY(!looksLikeNoise("Setuptools GUI Studio", "C:/x/foo.exe"));
-    }
-
-    void mainExeIsRanked()
-    {
-        QCOMPARE(pickMainExe("Notepad++", {"notepad++.exe", "updater.exe", "uninstall.exe"}), QString("notepad++.exe"));
-        QCOMPARE(pickMainExe("My App", {"crashhandler.exe", "myapp.exe", "unins000.exe"}), QString("myapp.exe"));
-        // exact beats partial; a helper only wins when nothing else matches
-        QCOMPARE(pickMainExe("Foo", {"foobar.exe", "foo.exe"}), QString("foo.exe"));
-        QCOMPARE(pickMainExe("Foo", {"fooupdater.exe", "foolauncher.exe"}), QString("foolauncher.exe"));
-        QCOMPARE(pickMainExe("Foo", {"fooupdater.exe"}), QString("fooupdater.exe"));
-        QVERIFY(pickMainExe("Foo", {"bar.exe", "unins000.exe"}).isEmpty());
-        QVERIFY(pickMainExe({}, {"foo.exe"}).isEmpty());
     }
 
     void packagedTargetsAreRecognised()
@@ -762,6 +755,202 @@ private slots:
         QCOMPARE(QGuiApplication::clipboard()->text(), QString("https://qa.example"));
     }
 
+    void backgroundGuardSwitchDefaultsOnAndSurvivesBackup()
+    {
+        const QString id = core->addItem(LH::Software, "guard test", m_realFile.fileName());
+        QVERIFY(!id.isEmpty());
+        QVERIFY(core->item(id).guard); // new cards start with the guard on
+        QCOMPARE(core->itemInfo(id).value("guardState").toString(), QString("notEnforced")); // never claims protection yet
+
+        core->setGuard(id, false);
+        QVERIFY(!core->item(id).guard);
+        QCOMPARE(core->itemInfo(id).value("guardState").toString(), QString("off"));
+
+        const QString path = m_dir.path() + "/guard-backup.json";
+        QVERIFY(core->backupTo(path));
+        core->setGuard(id, true);
+        QVERIFY(core->restoreFrom(path));
+        QVERIFY(!core->item(id).guard); // the saved off state is restored
+        core->setGuard(id, true);
+
+        core->settings()->set("guardEnabled", false); // master switch overrides the card
+        QCOMPARE(core->itemInfo(id).value("guardState").toString(), QString("off"));
+        core->settings()->set("guardEnabled", true);
+
+        // older backups carry no guard key: on; only program cards have the switch
+        QVERIFY(Item::fromJson(QJsonObject{{"id", "old"}}).guard);
+        const QString web = core->addItem(LH::Web, "guard web", "https://guard.example");
+        core->setGuard(web, false);
+        QVERIFY(core->item(web).guard);
+        QCOMPARE(core->itemInfo(web).value("guardState").toString(), QString("none"));
+    }
+
+    // Real migration path: a library.db made by the previous schema (no guard column) is opened by Database::open.
+    void guardColumnMigrationKeepsExistingData()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString conn = "guard_migration_old_schema";
+        {
+            QSqlDatabase old = QSqlDatabase::addDatabase("QSQLITE", conn);
+            old.setDatabaseName(dir.path() + "/library.db");
+            QVERIFY(old.open());
+            QSqlQuery q(old);
+            QVERIFY(q.exec("CREATE TABLE items (id TEXT PRIMARY KEY, category INTEGER NOT NULL, name TEXT NOT NULL,"
+                           " target TEXT NOT NULL DEFAULT '', norm TEXT NOT NULL DEFAULT '', favorite INTEGER NOT NULL DEFAULT 0,"
+                           " last_opened TEXT, status INTEGER NOT NULL DEFAULT 0,"
+                           " icon TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '', args TEXT NOT NULL DEFAULT '')"));
+            QVERIFY(q.exec("CREATE TABLE members (collection_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,"
+                           " item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,"
+                           " pos INTEGER NOT NULL, PRIMARY KEY(collection_id, item_id))"));
+            QVERIFY(q.exec("INSERT INTO items(id,category,name,target,norm,favorite,tags,args) VALUES"
+                           "('sw1',0,'Old Program','C:/Apps/old.exe','c:/apps/old.exe',1,'work,tools','--fast'),"
+                           "('sw2',0,'Second Program','C:/Apps/two.exe','c:/apps/two.exe',0,'',''),"
+                           "('web1',3,'Old Site','https://old.example','https://old.example',0,'',''),"
+                           "('doc1',1,'Old Doc','C:/Docs/a.pdf','c:/docs/a.pdf',0,'',''),"
+                           "('col1',4,'Old Collection','','',0,'','')"));
+            QVERIFY(q.exec("INSERT INTO members(collection_id,item_id,pos) VALUES ('col1','sw1',0),('col1','web1',1)"));
+            QVERIFY(!q.exec("SELECT guard FROM items")); // really the old schema
+        }
+        QSqlDatabase::removeDatabase(conn);
+
+        auto verifyData = [](Database &db) {
+            QCOMPARE(db.itemCount(), 5);
+            Item a;
+            QVERIFY(db.getItem("sw1", a));
+            QCOMPARE(a.name, QString("Old Program"));
+            QCOMPARE(a.target, QString("C:/Apps/old.exe"));
+            QCOMPARE(a.args, QString("--fast"));
+            QVERIFY(a.favorite);
+            QCOMPARE(a.tags, QStringList({"tools", "work"})); // tags are read back sorted
+            Item w;
+            QVERIFY(db.getItem("web1", w));
+            QCOMPARE(w.name, QString("Old Site"));
+            QCOMPARE(w.target, QString("https://old.example"));
+            QCOMPARE(db.members("col1"), QStringList({"sw1", "web1"}));
+        };
+
+        {
+            Database db;
+            QVERIFY(db.open(dir.path())); // runs the real migration
+            QVERIFY(!db.libraryIsNew());
+            Item sw1, sw2;
+            QVERIFY(db.getItem("sw1", sw1));
+            QVERIFY(db.getItem("sw2", sw2));
+            QVERIFY(sw1.guard); // existing Software cards get guard = 1
+            QVERIFY(sw2.guard);
+            verifyData(db);
+
+            // a card the user switches off must keep that choice
+            db.setGuard("sw2", false);
+            // new rows after migration also work
+            Item added;
+            added.id = "new1";
+            added.category = LH::Software;
+            added.name = "New Program";
+            added.target = "C:/Apps/new.exe";
+            QVERIFY(db.insertItem(added));
+            Item got;
+            QVERIFY(db.getItem("new1", got));
+            QVERIFY(got.guard);
+        }
+        // repeated migration: reopen twice; nothing fails, nothing is reset or corrupted
+        for (int round = 0; round < 2; ++round) {
+            Database db;
+            QVERIFY(db.open(dir.path()));
+            QCOMPARE(db.itemCount(), 6);
+            Item sw1, sw2;
+            QVERIFY(db.getItem("sw1", sw1));
+            QVERIFY(db.getItem("sw2", sw2));
+            QVERIFY(sw1.guard);
+            QVERIFY(!sw2.guard);
+            Item a;
+            QVERIFY(db.getItem("sw1", a));
+            QCOMPARE(a.args, QString("--fast"));
+            QCOMPARE(db.members("col1"), QStringList({"sw1", "web1"}));
+        }
+        {
+            const QString c2 = "guard_migration_check";
+            {
+                QSqlDatabase chk = QSqlDatabase::addDatabase("QSQLITE", c2);
+                chk.setDatabaseName(dir.path() + "/library.db");
+                QVERIFY(chk.open());
+                QSqlQuery q(chk);
+                QVERIFY(q.exec("PRAGMA integrity_check") && q.next());
+                QCOMPARE(q.value(0).toString(), QString("ok"));
+                QVERIFY(q.exec("SELECT COUNT(*) FROM pragma_table_info('items') WHERE name='guard'") && q.next());
+                QCOMPARE(q.value(0).toInt(), 1); // the column was added exactly once
+            }
+            QSqlDatabase::removeDatabase(c2);
+        }
+    }
+
+    void guardMasterSwitchPersists()
+    {
+        QCOMPARE(AppSettings::defaults().value("guardEnabled").toBool(), true); // fresh installation
+        QCOMPARE(AppSettings::defaults().value("guardEnforce").toBool(), false);
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.path() + "/settings.json";
+
+        AppSettings fresh;
+        QVERIFY(fresh.boolean("guardEnabled"));
+        QVERIFY(!AppSettings().load(path)); // nothing saved yet: a fresh install keeps the default
+
+        for (bool value : {false, true, false}) {
+            AppSettings a;
+            a.set("guardEnabled", value);
+            QVERIFY(a.save(path));
+            AppSettings b; // a new object, as after a restart
+            QVERIFY(b.load(path));
+            QCOMPARE(b.boolean("guardEnabled"), value);
+        }
+        // a settings file from before the switch existed falls back to the default (on)
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        f.write("{\"theme\":\"light\"}");
+        f.close();
+        AppSettings old;
+        QVERIFY(old.load(path));
+        QVERIFY(old.boolean("guardEnabled"));
+    }
+
+    void guardCardStatesAreIndependentOfMasterAndBackedUp()
+    {
+        QFile one(m_dir.path() + "/indep-on.exe"), two(m_dir.path() + "/indep-off.exe");
+        QVERIFY(one.open(QIODevice::WriteOnly) && two.open(QIODevice::WriteOnly));
+        one.close();
+        two.close();
+        const QString on = core->addItem(LH::Software, "guard indep on", one.fileName());
+        const QString off = core->addItem(LH::Software, "guard indep off", two.fileName());
+        QVERIFY(!on.isEmpty());
+        QVERIFY(!off.isEmpty());
+        QVERIFY(on != off);
+        QVERIFY(core->item(on).guard);
+        core->setGuard(off, false);
+
+        core->settings()->set("guardEnabled", false); // master switch must not rewrite the cards
+        QVERIFY(core->item(on).guard);
+        QVERIFY(!core->item(off).guard);
+        core->settings()->set("guardEnabled", true);
+        QVERIFY(core->item(on).guard);
+        QVERIFY(!core->item(off).guard);
+
+        const QString path = m_dir.path() + "/guard-indep-backup.json";
+        QVERIFY(core->backupTo(path));
+        core->setGuard(on, false);
+        core->setGuard(off, true);
+        QVERIFY(core->restoreFrom(path));
+        QVERIFY(core->item(on).guard);
+        QVERIFY(!core->item(off).guard);
+
+        // only Software cards have a switch: a Document stays on and reports no guard state
+        const QString doc = core->addItem(LH::Document, "guard doc", m_realFile.fileName());
+        core->setGuard(doc, false);
+        QVERIFY(core->item(doc).guard);
+        QCOMPARE(core->itemInfo(doc).value("guardState").toString(), QString("none"));
+    }
+
     void colourThemesRetintTheSkin()
     {
         auto *s = core->settings();
@@ -983,6 +1172,205 @@ private slots:
         cn->fetchGithub("not a valid name!");
         QCOMPARE(spy.count(), 1);
         QVERIFY(!spy.first().at(1).toString().isEmpty());
+    }
+
+    // ---- Stage 2: read-only process attribution (synthetic records) ----
+    static ProcInspect::ProcessRecord P(quint32 pid, quint32 ppid, quint64 created, const QString &path, bool win = false,
+                                        const QString &pkg = {})
+    {
+        ProcInspect::ProcessRecord r;
+        r.pid = pid; r.ppid = ppid; r.created = created; r.exePath = path; r.hasWindow = win; r.packageFamily = pkg;
+        r.name = path.section('\\', -1);
+        return r;
+    }
+    static const ProcInspect::Verdict &V(const ProcInspect::Inspection &i, quint32 pid)
+    {
+        for (const auto &v : i.verdicts) if (v.proc.pid == pid) return v;
+        static ProcInspect::Verdict none; return none;
+    }
+    static std::function<QString(const QString &)> pub(const QString &p)
+    {
+        return [p](const QString &) { return p; };
+    }
+
+    void procMultipleExesOfOneApp()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        auto r = attribute({P(10, 4, 100, "D:\\Acme\\acme.exe", true), P(11, 10, 110, "D:\\Acme\\helper.exe"),
+                            P(12, 10, 120, "D:\\Acme\\render.exe", true), P(13, 4, 90, "D:\\Other\\acme.exe")}, {c}, pub("Acme Inc"));
+        QCOMPARE(V(r, 10).cls, Class::Main);
+        QCOMPARE(V(r, 11).cls, Class::Unknown);              // child of the live Main: not assumed unnecessary
+        QVERIFY(V(r, 11).reason.contains("descendant"));
+        QCOMPARE(V(r, 12).cls, Class::Unknown);              // window alone does not make it Essential
+        QCOMPARE(V(r, 12).cardId, QString("a"));             // ...but it is still attributed to the card
+        QCOMPARE(V(r, 11).cardId, QString("a"));
+        // a same-card process that is NOT below Main (detached leftover) is the only kind that becomes a candidate
+        auto rd = attribute({P(10, 4, 100, "D:\\Acme\\acme.exe", true), P(14, 4, 95, "D:\\Acme\\sync.exe")}, {c}, pub("Acme Inc"));
+        QCOMPARE(V(rd, 14).cls, Class::CandidateBackground);
+        QCOMPARE(V(r, 13).cls, Class::Unknown); // same file name elsewhere: filename alone is not evidence
+        QVERIFY(V(r, 13).cardId.isEmpty());
+    }
+
+    void procInstallDirAloneIsNotEnough()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        auto r = attribute({P(20, 1, 100, "D:\\Acme\\tool.exe")}, {c}, pub("Someone Else"));
+        QCOMPARE(V(r, 20).cls, Class::Unknown);
+        QVERIFY(!V(r, 20).reason.isEmpty());
+    }
+
+    void procSharedHostIsAmbiguous()
+    {
+        using namespace ProcInspect;
+        CardRef a{"a", "Suite Writer", "D:\\Suite\\writer.exe", "D:\\Suite", "Suite Co", {}};
+        CardRef b{"b", "Suite Sheet", "D:\\Suite\\sheet.exe", "D:\\Suite", "Suite Co", {}};
+        auto r = attribute({P(30, 1, 100, "D:\\Suite\\shared_host.exe")}, {a, b}, pub("Suite Co"));
+        QCOMPARE(V(r, 30).cls, Class::Unknown);
+        QCOMPARE(V(r, 30).ambiguousCards.size(), 2);
+        QVERIFY(V(r, 30).reason.contains("Ambiguous"));
+        auto r2 = attribute({P(31, 1, 100, "C:\\Program Files\\Common Files\\host.exe")}, {a, b}, pub("Suite Co"));
+        QCOMPARE(V(r2, 31).cls, Class::Unknown);
+        auto r3 = attribute({P(32, 1, 100, "D:\\Suite\\writer.exe", true)}, {a, b}, pub("Suite Co"));
+        QCOMPARE(V(r3, 32).cardId, QString("a"));
+        QCOMPARE(V(r3, 32).cls, Class::Main);
+    }
+
+    void procDetachedProcessKeepsOwnership()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        auto r = attribute({P(40, 9999, 100, "D:\\Acme\\updater.exe")}, {c}, pub("Acme Inc"));
+        QVERIFY(!V(r, 40).parentValid);
+        QCOMPARE(V(r, 40).cls, Class::CandidateBackground);
+        QVERIFY(V(r, 40).evidence.join(" ").contains("Detached"));
+    }
+
+    void procPackagedAppUsesPackageIdentity()
+    {
+        using namespace ProcInspect;
+        QCOMPARE(packageFamilyOfAumid("Contoso.Calc_8wekyb3d8bbwe!App"), QString("Contoso.Calc_8wekyb3d8bbwe"));
+        CardRef c;
+        c.id = "p"; c.name = "Calc"; c.packageFamily = "Contoso.Calc_8wekyb3d8bbwe";
+        auto r = attribute({P(50, 1, 100, "C:\\WindowsApps\\Contoso\\Calc.exe", true, "contoso.calc_8wekyb3d8bbwe"),
+                            P(51, 1, 110, "C:\\WindowsApps\\Contoso\\Bg.exe", false, "Contoso.Calc_8wekyb3d8bbwe"),
+                            P(53, 50, 120, "C:\\WindowsApps\\Contoso\\Child.exe", false, "Contoso.Calc_8wekyb3d8bbwe"),
+                            P(52, 1, 100, "C:\\WindowsApps\\Other\\Calc.exe", true, "Other.Thing_abc")}, {c});
+        QCOMPARE(V(r, 50).cls, Class::Main);
+        QCOMPARE(V(r, 51).cls, Class::CandidateBackground);
+        QCOMPARE(V(r, 53).cls, Class::Unknown);               // child of Main
+        QCOMPARE(V(r, 52).cls, Class::Unknown);
+    }
+
+    void procPidReuseIsDetectedByCreationTime()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        auto r = attribute({P(10, 1, 500, "D:\\Acme\\acme.exe", true), P(11, 10, 100, "D:\\Acme\\helper.exe")}, {c}, pub("Acme Inc"));
+        QVERIFY(!V(r, 11).parentValid);
+        QCOMPARE(V(r, 11).cls, Class::CandidateBackground);
+        const quint32 me = quint32(QCoreApplication::applicationPid());
+        const quint64 t = creationTimeOf(me);
+        QVERIFY(t != 0);
+        QVERIFY(stillSameProcess(me, t));
+        QVERIFY(!stillSameProcess(me, t + 12345));
+    }
+
+    void procServicesAndSharedFolders()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        auto r = attribute({P(60, 1, 10, "C:\\Windows\\System32\\services.exe"), P(61, 60, 100, "D:\\Acme\\svc.exe")}, {c}, pub("Acme Inc"));
+        QCOMPARE(V(r, 61).cls, Class::Unknown);              // service child alone: neither essential nor candidate
+        QCOMPARE(V(r, 61).cardId, QString("a"));
+        QVERIFY(isSharedLocation("C:\\Windows\\System32"));
+        QVERIFY(isSharedLocation("C:\\"));
+        QVERIFY(!isSharedLocation("D:\\Acme"));
+        CardRef cmd = makeCardRef("x", "Command Prompt", "C:\\Windows\\System32\\cmd.exe");
+        QVERIFY(cmd.installDir.isEmpty());
+    }
+
+    void procEssentialNeedsDependencyEvidence()
+    {
+        using namespace ProcInspect;
+        CardRef c{"a", "Acme", "D:\\Acme\\acme.exe", "D:\\Acme", "Acme Inc", {}};
+        // launcher (no window) started the Main process: the launcher is Essential; its sibling helper is a candidate
+        auto r = attribute({P(70, 1, 100, "D:\\Acme\\launcher.exe"), P(71, 70, 110, "D:\\Acme\\acme.exe", true),
+                            P(72, 1, 105, "D:\\Acme\\sync.exe")}, {c}, pub("Acme Inc"));
+        QCOMPARE(V(r, 71).cls, Class::Main);
+        QCOMPARE(V(r, 70).cls, Class::Essential);
+        QCOMPARE(V(r, 72).cls, Class::CandidateBackground);
+        // an ancestor of a non-Main window owner is not a candidate (something visible hangs below it)
+        auto r2 = attribute({P(80, 1, 100, "D:\\Acme\\host.exe"), P(81, 80, 110, "D:\\Acme\\view.exe", true)}, {c}, pub("Acme Inc"));
+        QCOMPARE(V(r2, 80).cls, Class::Unknown);
+        QCOMPARE(V(r2, 81).cls, Class::Unknown);
+        // packaged app without a windowed process: nothing to anchor on, everything stays Unknown
+        CardRef p; p.id = "p"; p.name = "Pkg"; p.packageFamily = "X.Y_abc";
+        auto r3 = attribute({P(90, 1, 100, "C:\\WindowsApps\\X\\bg.exe", false, "X.Y_abc")}, {p});
+        QCOMPARE(V(r3, 90).cardId, QString("p"));
+        QCOMPARE(V(r3, 90).cls, Class::Unknown);
+    }
+
+    void procRealPackagedApps()
+    {
+        using namespace ProcInspect;
+        const ScanReport rep = scanInstalledSoftwareReport();
+        QVector<CardRef> cards;
+        for (const ScannedApp &a : rep.apps)
+            if (isPackagedTarget(a.target))
+                cards << makeCardRef(a.target, a.name, a.target);
+        const auto procs = collectProcesses();
+        const auto r = attribute(procs, cards);
+        int pkgProcs = 0, attributed = 0, noWindow = 0;
+        QSet<QString> cardsRunning;
+        for (const auto &v : r.verdicts) {
+            if (v.proc.packageFamily.isEmpty())
+                continue;
+            ++pkgProcs;
+            if (!v.cardId.isEmpty()) {
+                ++attributed;
+                cardsRunning.insert(v.cardId);
+                // the family on the process must equal the family of the card it was attributed to
+                for (const CardRef &c : cards)
+                    if (c.id == v.cardId)
+                        QCOMPARE(c.packageFamily.toLower(), v.proc.packageFamily.toLower());
+            }
+            qInfo().noquote() << "PKG" << v.proc.pid << v.proc.name << v.proc.packageFamily << "->"
+                              << (v.cardName.isEmpty() ? QString("(no card)") : v.cardName) << classLabel(v.cls)
+                              << (v.proc.hasWindow ? "window" : "no-window");
+        }
+        for (const QString &cid : cardsRunning) {
+            bool win = false;
+            QString nm;
+            for (const auto &v : r.verdicts)
+                if (v.cardId == cid) { nm = v.cardName; win = win || v.proc.hasWindow; }
+            if (!win)
+                ++noWindow, qInfo().noquote() << "PKG-NOWINDOW" << nm << "has processes but no visible window";
+        }
+        qInfo() << "packaged cards" << cards.size() << "packaged processes" << pkgProcs << "attributed" << attributed
+                << "cards running" << cardsRunning.size() << "running without window" << noWindow;
+    }
+
+    void procRealMachineDiscovery()
+    {
+        using namespace ProcInspect;
+        QString err;
+        QElapsedTimer t;
+        t.start();
+        const auto procs = collectProcesses(&err);
+        QVERIFY2(procs.size() > 10, qPrintable(err));
+        const quint32 me = quint32(QCoreApplication::applicationPid());
+        bool found = false;
+        for (const auto &p : procs)
+            if (p.pid == me) { found = true; QVERIFY(!p.exePath.isEmpty()); QVERIFY(p.created != 0); }
+        QVERIFY(found);
+        CardRef self = makeCardRef("me", "core_test", QCoreApplication::applicationFilePath());
+        const auto r = inspectNow({self});
+        qInfo() << "processes" << r.processCount << "in" << t.elapsed() << "ms";
+        QCOMPARE(V(r, me).cardId, QString("me"));
+        QCOMPARE(V(r, me).cls, Class::Main);
+        QVERIFY2(t.elapsed() < 3000, "process inspection should take well under 3 s");
     }
 };
 

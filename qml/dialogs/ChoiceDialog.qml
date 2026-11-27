@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 
 // Message + a row of buttons. ask(title, text, labels, callback(index), dangerIndex).

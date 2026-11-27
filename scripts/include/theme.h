@@ -2,7 +2,6 @@
 
 #include <QColor>
 #include <QObject>
-#include <QPalette>
 #include <QVariantList>
 
 class AppSettings;
@@ -13,7 +12,6 @@ class Theme : public QObject
     Q_OBJECT
     Q_PROPERTY(QString style READ style NOTIFY changed)
     Q_PROPERTY(bool dark READ dark NOTIFY changed)
-    Q_PROPERTY(bool dock READ dock NOTIFY changed)
     Q_PROPERTY(int radius READ radius NOTIFY changed)
     Q_PROPERTY(int borderWidth READ borderWidth NOTIFY changed)
     Q_PROPERTY(bool glow READ glow NOTIFY changed)
@@ -28,8 +26,6 @@ class Theme : public QObject
     Q_PROPERTY(QColor text READ text NOTIFY changed)
     Q_PROPERTY(QColor subtext READ subtext NOTIFY changed)
     Q_PROPERTY(QColor border READ border NOTIFY changed)
-    Q_PROPERTY(QColor sidebar READ sidebar NOTIFY changed)
-    Q_PROPERTY(QColor sidebarText READ sidebarText NOTIFY changed)
     Q_PROPERTY(QColor warning READ warning NOTIFY changed)
     Q_PROPERTY(QColor missing READ missing NOTIFY changed)
     Q_PROPERTY(QColor favorite READ favorite NOTIFY changed)
@@ -39,7 +35,6 @@ public:
 
     QString style() const { return m_style; }
     bool dark() const { return m_dark; }
-    bool dock() const { return m_dock; }
     int radius() const { return m_radius; }
     int borderWidth() const { return m_borderWidth; }
     bool glow() const { return m_glow; }
@@ -54,8 +49,6 @@ public:
     QColor text() const { return m_text; }
     QColor subtext() const { return m_subtext; }
     QColor border() const { return m_border; }
-    QColor sidebar() const { return m_sidebar; }
-    QColor sidebarText() const { return m_sidebarText; }
     QColor warning() const { return m_warning; }
     QColor missing() const { return m_missing; }
     QColor favorite() const { return m_favorite; }
@@ -68,10 +61,6 @@ public:
     // Colour themes layered on the skin: [{key, label, accent}] (the first is "default" = the skin's own colours).
     Q_INVOKABLE QVariantList palettes() const;
 
-    // checkIconPath: an image used for the checked state of checkboxes.
-    QString styleSheet(const QString &checkIconPath = QString()) const;
-    QPalette palette() const;
-
 signals:
     void changed();
 
@@ -81,7 +70,6 @@ private:
     AppSettings *m_settings;
     QString m_style = "neon";
     bool m_dark = true;
-    bool m_dock = false;
     int m_radius = 14;
     int m_borderWidth = 1;
     bool m_glow = false;
@@ -89,5 +77,5 @@ private:
     bool m_hardShadow = false;
     QString m_headingFont;
     QColor m_accent, m_bg, m_surface, m_card, m_cardHover, m_text, m_subtext, m_border;
-    QColor m_sidebar, m_sidebarText, m_warning, m_missing, m_favorite;
+    QColor m_warning, m_missing, m_favorite;
 };

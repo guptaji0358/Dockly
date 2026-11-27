@@ -45,3 +45,10 @@ Use CodeLens MCP as the default tool for reading and exploring related source co
 
 ### Evidence-based reporting
 For each evaluated capability report: capability name; overall rating /10; status (Working / Partially Working / Broken / Not Tested); verified working behaviours; bugs found; reproduction steps; expected vs actual behaviour; severity; evidence and measurements; remaining limitations; recommendations. Distinguish confirmed bugs from suspicions and untested assumptions.
+
+## Project memory
+
+- Memory lives in `.claude/memory/`; start at [index.md](memory/index.md).
+- Read the index and the relevant memory files before broad source inspection, then verify them against the code you actually touch. Source wins over memory.
+- After meaningful changes (modules, interfaces, settings, build or test workflow), update the affected memory files and the index.
+- Keep every memory Markdown file at 200 lines or fewer; split by topic when one grows.

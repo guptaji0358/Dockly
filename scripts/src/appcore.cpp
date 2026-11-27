@@ -28,6 +28,7 @@
 #include <QUrl>
 #include <QUuid>
 #include <QtConcurrent>
+#include <array>
 
 #include <QClipboard>
 #include <QPixmapCache>
@@ -172,6 +173,44 @@ AppCore::AppCore(QObject *parent)
         }
         emit catalogChanged();
         emit message(QStringLiteral("Found %1 installed program(s). Pick the ones you want from \"Add Software\".").arg(n));
+    });
+    connect(&m_inspectWatcher, &QFutureWatcher<ProcInspect::Inspection>::finished, this, [this] {
+        if (m_closed)
+            return;
+        const ProcInspect::Inspection r = m_inspectWatcher.result();
+        m_lastInsp = r; m_lastInspId = m_inspectId; m_lastInspMs = QDateTime::currentMSecsSinceEpoch();
+        QVariantList rows;
+        int counts[4] = {0, 0, 0, 0};
+        for (const ProcInspect::Verdict &v : r.verdicts) {
+            const bool mine = v.cardId == m_inspectId || v.ambiguousCards.contains(item(m_inspectId).name);
+            if (v.proc.pid == 0)
+                continue; // the idle pseudo-process
+            if (v.cardId == m_inspectId)
+                ++counts[int(v.cls)];
+            rows.append(QVariantMap{
+                {"key", v.key()}, {"pid", v.proc.pid}, {"ppid", v.proc.ppid}, {"parentValid", v.parentValid},
+                {"parentName", v.parentName}, {"name", v.proc.name}, {"exePath", v.proc.exePath},
+                {"created", v.proc.created ? QDateTime::fromMSecsSinceEpoch(qint64(v.proc.created / 10000) - 11644473600000LL)
+                                                  .toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")) : QString()},
+                {"classKey", ProcInspect::classKey(v.cls)}, {"classLabel", ProcInspect::classLabel(v.cls)},
+                {"cardId", v.cardId}, {"cardName", v.cardName}, {"mine", v.cardId == m_inspectId},
+                {"related", mine}, {"evidence", v.evidence}, {"reason", v.reason}, {"ambiguous", v.ambiguousCards},
+            });
+        }
+        emit processInspection(m_inspectId, QVariantMap{
+            {"id", m_inspectId}, {"name", item(m_inspectId).name}, {"error", r.error}, {"elapsedMs", r.elapsedMs},
+            {"processCount", r.processCount}, {"rows", annotateRows(m_inspectId, rows)},
+            {"closedApp", Guard::closedCardsOf(r, {m_inspectId}).contains(m_inspectId)},
+            {"main", counts[0]}, {"essential", counts[1]}, {"candidate", counts[2]},
+        });
+    });
+    QTimer::singleShot(3000, this, [this] { // crash recovery, only when a guard database already exists
+        if (!m_closed && QFile::exists(QDir(m_dataDir).filePath(QStringLiteral("guard.db"))))
+            guardRecover();
+    });
+    connect(&m_guardWatcher, &QFutureWatcher<QVector<Guard::ActionRecord>>::finished, this, [this] {
+        if (!m_closed)
+            finishGuardRun(m_guardWatcher.result());
     });
     connect(&m_checkWatcher, &QFutureWatcher<QHash<QString, int>>::finished, this, [this] {
         m_checking = false;
@@ -657,6 +696,33 @@ void AppCore::setItemTags(const QString &id, const QString &tagsText)
     changed();
 }
 
+void AppCore::setGuard(const QString &id, bool on)
+{
+    const Item it = item(id);
+    if (it.id.isEmpty() || it.category != LH::Software || it.guard == on)
+        return;
+    m_db.setGuard(id, on);
+    changed();
+}
+
+void AppCore::inspectProcesses(const QString &id)
+{
+    if (m_closed || m_inspectWatcher.isRunning() || item(id).category != LH::Software)
+        return;
+    m_inspectId = id;
+    QVector<std::array<QString, 3>> raw; // id, name, target; version info is read on the worker thread
+    for (const QString &cid : queryIds(LH::ModeCategory, LH::Software, {}, {})) {
+        const Item it = item(cid);
+        raw.append({it.id, it.name, it.target});
+    }
+    m_inspectWatcher.setFuture(QtConcurrent::run([raw] {
+        QVector<ProcInspect::CardRef> cards;
+        for (const auto &r : raw)
+            cards << ProcInspect::makeCardRef(r[0], r[1], r[2]);
+        return ProcInspect::inspectNow(cards);
+    }));
+}
+
 QVariantList AppCore::tagList(int category) const
 {
     return m_closed ? QVariantList() : m_db.tagCounts(category);
@@ -680,6 +746,11 @@ QVariantMap AppCore::itemInfo(const QString &id) const
         {"favorite", it.favorite},
         {"status", int(it.status)},
         {"memberCount", it.memberCount},
+        {"guard", it.guard},
+        // never claims protection: with the switch on it says "notEnforced" until enforcement exists and is verified
+        {"guardState", it.category != LH::Software ? QStringLiteral("none")
+                       : (!it.guard || !m_settings->boolean("guardEnabled")) ? QStringLiteral("off")
+                                                                              : QStringLiteral("notEnforced")},
     };
 }
 

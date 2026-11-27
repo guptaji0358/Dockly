@@ -7,7 +7,7 @@
 
 class AppCore;
 
-// Filtered, sorted view over AppCore's items. Shared by both frontends.
+// Filtered, sorted view over AppCore's items.
 class ItemModel : public QAbstractListModel
 {
     Q_OBJECT
@@ -53,7 +53,6 @@ public:
 
     Q_INVOKABLE QString idAt(int row) const { return m_ids.value(row); }
     Q_INVOKABLE QString nameAt(int row) const { return data(index(row), NameRole).toString(); }
-    Q_INVOKABLE int rowOf(const QString &id) const { return m_ids.indexOf(id); }
 
 signals:
     void filterChanged();

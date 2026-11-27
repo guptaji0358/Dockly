@@ -14,13 +14,11 @@ class RunningApps : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool enabled READ enabled WRITE setEnabled NOTIFY enabledChanged)
-    Q_PROPERTY(QStringList ids READ ids NOTIFY changed)
 public:
     explicit RunningApps(QObject *parent = nullptr);
 
     bool enabled() const { return m_enabled; }
     void setEnabled(bool on);
-    QStringList ids() const { return m_running.values(); }
     bool isRunning(const QString &id) const { return m_enabled && m_running.contains(id); }
 
     // The programs to look for: item id -> target path (any non-program entries are ignored).

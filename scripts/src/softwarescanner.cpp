@@ -64,35 +64,6 @@ bool looksLikeNoise(const QString &name, const QString &target)
     return base.startsWith("unins") || base == "msiexec.exe";
 }
 
-QString pickMainExe(const QString &displayName, const QStringList &exeFileNames)
-{
-    static const QStringList auxiliary = {"update", "crash", "helper", "setup", "install", "unins", "redist", "repair",
-                                          "service", "agent", "report", "launcherhelper"};
-    const QString app = squash(displayName);
-    QString best;
-    int bestScore = 0;
-    for (const QString &file : exeFileNames) {
-        const QString b = squash(QFileInfo(file).completeBaseName());
-        if (b.isEmpty() || app.isEmpty() || looksLikeNoise({}, file))
-            continue;
-        bool aux = false;
-        for (const QString &w : auxiliary)
-            aux = aux || b.contains(w);
-        int score = 0;
-        if (b == app)
-            score = 1000;
-        else if (app.contains(b) || b.contains(app))
-            score = 100 + int(b.size());
-        if (aux)
-            score /= 4; // helpers/updaters only win when nothing else matches
-        if (score > bestScore) {
-            bestScore = score;
-            best = file;
-        }
-    }
-    return best;
-}
-
 bool looksLikeExecutableName(const QString &name, const QString &exePath)
 {
     const QString n = name.trimmed();
@@ -465,7 +436,6 @@ QString launchKey(const QString &launch, const QString &args)
 QVector<ScannedApp> mergeRecords(const QVector<RawRecord> &records, bool fillFromExe, QVector<Rejection> *rejected)
 {
     struct Group {
-        int resultIndex = -1;
         QVector<NameCandidate> names;
         std::function<QString()> lazy;
         bool alive = true;
@@ -520,7 +490,6 @@ QVector<ScannedApp> mergeRecords(const QVector<RawRecord> &records, bool fillFro
         a.installDir = r.installDir.trimmed();
         a.sources = 1 << int(r.source);
         Group g;
-        g.resultIndex = result.size();
         if (!r.name.trimmed().isEmpty())
             g.names.append({r.name, sourcePrior(r.source)});
         g.lazy = r.resolveName;
@@ -1079,9 +1048,4 @@ ScanReport scanInstalledSoftwareReport()
     }
     rep.elapsedMs = timer.elapsed();
     return rep;
-}
-
-QVector<ScannedApp> scanInstalledSoftware()
-{
-    return scanInstalledSoftwareReport().apps;
 }

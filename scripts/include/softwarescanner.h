@@ -79,6 +79,8 @@ struct ScanReport {
     qint64 elapsedMs = 0;
     QString toText() const;
 };
+// Scans the shell Apps folder, the Start Menu shortcuts and the registry (Uninstall entries and
+// App Paths) for installed programs. Safe to call from a worker thread.
 ScanReport scanInstalledSoftwareReport();
 
 // Resolves a .lnk: target, arguments and working directory (empty target when unresolvable).
@@ -108,18 +110,8 @@ ExeInfo executableInfo(const QString &exePath);
 // Returns an empty string when the value holds no .exe path.
 QString exeFromRegistryValue(const QString &value);
 
-// Picks the likeliest main executable for a product from the exe file names found in its install
-// folder (exact name match first, then partial; updaters/helpers/installers only as a last resort).
-// Returns an empty string when nothing matches.
-QString pickMainExe(const QString &displayName, const QStringList &exeFileNames);
-
 // True for uninstallers, installers, readmes, help shortcuts and the like.
 bool looksLikeNoise(const QString &name, const QString &target);
-
-// Scans the Start Menu shortcuts (all users + current user), then the registry
-// (Uninstall entries and App Paths), for installed programs.
-// Safe to call from a worker thread.
-QVector<ScannedApp> scanInstalledSoftware();
 
 // Human-readable name of an executable (version-info FileDescription/ProductName),
 // or an empty string when it has none.

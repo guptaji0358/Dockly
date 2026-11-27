@@ -4,8 +4,10 @@
 #include "connectors.h"
 #include "database.h"
 #include "gamepad.h"
+#include "guardstartup.h"
 #include "item.h"
 #include "perfmonitor.h"
+#include "procinspect.h"
 #include "runningapps.h"
 #include "sites.h"
 #include "softwarescanner.h"
@@ -14,6 +16,7 @@
 #include <QCache>
 #include <QFileIconProvider>
 #include <QFutureWatcher>
+#include <memory>
 #include <QHash>
 #include <QMultiHash>
 #include <QIcon>
@@ -27,7 +30,7 @@
 class QNetworkAccessManager;
 
 // Owns settings, the SQLite databases, launching and validation.
-// Both frontends talk only to this class and ItemModel. Only a small row cache lives in
+// The QML interface talks to this class and ItemModel. Only a small row cache lives in
 // RAM; everything else is queried from SQLite on demand.
 class AppCore : public QObject
 {
@@ -94,7 +97,29 @@ public:
     // Tags: free labels on any item ("work", "client-a"). Text is split on commas / spaces; a leading # is ignored.
     Q_INVOKABLE void setItemTags(const QString &id, const QString &tagsText);
     Q_INVOKABLE QVariantList tagList(int category = -1) const; // [{tag, count}], most used first
-    Q_INVOKABLE QVariantMap itemInfo(const QString &id) const;
+    // Background Process Guard switch of a program card (default on). Stage 1 only stores the choice; nothing is enforced yet.
+    Q_INVOKABLE void setGuard(const QString &id, bool on);
+    Q_INVOKABLE QVariantMap itemInfo(const QString &id) const; // includes guard (bool) and guardState: none | off | notEnforced
+    // Stage 2, read-only: finds the running processes that belong to a program card and classifies them. Async; the
+    // result arrives in processInspection(id, result). Never terminates or changes anything.
+    Q_INVOKABLE void inspectProcesses(const QString &id);
+
+    // ---- Background Process Guard, Stages 3.2-3.4 / 3.6 (appcore_guard.cpp) ----
+    // Nothing runs in the background: enforcement happens only when the user presses a button, on the most
+    // recent inspection, and every process is re-verified (pid + creation time + exe) right before acting.
+    Q_INVOKABLE QVariantMap guardInfo(const QString &id);
+    Q_INVOKABLE void guardSetAllowed(const QString &id, const QString &exePath, const QString &mode, bool on); // mode: closed | open-lower | open-force
+    Q_INVOKABLE void guardSetClosedPolicy(const QString &id, int graceMs, bool allowForce);
+    Q_INVOKABLE void guardSetOpenPolicy(const QString &id, bool enabled, bool forceAcknowledged);
+    Q_INVOKABLE void guardRunClosed(const QString &id);   // user-triggered closed-app enforcement
+    Q_INVOKABLE void guardRunOpen(const QString &id);     // user-triggered open-app soft controls
+    Q_INVOKABLE QStringList guardRecover();               // crash recovery: planned startup rows + pending soft controls
+    Q_INVOKABLE QVariantList startupRows();
+    Q_INVOKABLE QVariantMap startupDisable(int source, const QString &name);
+    Q_INVOKABLE QVariantMap startupRestore(double entryId);
+    Q_INVOKABLE QVariantList startupRestoreAll();
+    Q_INVOKABLE QVariantList startupLedger();
+    Q_INVOKABLE QStringList startupCheck();
     Q_INVOKABLE void select(const QString &id);
 
     // --- launching -------------------------------------------------------
@@ -152,7 +177,7 @@ public:
     Q_INVOKABLE QString aboutText() const;
     Q_INVOKABLE QString dataFolder() const { return m_dataDir; }
 
-    // --- native dialogs (used by QML; widgets use their own with a parent)
+    // --- native dialogs (used by QML)
     Q_INVOKABLE QString fileFilter(int category) const;
     Q_INVOKABLE QStringList pickFiles(const QString &title, const QString &filter, bool multiple);
     Q_INVOKABLE QString pickSaveFile(const QString &title, const QString &path, const QString &filter);
@@ -164,6 +189,8 @@ public slots:
     void saveNow();
 
 signals:
+    void processInspection(const QString &id, const QVariantMap &result);
+    void guardActions(const QString &id, const QVariantList &records); // outcomes of a user-triggered run
     void itemsChanged();
     void iconsChanged();
     void scanningChanged();
@@ -239,4 +266,20 @@ private:
     QFutureWatcher<ScanReport> m_scanWatcher;
     ScanReport m_lastScan;
     QFutureWatcher<QHash<QString, int>> m_checkWatcher;
+    QFutureWatcher<ProcInspect::Inspection> m_inspectWatcher;
+    QString m_inspectId;
+    ProcInspect::Inspection m_lastInsp;      // most recent inspection, kept in memory only
+    QString m_lastInspId;
+    qint64 m_lastInspMs = 0;
+    Guard::GuardStore m_gstore;
+    std::unique_ptr<Guard::StartupBackend> m_sbe;
+    QFutureWatcher<QVector<Guard::ActionRecord>> m_guardWatcher;
+    QString m_guardRunId;
+    bool ensureGuardStore();
+    QVector<ProcInspect::CardRef> softwareCardRefs() const;
+    Guard::Policy buildGuardPolicy() const;
+    QHash<QString, Guard::OpenPolicy> buildOpenPolicies() const;
+    QHash<QString, Guard::ClosedPolicy> buildClosedPolicies() const;
+    QVariantList annotateRows(const QString &cardId, const QVariantList &rows);
+    void finishGuardRun(const QVector<Guard::ActionRecord> &r);
 };

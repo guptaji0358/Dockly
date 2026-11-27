@@ -16,7 +16,6 @@ QVariantMap AppSettings::defaults()
         {"minimizeToTray", false},
         {"theme", "dark"},        // light | dark | system
         {"style", "neon"},        // neon | playful | editorial
-        {"navigation", "sidebar"}, // sidebar | dock
         {"accent", ""},           // empty = the skin's own accent
         {"palette", "default"},   // default | ocean | forest | sunset | rose | violet | graphite : colour theme layered on the skin
         {"launcherEnabled", true}, // quick launcher: a type-to-launch box opened from anywhere
@@ -59,6 +58,9 @@ QVariantMap AppSettings::defaults()
         {"dockOpacity", 40},   // dock background opacity in percent; 0 = fully see-through
         {"showRunning", true},   // mark programs that are open with a dot
         {"focusRunning", true},  // opening a program that is already open brings its window forward instead of starting another
+        {"startupManagement", false}, // separate opt-in: lets Dockly disable (and later restore) per-user startup entries of programs
+        {"guardEnabled", true},   // Background Process Guard master switch; per-card switches are stored on each program card
+        {"guardEnforce", false},  // reserved: stays false until enforcement exists (nothing acts on it yet)
         {"gamepadEnabled", true}, // a game controller can drive the radial ring (only while Dockly's own window is in front)
         {"liteMode", false},      // Lite mode switched on by hand: no animations / glow, cheaper icons, Dockly's background work slowed down
         {"liteAuto", true},       // switch Lite mode on by itself while CPU, RAM or GPU stays high

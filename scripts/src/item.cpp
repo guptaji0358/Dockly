@@ -74,6 +74,8 @@ QJsonObject Item::toJson() const
     o["name"] = name;
     o["target"] = target;
     o["favorite"] = favorite;
+    if (!guard)
+        o["guard"] = false; // written only when switched off; a missing key means on
     if (!args.isEmpty())
         o["args"] = args;
     if (!icon.isEmpty())
@@ -95,6 +97,7 @@ Item Item::fromJson(const QJsonObject &o)
     it.name = o["name"].toString();
     it.target = o["target"].toString();
     it.favorite = o["favorite"].toBool();
+    it.guard = o["guard"].toBool(true); // older backups have no key: on
     it.args = o["args"].toString();
     it.icon = o["icon"].toString();
     for (const QJsonValue &v : o["tags"].toArray())
