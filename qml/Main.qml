@@ -146,8 +146,6 @@ ApplicationWindow {
     function pickExisting(collectionId) { pickDialog.openFor(collectionId) }
     function ask(title, text, labels, callback, dangerIndex) { choice.ask(title, text, labels, callback, dangerIndex) }
 
-    function goTo(i) { tab = i }
-
     // ---- window behaviour -----------------------------------------------
 
     onClosing: close => {
