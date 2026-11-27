@@ -436,7 +436,6 @@ QString launchKey(const QString &launch, const QString &args)
 QVector<ScannedApp> mergeRecords(const QVector<RawRecord> &records, bool fillFromExe, QVector<Rejection> *rejected)
 {
     struct Group {
-        int resultIndex = -1;
         QVector<NameCandidate> names;
         std::function<QString()> lazy;
         bool alive = true;
@@ -491,7 +490,6 @@ QVector<ScannedApp> mergeRecords(const QVector<RawRecord> &records, bool fillFro
         a.installDir = r.installDir.trimmed();
         a.sources = 1 << int(r.source);
         Group g;
-        g.resultIndex = result.size();
         if (!r.name.trimmed().isEmpty())
             g.names.append({r.name, sourcePrior(r.source)});
         g.lazy = r.resolveName;
