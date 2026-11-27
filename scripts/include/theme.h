@@ -2,7 +2,6 @@
 
 #include <QColor>
 #include <QObject>
-#include <QPalette>
 #include <QVariantList>
 
 class AppSettings;
@@ -67,10 +66,6 @@ public:
     Q_INVOKABLE QColor accentOf(int category) const;
     // Colour themes layered on the skin: [{key, label, accent}] (the first is "default" = the skin's own colours).
     Q_INVOKABLE QVariantList palettes() const;
-
-    // checkIconPath: an image used for the checked state of checkboxes.
-    QString styleSheet(const QString &checkIconPath = QString()) const;
-    QPalette palette() const;
 
 signals:
     void changed();
