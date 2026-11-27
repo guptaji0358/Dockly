@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 
 // "Run with arguments": asks for command-line arguments and starts the program once with them.
