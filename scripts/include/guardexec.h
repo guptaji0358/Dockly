@@ -4,7 +4,6 @@
 
 #include <QSet>
 #include <QString>
-#include <QStringList>
 #include <QVector>
 
 // Stage 3.2 / 3.4: the executor. It only ever acts on a Decision that the pure engine marked WouldStop
