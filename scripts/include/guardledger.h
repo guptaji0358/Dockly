@@ -3,8 +3,8 @@
 #include <QString>
 #include <QStringList>
 
-// Stage 3.1: recovery-ledger DESIGN and read-only logic. Nothing here touches Windows startup settings,
-// and the application never opens a ledger on the user's profile in this phase (no entries are created).
+// Recovery-ledger types, schema and pure decision logic. Nothing in this module touches Windows startup
+// settings; guardstore / guardstartup do the storing and the (user-triggered) changes.
 // The ledger exists so a future restore can prove that nothing changed behind its back.
 //
 // Note: the ledger would hold a startup entry's own value (needed to restore it). That is not a process
