@@ -15,7 +15,6 @@ class PerfMonitor : public QObject
     Q_PROPERTY(int gpu READ gpu NOTIFY sampled)  // -1 = not available on this machine
     Q_PROPERTY(bool lite READ lite NOTIFY liteChanged)
     Q_PROPERTY(bool autoTriggered READ autoTriggered NOTIFY liteChanged) // lite is on because of load, not the manual switch
-    Q_PROPERTY(bool monitoring READ monitoring NOTIFY monitoringChanged)
 public:
     explicit PerfMonitor(QObject *parent = nullptr);
     ~PerfMonitor() override;
@@ -25,7 +24,6 @@ public:
     int gpu() const { return m_gpu; }
     bool lite() const { return m_manual || m_auto; }
     bool autoTriggered() const { return m_auto && !m_manual; }
-    bool monitoring() const { return m_timer.isActive(); }
 
     void setManual(bool on);
     // auto: watch the load and switch by itself; one threshold per resource, in percent
@@ -34,7 +32,6 @@ public:
 signals:
     void sampled();
     void liteChanged();
-    void monitoringChanged();
 
 private:
     void sample();

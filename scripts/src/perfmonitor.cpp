@@ -79,7 +79,6 @@ void PerfMonitor::updateTimer()
     } else {
         m_timer.stop();
     }
-    emit monitoringChanged();
 }
 
 void PerfMonitor::applyState(bool wasLite)
