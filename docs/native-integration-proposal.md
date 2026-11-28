@@ -1,7 +1,7 @@
 # Dockly: Rust / C integration, investigation and proposal
 
-Date: 2026-11-27. Covers Phase 1 (investigation), Phase 2 (proposal) and the result of Phase 3
-(section 14). Sections 2 to 4 describe the project as it was before Phase 3.
+Date: 2026-11-27. Covers Phase 1 (investigation), Phase 2 (proposal) and the results of Phase 3
+(section 14) and Phases 4 to 6 (section 15). Sections 2 to 4 describe the project as it was before Phase 3.
 
 ## 1. Recommendation
 
@@ -209,3 +209,61 @@ single Win32 query, so these are not a like-for-like speed comparison.
 
 Not checked: `build.ps1 -Native -Deploy` into the real `dist\` (Dockly was running), a machine
 without MSYS2 or with more than 64 logical processors, a `rustup` toolchain, Miri.
+
+## 15. Phases 4 to 6 result (2026-11-28)
+
+Interface (ABI 2, `native/include/dockly_native.h` is the contract):
+
+| Export | Purpose |
+|---|---|
+| `dn_device_list` | Drive letters, and present USB, HID, COM port, Bluetooth, network, display and sensor devices |
+| `dn_watch_open` / `read` / `close` | Counts of device arrivals and removals; polled, no callback into C++ |
+| `dn_memory_info_read` | Process counters, address space totals, free block fragmentation, the DLL's own heap use |
+
+Differences from sections 7 and 9: text is NUL-terminated UTF-8 in fixed fields; handles are
+numbers checked against a table, so double close and use after close are refused; network and
+display adapters come from the Configuration Manager, not `GetAdaptersAddresses` or DXGI, so there
+is no link speed or video memory. The only consumer is the diagnostic flag
+`Dockly.exe --native-report <file>`; the UI is unchanged. The report holds device ids, which can
+include serial numbers.
+
+Checks on this machine:
+
+| Check | Result |
+|---|---|
+| `build.ps1 -Native`, `ctest` | 5 of 5 passed (18 Rust tests; 32 QtTest results in `native_test`) |
+| `ctest -R native --repeat until-fail:10` | Passed |
+| `build.ps1` (OFF), `ctest` | 3 of 3 passed |
+| `cargo clippy --all-targets` | No warnings |
+| Scratch copy of `dist`: report, screenshot start, report without the DLL, unwritable path | Exit 0, 0, 2, 1 |
+| DLL heap after 50 rounds of all lists and a watch | No growth in live bytes or outstanding allocations |
+| DLL | 267 KB, 7 exports, imports Windows system and UCRT DLLs only |
+
+Time per call, three runs of `native_test` (the pairs do different work; not a language comparison):
+
+| Call | Time |
+|---|---|
+| `dn_device_list` storage | 69 to 76 µs |
+| `QStorageInfo::mountedVolumes` with size and name | 150 to 160 µs |
+| `dn_device_list` USB (6 devices) | 2.1 to 2.5 ms |
+| `dn_device_list` HID (4 devices) | 1.7 to 1.9 ms |
+| `dn_memory_info_read` | 340 to 360 µs |
+| `dn_watch_read` | about 15 ns |
+| `dn_system_info_read` | 3.5 to 3.7 µs |
+
+Device lists and the memory walk are too slow for a UI timer; run them on demand or on a worker.
+
+### Status against the original request
+
+| Item | Status |
+|---|---|
+| Rust crate, C ABI, CMake, bridge, boundary rules | Done |
+| Detect hardware, state and ids; connect and disconnect events | Done, read-only; hot-plug not tried by hand |
+| CPU and memory information, process memory visibility, DLL leak counting | Done |
+| Data transfer: serial, HID, BLE, vendor SDKs | Not done: needs a named target device (no COM port here) |
+| Device capabilities beyond ids and status (link speed, video memory, GATT) | Not done |
+| New C code | Not added: no SDK or C library needs it |
+| Custom allocators, pools, shared or mapped memory, zero-copy | Not added: no measured bottleneck |
+| Allocation tracking for C++ and Qt | Not done: only the DLL's heap is counted |
+| Optimising existing code | Not done: nothing measured justifies it |
+| Miri, `rustup` toolchain, more than 64 processors, long-run soak | Not checked |
