@@ -4,6 +4,7 @@ rem   build.bat                  incremental build + deploy
 rem   build.bat nodeploy         incremental build only
 rem   build.bat clean            wipe .\build and .\dist first (full rebuild); "clean nodeploy" also works
 rem On a successful build, commits everything with .\commit.txt and pushes (if commit.txt exists).
+rem commit.txt is deleted once the commit succeeds, so each message is used only once.
 cd /d "%~dp0"
 
 set "NODEPLOY="
@@ -47,6 +48,8 @@ if exist commit.txt (
             echo COMMIT FAILED
             exit /b 1
         )
+        rem The message is used up: remove it so a later build cannot reuse it.
+        del commit.txt
         git push
         if errorlevel 1 (
             echo PUSH FAILED
