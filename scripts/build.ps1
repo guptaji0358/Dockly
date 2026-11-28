@@ -8,6 +8,19 @@ $qtRoot = 'C:\Qt'
 $qt     = "$qtRoot\6.12.0\mingw_64"
 $env:PATH = "$qtRoot\Tools\mingw1310_64\bin;$qtRoot\Tools\Ninja;$qtRoot\Tools\CMake_64\bin;$qt\bin;$env:PATH"
 
+# CMake caches absolute paths, so a build folder left over from before the project was moved
+# or renamed is unusable: recreate it. It only holds generated files.
+$cache = 'build\CMakeCache.txt'
+if (Test-Path $cache) {
+    $line = Select-String -Path $cache -Pattern '^CMAKE_CACHEFILE_DIR:INTERNAL=(.+)$' | Select-Object -First 1
+    $want = (Join-Path (Get-Location).Path 'build').Replace('\', '/')
+    if ($line -and $line.Matches[0].Groups[1].Value -ne $want) {
+        Write-Host "The build folder belongs to another location - recreating it."
+        try { Remove-Item build -Recurse -Force -ErrorAction Stop }
+        catch { Write-Host "Cannot delete the build folder - close anything running from it and retry."; exit 1 }
+    }
+}
+
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=$qt" `
       "-DCMAKE_CXX_COMPILER=$qtRoot/Tools/mingw1310_64/bin/g++.exe"
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
