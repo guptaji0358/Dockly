@@ -10,6 +10,14 @@ Status as of 2026-11-19 (initial analysis). Nothing here was fixed; these are ob
 | `Main.qml` tabs | 9 tabs | `Ctrl+1..N` Repeater has `model: 8`, so Settings has no shortcut |
 | README "Flowchart -> code" | Hubs listed, flowchart-based | Heading is historical; do not treat as a spec |
 
+## Native layer and autostart
+
+- Fixed 2026-11-28: a run with `LH_DATA_DIR` set used to rewrite the real autostart entry.
+  `applyStartWithWindows()` now returns early for such profiles, so "Start with Windows" does
+  nothing in them. Covered by `core_test::separateProfileLeavesAutostartAlone`.
+- Static linking of a Rust `staticlib` into the Qt MinGW build segfaulted (cause not confirmed);
+  the native layer is a DLL for that reason.
+
 ## Limits stated by the project
 
 - "Check for Updates" only reports the version; no update server.
