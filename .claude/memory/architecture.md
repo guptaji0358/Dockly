@@ -24,6 +24,14 @@ build/  dist/         build output / deployed copy (both git-ignored); any build
 | `Dockly` | WIN32 exe | C stub `launcher_main.c`, statically linked, no Qt |
 | `DocklyApp` | shared lib (DLL) | `app_main.cpp` + image providers + QML module; exports `dockly_main`; post-build copies `connectors/` beside it |
 
+Optional native layer (CMake `DOCKLY_NATIVE`, default OFF): Rust crate `native/` builds
+`dockly_native.dll`; the contract is `native/include/dockly_native.h` (ABI 2: system info, process
+memory, device lists, device arrival/removal counts). Only `nativebridge.h/.cpp` calls it, loading
+it at run time. Used by one startup log line and `--native-report <file>`; no UI. Sources:
+`native/src/` `lib.rs` (exports), `ffi.rs` (boundary), `sysinfo.rs`, `memory.rs`, `devices.rs` +
+`devices/os.rs`, `watch.rs`. A layout change touches the header, the Rust asserts, the C++ asserts
+and the ABI number. Wiring: `cmake/native.cmake`. Design: `docs/native-integration-proposal.md`.
+
 Qt policies QTP0001 / QTP0004 are set to NEW in `qml/CMakeLists.txt`. Shaders compile to `.qsb`
 via `qt_add_shaders` (prefix `/qt/qml/DocklyUI`).
 

@@ -10,6 +10,17 @@ Status as of 2026-11-19 (initial analysis). Nothing here was fixed; these are ob
 | `Main.qml` tabs | 9 tabs | `Ctrl+1..N` Repeater has `model: 8`, so Settings has no shortcut |
 | README "Flowchart -> code" | Hubs listed, flowchart-based | Heading is historical; do not treat as a spec |
 
+## Native layer and autostart
+
+- Fixed 2026-11-28: a run with `LH_DATA_DIR` set used to rewrite the real autostart entry.
+  `applyStartWithWindows()` now returns early for such profiles, so "Start with Windows" does
+  nothing in them. Covered by `core_test::separateProfileLeavesAutostartAlone`.
+- Static linking of a Rust `staticlib` into the Qt MinGW build segfaulted (cause not confirmed);
+  the native layer is a DLL for that reason.
+- Native device lists take 2 ms or more and the memory walk about 0.35 ms: not for UI timers.
+- Not verified: hot-plug by hand, deploy with `-Native` into the real `dist\`, serial/HID/BLE data
+  transfer (not implemented), a machine without MSYS2.
+
 ## Limits stated by the project
 
 - "Check for Updates" only reports the version; no update server.

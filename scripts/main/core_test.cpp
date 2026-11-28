@@ -9,6 +9,8 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QFile>
+#include <QScopeGuard>
+#include <QSettings>
 #include <QTcpSocket>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -24,6 +26,13 @@ class CoreTest : public QObject
     QTemporaryDir m_dir;
     QTemporaryFile m_realFile;
     AppCore *core = nullptr;
+    QVariant m_autostart; // the real Windows autostart entry, read before AppCore starts
+
+    static QSettings runKey()
+    {
+        return QSettings(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
+                         QSettings::NativeFormat);
+    }
 
 private slots:
     void initTestCase()
@@ -33,12 +42,36 @@ private slots:
         QVERIFY(m_realFile.open());
         core = AppCore::instance();
         core->settings()->set("checkMissingOnStartup", false);
+        m_autostart = runKey().value("Dockly");
         core->init();
         QVERIFY(QFile::exists(m_dir.path() + "/library.db"));
         QVERIFY(QFile::exists(m_dir.path() + "/catalog.db"));
         QCOMPARE(core->queryIds(LH::ModeCategory, LH::AllCategories, {}, {}).size(), 0);
         // Detected software is never turned into cards on its own.
         QCOMPARE(core->queryIds(LH::ModeCategory, LH::Software, {}, {}).size(), 0);
+    }
+
+    // A separate profile (LH_DATA_DIR) must never add, change or remove the user's autostart entry.
+    void separateProfileLeavesAutostartAlone()
+    {
+#ifndef Q_OS_WIN
+        QSKIP("Windows only");
+#endif
+        // put the entry back if the check fails, so a regression does not damage the machine
+        const auto restore = qScopeGuard([this] {
+            QSettings run = runKey();
+            if (run.value("Dockly") == m_autostart)
+                return;
+            if (m_autostart.isValid())
+                run.setValue("Dockly", m_autostart);
+            else
+                run.remove("Dockly");
+        });
+        QCOMPARE(runKey().value("Dockly"), m_autostart); // after init()
+        core->settings()->set("startWithWindows", true);
+        QCOMPARE(runKey().value("Dockly"), m_autostart);
+        core->settings()->set("startWithWindows", false);
+        QCOMPARE(runKey().value("Dockly"), m_autostart);
     }
 
     void addNormalizesAndDedupes()
