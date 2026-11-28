@@ -59,5 +59,6 @@ if ($Deploy) {
     }
     Sync-IfChanged build\Dockly.exe dist\Dockly.exe
     Sync-IfChanged build\DocklyApp.dll dist\resources\DLLs\DocklyApp.dll
+    if ($Native) { Sync-IfChanged build\dockly_native.dll dist\resources\DLLs\dockly_native.dll }
     Copy-Item build\connectors dist\resources\ -Recurse -Force
 }
