@@ -27,7 +27,7 @@ private slots:
     {
         const NativeBridge b;
         QVERIFY2(b.isAvailable(), qPrintable(b.error()));
-        QVERIFY(b.summary().startsWith("native layer ABI 1:"));
+        QVERIFY(b.summary().startsWith("native layer ABI 2:"));
     }
 
     void valuesAgreeWithWindows()
