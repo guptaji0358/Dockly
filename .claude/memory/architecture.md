@@ -24,6 +24,11 @@ build/  dist/         build output / deployed copy (both git-ignored); any build
 | `Dockly` | WIN32 exe | C stub `launcher_main.c`, statically linked, no Qt |
 | `DocklyApp` | shared lib (DLL) | `app_main.cpp` + image providers + QML module; exports `dockly_main`; post-build copies `connectors/` beside it |
 
+Optional native layer (CMake `DOCKLY_NATIVE`, default OFF): Rust crate `native/` builds
+`dockly_native.dll` (C ABI in `native/include/dockly_native.h`: `dn_abi_version`,
+`dn_system_info_read`). Only `nativebridge.h/.cpp` calls it, loading it at run time; so far it is
+used for one startup log line. Wiring: `cmake/native.cmake`. Design: `docs/native-integration-proposal.md`.
+
 Qt policies QTP0001 / QTP0004 are set to NEW in `qml/CMakeLists.txt`. Shaders compile to `.qsb`
 via `qt_add_shaders` (prefix `/qt/qml/DocklyUI`).
 
