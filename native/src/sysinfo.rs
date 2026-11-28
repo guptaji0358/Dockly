@@ -130,5 +130,50 @@ mod os {
         Err(ERR_OS)
     }
 
+    pub fn read() -> Result<SystemInfo, i32> {
+        let mut memory = MemoryStatusEx { length: size_of::<MemoryStatusEx>() as u32, ..Default::default() };
+        // SAFETY: a correctly sized, writable MEMORYSTATUSEX.
+        if unsafe { GlobalMemoryStatusEx(&mut memory) } == 0 {
+            return Err(ERR_OS);
+        }
+        let mut version = OsVersionInfo {
+            size: size_of::<OsVersionInfo>() as u32,
+            major: 0,
+            minor: 0,
+            build: 0,
+            platform: 0,
+            service_pack: [0; 128],
+        };
+        // SAFETY: a correctly sized, writable OSVERSIONINFOW.
+        if unsafe { RtlGetVersion(&mut version) } != 0 {
+            return Err(ERR_OS);
+        }
+        // SAFETY: takes a plain value.
+        let logical = unsafe { GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) };
+        if logical == 0 {
+            return Err(ERR_OS);
+        }
+        let (cores, packages) = cores_and_packages()?;
+        Ok(SystemInfo {
+            struct_size: 0, // set by ffi::write_out
+            logical_processors: logical,
+            physical_cores: cores,
+            processor_packages: packages,
+            total_physical_bytes: memory.total_phys,
+            available_physical_bytes: memory.avail_phys,
+            os_major: version.major,
+            os_minor: version.minor,
+            os_build: version.build,
+            memory_load_percent: memory.memory_load,
+        })
+    }
+}
+
+#[cfg(windows)]
+pub use os::read;
+
+#[cfg(not(windows))]
+pub fn read() -> Result<SystemInfo, i32> {
+    Err(crate::ffi::ERR_OS)
 }
 
