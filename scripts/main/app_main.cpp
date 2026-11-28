@@ -8,6 +8,9 @@
 #include "screenimageprovider.h"
 #include "itemmodel.h"
 #include "tray.h"
+#ifdef DOCKLY_NATIVE
+#include "nativebridge.h"
+#endif
 
 #include <QApplication>
 #include <QCryptographicHash>
@@ -164,6 +167,9 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
         qInstallMessageHandler(logHandler);
     }
     qInfo() << "Dockly" << LH_VERSION << "starting, data folder" << dir;
+#ifdef DOCKLY_NATIVE
+    qInfo().noquote() << NativeBridge().summary(); // log only: nothing in the UI uses the native layer yet
+#endif
 
     AppCore *core = AppCore::instance();
     core->init();
