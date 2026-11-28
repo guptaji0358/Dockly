@@ -34,3 +34,26 @@ const _: () = {
     assert!(offset_of!(SystemInfo, memory_load_percent) == 44);
 };
 
+const RELATION_PROCESSOR_CORE: u32 = 0;
+const RELATION_PROCESSOR_PACKAGE: u32 = 3;
+
+/// Counts (cores, packages) in a `GetLogicalProcessorInformationEx` buffer: a run of records,
+/// each starting with `u32 relationship, u32 size`. `None` when the buffer is malformed.
+fn count_relations(mut bytes: &[u8]) -> Option<(u32, u32)> {
+    let (mut cores, mut packages) = (0, 0);
+    while !bytes.is_empty() {
+        let relation = u32::from_ne_bytes(bytes.get(0..4)?.try_into().ok()?);
+        let size = u32::from_ne_bytes(bytes.get(4..8)?.try_into().ok()?) as usize;
+        if size < 8 {
+            return None; // would never advance
+        }
+        bytes = bytes.get(size..)?;
+        match relation {
+            RELATION_PROCESSOR_CORE => cores += 1,
+            RELATION_PROCESSOR_PACKAGE => packages += 1,
+            _ => {}
+        }
+    }
+    Some((cores, packages))
+}
+
