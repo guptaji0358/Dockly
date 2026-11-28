@@ -27,6 +27,27 @@ extern "C" {
 #define DN_ERR_OS (-3)    /* a Windows call failed */
 #define DN_ERR_PANIC (-4) /* internal error in the library */
 
+typedef struct dn_system_info {
+    uint32_t struct_size;
+    uint32_t logical_processors; /* all processor groups */
+    uint32_t physical_cores;
+    uint32_t processor_packages;
+    uint64_t total_physical_bytes;
+    uint64_t available_physical_bytes;
+    uint32_t os_major;
+    uint32_t os_minor;
+    uint32_t os_build;
+    uint32_t memory_load_percent; /* 0..100 */
+} dn_system_info;
+
+/* The ABI version the DLL was built with. Compare with DN_ABI_VERSION before any other call. */
+uint32_t dn_abi_version(void);
+
+/* Fills *out with a read-only snapshot. Safe to call from any thread.
+ * out must point to a writable object of at least out->struct_size bytes.
+ * On any status other than DN_OK, *out is left unchanged. */
+int32_t dn_system_info_read(dn_system_info *out);
+
 #ifdef __cplusplus
 }
 #endif
