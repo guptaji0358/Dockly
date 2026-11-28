@@ -78,6 +78,39 @@ private slots:
         QCOMPARE(bigger.tail, uint64_t(0x1122334455667788ULL));
     }
 
+    void callableFromManyThreads()
+    {
+        const NativeBridge b;
+        std::atomic<int> failures{0};
+        std::vector<std::thread> threads;
+        for (int t = 0; t < 8; ++t)
+            threads.emplace_back([&] {
+                for (int n = 0; n < 500; ++n) {
+                    dn_system_info i = blank();
+                    if (b.systemInfo(&i) != DN_OK || i.physical_cores == 0)
+                        ++failures;
+                }
+            });
+        for (auto &t : threads)
+            t.join();
+        QCOMPARE(failures.load(), 0);
+    }
+
+    void repeatedCallsDoNotLeakHandles()
+    {
+        const NativeBridge b;
+        dn_system_info i = blank();
+        QCOMPARE(b.systemInfo(&i), DN_OK); // anything created once is created here
+        DWORD before = 0, after = 0;
+        QVERIFY(GetProcessHandleCount(GetCurrentProcess(), &before));
+        for (int n = 0; n < 10000; ++n) {
+            i = blank();
+            QCOMPARE(b.systemInfo(&i), DN_OK);
+        }
+        QVERIFY(GetProcessHandleCount(GetCurrentProcess(), &after));
+        QVERIFY2(after <= before + 2, qPrintable(QString("handles %1 -> %2").arg(before).arg(after)));
+    }
+
 };
 
 QTEST_GUILESS_MAIN(NativeTest)
