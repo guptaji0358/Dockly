@@ -57,3 +57,52 @@ fn count_relations(mut bytes: &[u8]) -> Option<(u32, u32)> {
     Some((cores, packages))
 }
 
+#[cfg(windows)]
+mod os {
+    use super::{count_relations, SystemInfo};
+    use crate::ffi::ERR_OS;
+
+    const ALL_PROCESSOR_GROUPS: u16 = 0xffff;
+    const RELATION_ALL: i32 = 0xffff;
+    const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
+
+    #[repr(C)]
+    #[derive(Default)]
+    struct MemoryStatusEx {
+        length: u32,
+        memory_load: u32,
+        total_phys: u64,
+        avail_phys: u64,
+        total_page_file: u64,
+        avail_page_file: u64,
+        total_virtual: u64,
+        avail_virtual: u64,
+        avail_extended_virtual: u64,
+    }
+
+    #[repr(C)]
+    struct OsVersionInfo {
+        size: u32,
+        major: u32,
+        minor: u32,
+        build: u32,
+        platform: u32,
+        service_pack: [u16; 128],
+    }
+
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn GlobalMemoryStatusEx(status: *mut MemoryStatusEx) -> i32;
+        fn GetActiveProcessorCount(group: u16) -> u32;
+        fn GetLogicalProcessorInformationEx(relation: i32, buffer: *mut u8, length: *mut u32) -> i32;
+        fn GetLastError() -> u32;
+    }
+
+    #[link(name = "ntdll")]
+    extern "system" {
+        // unlike GetVersionExW, reports the real version without an application manifest
+        fn RtlGetVersion(info: *mut OsVersionInfo) -> i32;
+    }
+
+}
+
