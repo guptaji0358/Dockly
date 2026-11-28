@@ -17,6 +17,9 @@ Status as of 2026-11-19 (initial analysis). Nothing here was fixed; these are ob
   nothing in them. Covered by `core_test::separateProfileLeavesAutostartAlone`.
 - Static linking of a Rust `staticlib` into the Qt MinGW build segfaulted (cause not confirmed);
   the native layer is a DLL for that reason.
+- Native device lists take 2 ms or more and the memory walk about 0.35 ms: not for UI timers.
+- Not verified: hot-plug by hand, deploy with `-Native` into the real `dist\`, serial/HID/BLE data
+  transfer (not implemented), a machine without MSYS2.
 
 ## Limits stated by the project
 
