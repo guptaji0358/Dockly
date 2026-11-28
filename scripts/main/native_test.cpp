@@ -111,6 +111,30 @@ private slots:
         QVERIFY2(after <= before + 2, qPrintable(QString("handles %1 -> %2").arg(before).arg(after)));
     }
 
+    void missingLibraryIsReportedNotFatal()
+    {
+        const NativeBridge b("Z:/nowhere/dockly_native.dll");
+        QVERIFY(!b.isAvailable());
+        QVERIFY(!b.error().isEmpty());
+        dn_system_info i = blank();
+        QCOMPARE(b.systemInfo(&i), DN_ERR_OS);
+        QVERIFY(b.summary().startsWith("native layer unavailable"));
+    }
+
+    void foreignLibraryIsRefused()
+    {
+        const NativeBridge b(qEnvironmentVariable("windir") + "/System32/version.dll");
+        QVERIFY(!b.isAvailable());
+        QCOMPARE(b.error(), QString("not a Dockly native library"));
+    }
+
+    void otherAbiVersionIsRefused()
+    {
+        const NativeBridge b(QStringLiteral(DN_BADABI_PATH));
+        QVERIFY(!b.isAvailable());
+        QVERIFY2(b.error().startsWith("ABI version"), qPrintable(b.error()));
+    }
+
 };
 
 QTEST_GUILESS_MAIN(NativeTest)
