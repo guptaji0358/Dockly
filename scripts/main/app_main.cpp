@@ -136,7 +136,25 @@ extern "C" __declspec(dllexport) int dockly_main(int argc, char *argv[])
     QCommandLineOption launcherQuery("launcherquery", "Text typed into the quick launcher for --launchershot (diagnostics).", "text");
     QCommandLineOption uiScript("uiscript", "Diagnostics only: steps separated by ';' (click:x,y right:x,y wait:ms shot:file quit) injected into Dockly's own main window; nothing outside it is touched.", "steps");
     cli.addOptions({uiScript, minimized, shot, page, ring, demo, dialog, dbl, window, dockShot, launcherShot, launcherQuery});
+#ifdef DOCKLY_NATIVE
+    QCommandLineOption nativeReport("native-report", "Write hardware and memory information as JSON to this file and exit (diagnostics; includes device ids).", "file");
+    cli.addOption(nativeReport);
+#endif
     cli.process(app);
+
+#ifdef DOCKLY_NATIVE
+    // answered before the single-instance check: it only reads the machine and touches no profile
+    if (cli.isSet(nativeReport)) {
+        const NativeBridge bridge;
+        const QByteArray json = QJsonDocument(bridge.report()).toJson();
+        QFile out(cli.value(nativeReport));
+        if (!out.open(QIODevice::WriteOnly) || out.write(json) != json.size()) {
+            fprintf(stderr, "cannot write %s\n", qPrintable(out.fileName()));
+            return 1;
+        }
+        return bridge.isAvailable() ? 0 : 2;
+    }
+#endif
 
     // One Dockly per data folder: starting it again brings the running one to the front instead of
     // opening a second copy (which is easy to mistake for "nothing happened" when it lives in the tray).
