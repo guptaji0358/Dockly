@@ -25,3 +25,12 @@ unsafe impl OutStruct for SystemInfo {
     }
 }
 
+// the same layout checks exist in scripts/src/nativebridge.cpp
+const _: () = {
+    use std::mem::{offset_of, size_of};
+    assert!(size_of::<SystemInfo>() == 48);
+    assert!(offset_of!(SystemInfo, total_physical_bytes) == 16);
+    assert!(offset_of!(SystemInfo, os_major) == 32);
+    assert!(offset_of!(SystemInfo, memory_load_percent) == 44);
+};
+
