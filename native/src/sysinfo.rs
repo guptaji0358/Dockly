@@ -104,5 +104,31 @@ mod os {
         fn RtlGetVersion(info: *mut OsVersionInfo) -> i32;
     }
 
+    fn cores_and_packages() -> Result<(u32, u32), i32> {
+        let mut length: u32 = 0;
+        // u64 storage keeps the records 8-byte aligned, as Windows expects
+        let mut buffer: Vec<u64> = Vec::new();
+        // the first pass asks for the size; retry in case processors are added in between
+        for _ in 0..4 {
+            let data = if buffer.is_empty() { std::ptr::null_mut() } else { buffer.as_mut_ptr().cast::<u8>() };
+            // SAFETY: `data` is null with length 0, or has at least `length` writable bytes.
+            if unsafe { GetLogicalProcessorInformationEx(RELATION_ALL, data, &mut length) } != 0 {
+                if length as usize > buffer.len() * 8 {
+                    return Err(ERR_OS);
+                }
+                // SAFETY: the buffer is initialised and holds at least `length` bytes (checked).
+                let bytes = unsafe { std::slice::from_raw_parts(data, length as usize) };
+                return count_relations(bytes).ok_or(ERR_OS);
+            }
+            // SAFETY: no arguments.
+            if unsafe { GetLastError() } != ERROR_INSUFFICIENT_BUFFER {
+                break;
+            }
+            buffer = vec![0; (length as usize).div_ceil(8)];
+            length = (buffer.len() * 8) as u32;
+        }
+        Err(ERR_OS)
+    }
+
 }
 
