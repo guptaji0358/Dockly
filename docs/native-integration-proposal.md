@@ -160,3 +160,52 @@ Performance Recorder, comparing software and OpenGL rendering, before and after 
 `EmptyWorkingSet` reduces the working set, not private memory. Any change to caching would be
 C++/QML work, which a Rust allocator does not reach.
 
+## 11. Phases and exit checks
+
+| Phase | Work | Done when |
+|---|---|---|
+| 3 | Crate, header, bridge, CMake; `dn_abi_version` and one system-info call; no UI change | All three suites and `native_test` pass; `DOCKLY_NATIVE=OFF` builds; deployed app starts |
+| 4 | Read-only device inventory and events, for a chosen feature | Simulated-source tests; hot-plug checked by hand |
+| 5 | Profile; optimise only what the profile shows | Before/after numbers over repeated runs |
+| 6 | Boundary tests (null, short buffer, bad size, double close), long-run handle and memory check | Results recorded |
+
+Rust unit tests and Miri cover pure logic only; Miri cannot execute the Win32 calls, and Miri
+needs a nightly toolchain that is not installed.
+
+## 12. Risks
+
+| Risk | Mitigation |
+|---|---|
+| Two C runtimes in one process | No CRT objects, memory or file handles cross the boundary |
+| MSYS2 Rust updates independently of Qt's compiler | Record the version; ABI and link test in CI or build |
+| Second toolchain required to build | `DOCKLY_NATIVE` switch |
+| Duplicating `perfmonitor` | Native module reports inventory, not load, unless it replaces it |
+| A crash in native code ends Dockly | Boundary validation and tests; keep the module small |
+
+## 13. Decision needed
+
+Which user-visible feature should use the hardware layer (for example a system panel, drive or
+device tiles, a serial or BLE device)? Phase 3 does not depend on the answer; Phase 4 does.
+
+## 14. Phase 3 result (2026-11-27)
+
+Added: `native/` (crate and header), `nativebridge.h/.cpp`, `native_test.cpp`,
+`native_badabi.c` (test fixture), `cmake/native.cmake`, the CMake option, `build.ps1 -Native`, and
+one startup log line in `app_main.cpp`. The interface is `dn_abi_version` and
+`dn_system_info_read` (processors, memory, Windows version). No UI change.
+
+| Check | Result |
+|---|---|
+| `build.ps1 -Native`, then `ctest` | 5 of 5 passed: `core_test`, `guard_test`, `guard3_test`, `native_test`, `native_rust` |
+| `native_rust` / `native_test` | 8 Rust tests; 15 QtTest results including set-up and clean-up |
+| `build.ps1` (OFF), then `ctest` | 3 of 3 passed |
+| Scratch copy of `dist` with the DLL | Starts, logs the system summary, exits 0 (screenshot mode) |
+| Same copy without the DLL | Starts, logs "native layer unavailable", exits 0 |
+| DLL | 235 KB; exports the two `dn_` functions; imports Windows system and UCRT DLLs |
+
+Call cost, three runs: `dn_system_info_read` 3.4 to 3.9 µs; `GlobalMemoryStatusEx` alone
+0.40 to 0.45 µs; a rejected call (boundary only) about 5 ns. The snapshot does more work than the
+single Win32 query, so these are not a like-for-like speed comparison.
+
+Not checked: `build.ps1 -Native -Deploy` into the real `dist\` (Dockly was running), a machine
+without MSYS2 or with more than 64 logical processors, a `rustup` toolchain, Miri.
