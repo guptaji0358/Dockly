@@ -1536,6 +1536,9 @@ QPixmap AppCore::originalPixmap(const Item &it, int size)
 void AppCore::applyStartWithWindows()
 {
 #ifdef Q_OS_WIN
+    // a separate profile (LH_DATA_DIR: tests, portable use) does not own the user's autostart entry
+    if (!qEnvironmentVariableIsEmpty("LH_DATA_DIR"))
+        return;
     QSettings run(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
                   QSettings::NativeFormat);
     const QString name = QStringLiteral("Dockly");
