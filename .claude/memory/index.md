@@ -40,3 +40,4 @@ Last full pass: 2026-11-19 (initial analysis; not every `.qml` file was read lin
 ## Cleanup history
 
 2026-11-27: dead-code cleanup (build-test-workflow.md lists what is kept on purpose).
+2026-11-27: optional Rust native layer added (architecture.md).
