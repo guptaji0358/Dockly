@@ -177,3 +177,38 @@ pub fn read() -> Result<SystemInfo, i32> {
     Err(crate::ffi::ERR_OS)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record(relation: u32, size: u32) -> Vec<u8> {
+        let mut r = vec![0u8; size.max(8) as usize];
+        r[0..4].copy_from_slice(&relation.to_ne_bytes());
+        r[4..8].copy_from_slice(&size.to_ne_bytes());
+        r
+    }
+
+    #[test]
+    fn counts_cores_and_packages() {
+        let buf = [record(3, 48), record(0, 48), record(2, 64), record(0, 32)].concat();
+        assert_eq!(count_relations(&buf), Some((2, 1)));
+        assert_eq!(count_relations(&[]), Some((0, 0)));
+    }
+
+    #[test]
+    fn rejects_malformed_buffers() {
+        assert_eq!(count_relations(&record(0, 0)), None); // zero size
+        assert_eq!(count_relations(&record(0, 48)[..40]), None); // truncated record
+        assert_eq!(count_relations(&[0, 0, 0]), None); // truncated header
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn reads_this_machine() {
+        let info = read().expect("snapshot");
+        assert!(info.physical_cores >= 1 && info.logical_processors >= info.physical_cores);
+        assert!(info.processor_packages >= 1);
+        assert!(info.total_physical_bytes >= info.available_physical_bytes);
+        assert!(info.memory_load_percent <= 100 && info.os_major >= 10);
+    }
+}
