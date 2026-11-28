@@ -1,0 +1,20 @@
+# Dockly's native layer: one DLL with a C ABI (include/dockly_native.h). No third-party crates.
+[package]
+name = "dockly-native"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "dockly_native"
+# DLL only: static linking into Qt's MinGW build crashed (docs/native-integration-proposal.md).
+crate-type = ["cdylib"]
+
+[profile.release]
+# panic stays "unwind" so exports can turn a panic into a status code.
+panic = "unwind"
+lto = true
+codegen-units = 1
+strip = true
+
+[workspace]
