@@ -60,3 +60,15 @@ int NativeBridge::systemInfo(dn_system_info *out) const
     return m_read ? m_read(out) : DN_ERR_OS;
 }
 
+QString NativeBridge::summary() const
+{
+    if (!isAvailable())
+        return QStringLiteral("native layer unavailable: %1").arg(m_error);
+    dn_system_info i{};
+    i.struct_size = sizeof(i);
+    if (const int status = systemInfo(&i); status != DN_OK)
+        return QStringLiteral("native layer: system info failed (status %1)").arg(status);
+    return QStringLiteral("native layer ABI %1: Windows %2.%3.%4, %5 cores / %6 logical, %7 MB RAM")
+        .arg(DN_ABI_VERSION).arg(i.os_major).arg(i.os_minor).arg(i.os_build)
+        .arg(i.physical_cores).arg(i.logical_processors).arg(i.total_physical_bytes / (1024 * 1024));
+}
