@@ -88,3 +88,75 @@ The crash was not root-caused. A msvcrt/UCRT toolchain mismatch is the suspected
 | Rust | New hardware detection and device I/O, their worker threads | Qt objects, UI, database |
 | C | The launcher; later, only a thin shim where an SDK requires it | Anything Rust can bind directly |
 
+## 6. Module layout
+
+Seven separate modules would be mostly empty, so start with one crate and split by file.
+
+```
+native/
+  Cargo.toml  Cargo.lock
+  include/dockly_native.h     the whole contract, hand-written
+  src/lib.rs                  exports only
+  src/ffi.rs                  pointer and length checks; all boundary unsafe code
+  src/sysinfo.rs              first module
+scripts/include/nativebridge.h, scripts/src/nativebridge.cpp   Qt wrapper, the only C++ caller
+scripts/main/native_test.cpp  boundary tests from C++
+```
+
+Later modules (`devices.rs`, `events.rs`) are added when a feature needs them.
+
+## 7. FFI contract
+
+1. C ABI only; symbols prefixed `dn_`; fixed-width integer types.
+2. `dn_abi_version()` is checked at load. A mismatch disables native features.
+3. Structs are `#[repr(C)]`, start with `uint32_t struct_size`, and are mirrored by
+   `static_assert` on size and offsets in C++ and the same checks in Rust.
+4. **Caller owns buffers.** Functions take pointer + capacity and report the required size.
+   No allocation crosses the boundary.
+5. Long-lived state is an opaque handle with matching `dn_*_open` / `dn_*_close`, wrapped in C++
+   by `std::unique_ptr` with a custom deleter.
+6. Every call returns an `int32_t` status; results go through out-pointers. Text is UTF-8 with an
+   explicit length.
+7. Exports catch panics (`catch_unwind`, so release builds keep `panic = "unwind"`) and return an
+   error status. C++ callbacks are `noexcept`. Nothing unwinds across the boundary.
+8. Callbacks arrive on a Rust thread; the bridge re-posts them to the Qt thread with a queued call.
+   `close` stops and joins the thread, and no callback runs after it returns.
+9. Each handle documents whether it is thread-safe. Default: one thread.
+10. Each `unsafe` block states the invariant it relies on.
+
+## 8. Build and deployment
+
+- CMake option `DOCKLY_NATIVE`, default OFF until stable; `build.ps1 -Native` turns it on.
+  OFF builds the application without any native code.
+- `cmake/native.cmake` runs `cargo build --release --locked` and copies the DLL into `build\`.
+- The DLL is **loaded at run time** by full path (no import library), so a missing or mismatched
+  file disables native features instead of stopping Dockly.
+- `build.ps1 -Native -Deploy` copies `dockly_native.dll` into `dist\resources\DLLs`.
+- Prefer no third-party crates at first (hand-declared Win32 functions). `windows-sys` is the
+  likely later choice; it needs one download and should then be vendored or locked.
+- `native/target/` goes into `.gitignore`. This matters because `build.bat` runs `git add -A`.
+
+## 9. Hardware support
+
+All items use normal user permissions. No driver, elevation or physical memory access.
+
+| Capability | Windows route | Status |
+|---|---|---|
+| CPU, RAM, OS | `GetLogicalProcessorInformationEx`, `GlobalMemoryStatusEx` | First module |
+| Storage volumes | `GetLogicalDrives`, `GetDiskFreeSpaceExW` | Cheap, read-only |
+| Network adapters | `GetAdaptersAddresses` | Cheap, read-only |
+| GPU adapters | DXGI enumeration | Read-only; load stays in `perfmonitor` |
+| USB, HID, serial port list | SetupAPI / Configuration Manager | After a feature asks |
+| Connect / disconnect events | `CM_Register_Notification` | With the device list |
+| Serial and HID data transfer | `CreateFileW`, overlapped I/O, timeouts | Needs a target device |
+| Bluetooth / BLE | WinRT or Win32 GATT | Needs a target device; larger work |
+| Sensors, vendor SDKs, MMIO | vendor or driver specific | Out of scope until named |
+
+## 10. Memory management
+
+Keep the standard allocators. First measure where the 181 MB private memory sits (likely
+candidates are Qt Quick, graphics and caches, none confirmed), for example with VMMap or Windows
+Performance Recorder, comparing software and OpenGL rendering, before and after idle trim.
+`EmptyWorkingSet` reduces the working set, not private memory. Any change to caching would be
+C++/QML work, which a Rust allocator does not reach.
+
