@@ -50,6 +50,34 @@ private slots:
         qInfo().noquote() << b.summary();
     }
 
+    void rejectsBadPointers()
+    {
+        const NativeBridge b;
+        QCOMPARE(b.systemInfo(nullptr), DN_ERR_ARG);
+        alignas(dn_system_info) unsigned char raw[sizeof(dn_system_info) + 1] = {};
+        QCOMPARE(b.systemInfo(reinterpret_cast<dn_system_info *>(raw + 1)), DN_ERR_ARG);
+    }
+
+    void shortStructIsLeftUnchanged()
+    {
+        const NativeBridge b;
+        for (const uint32_t size : {0u, 4u, uint32_t(sizeof(dn_system_info) - 1)}) {
+            dn_system_info i = blank(size);
+            const dn_system_info before = i;
+            QCOMPARE(b.systemInfo(&i), DN_ERR_SIZE);
+            QCOMPARE(std::memcmp(&i, &before, sizeof(i)), 0);
+        }
+    }
+
+    void largerCallerStructKeepsItsTail()
+    {
+        const NativeBridge b;
+        struct { dn_system_info info; uint64_t tail; } bigger{blank(sizeof(dn_system_info) + 8), 0x1122334455667788ULL};
+        QCOMPARE(b.systemInfo(&bigger.info), DN_OK);
+        QCOMPARE(bigger.info.struct_size, uint32_t(sizeof(dn_system_info) + 8));
+        QCOMPARE(bigger.tail, uint64_t(0x1122334455667788ULL));
+    }
+
 };
 
 QTEST_GUILESS_MAIN(NativeTest)
