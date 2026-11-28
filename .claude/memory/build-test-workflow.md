@@ -59,7 +59,8 @@ folder, scanner tests, dynamic software names.
 - `.claude/CLAUDE.md` says `build.bat` does a clean rebuild; the real `build.bat` is incremental
   and cleans only with the `clean` argument (known-issues.md).
 - Any `build-*/` folder is ignored; never commit build output. A `build/` configured under another
-  path makes CMake refuse to configure: delete `build/` and rebuild.
+  path makes CMake refuse to configure; since 2026-11-28 `build.ps1` detects that and recreates
+  `build/` itself.
 - `build\Dockly.exe` is only the loader and needs `resources\` beside it (use `dist\` or a copy).
 
 ## Kept on purpose although the app does not call them (2026-11-27)
