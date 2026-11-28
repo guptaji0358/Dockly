@@ -37,3 +37,54 @@ Add **one small Rust DLL with a C ABI**, and grow it only when a feature or a me
 A search found no USB, serial, Bluetooth, HID, storage, network adapter or device-change code.
 No current feature consumes such data.
 
+## 3. Measurements (baseline)
+
+Single runs on this machine (12 logical cores). Not a profile.
+
+Installed Dockly, running 314 minutes, dock, gamepad, running-apps and auto Lite enabled:
+
+| Metric | Value |
+|---|---|
+| CPU over 60 s | 0.5 s CPU time, about 0.8% of one core |
+| CPU over a separate 20 s | 78 ms |
+| Private memory | 181 MB, unchanged over 60 s |
+| Working set | 33 MB (peak 239 MB) |
+| Threads / handles | 24 / about 1771, no growth over 60 s |
+
+Existing tests on the current `build\` output:
+
+| Suite | Result | Time |
+|---|---|---|
+| `core_test` | 59 passed, 0 failed | 2.6 s |
+| `guard_test` | 16 passed, 0 failed | 0.6 s |
+| `guard3_test` | 23 passed, 0 failed | 0.2 s |
+
+The slowest single `core_test` functions, including process start, took under 0.9 s
+(catalog scan, packaged-app inspection, catalog refresh).
+
+Not measured: startup time, UI frame time, per-timer CPU cost, allocation counts, thread
+contention, leaks over long runs. The one-minute samples do not rule out a leak.
+
+## 4. Toolchain probe (throwaway code outside the repo)
+
+A Rust library exporting `probe_sum(ptr, len)`, using a thread and `println!`, called from C++
+built with Qt's `g++`:
+
+| Linking | Result |
+|---|---|
+| Rust `cdylib` (DLL) | Links and runs, correct result. 261 KB. Imports only Windows system and UCRT DLLs |
+| Rust `staticlib`, first try | Link errors: `WaitOnAddress` family missing |
+| `staticlib` + `-lsynchronization -static` | Links, then **segfaults inside `probe_sum`**; `-lucrt` did not help |
+
+The crash was not root-caused. A msvcrt/UCRT toolchain mismatch is the suspected reason.
+**Use the DLL.** Static linking should wait for a matching toolchain (official `rustup`
+`x86_64-pc-windows-gnu`, untested here).
+
+## 5. Language responsibilities
+
+| Language | Owns | Does not own |
+|---|---|---|
+| C++ / Qt | UI, application logic, existing Win32 modules, orchestration | New device back ends |
+| Rust | New hardware detection and device I/O, their worker threads | Qt objects, UI, database |
+| C | The launcher; later, only a thin shim where an SDK requires it | Anything Rust can bind directly |
+
