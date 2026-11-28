@@ -83,4 +83,24 @@ mod tests {
         assert_eq!(unsafe { write_out(odd, made) }, ERR_ARG);
     }
 
+    #[test]
+    fn short_struct_is_untouched() {
+        let mut s = Sample { size: FULL - 1, value: 99 };
+        assert_eq!(unsafe { write_out(&mut s, made) }, ERR_SIZE);
+        assert_eq!((s.size, s.value), (FULL - 1, 99));
+    }
+
+    #[test]
+    fn failure_leaves_output_unchanged() {
+        let mut s = Sample { size: FULL, value: 99 };
+        assert_eq!(unsafe { write_out(&mut s, || Err(ERR_OS)) }, ERR_OS);
+        assert_eq!(s.value, 99);
+    }
+
+    #[test]
+    fn larger_caller_keeps_its_size_and_tail() {
+        let mut words = [FULL + 8, 0, 0xAAAA_AAAA, 0xBBBB_BBBB];
+        assert_eq!(unsafe { write_out(words.as_mut_ptr().cast::<Sample>(), made) }, OK);
+        assert_eq!(words, [FULL + 8, 7, 0xAAAA_AAAA, 0xBBBB_BBBB]);
+    }
 }
