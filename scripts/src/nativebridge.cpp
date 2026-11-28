@@ -34,3 +34,29 @@ QString NativeBridge::defaultPath()
     return QCoreApplication::applicationDirPath() + QStringLiteral("/dockly_native.dll");
 }
 
+NativeBridge::NativeBridge(const QString &path)
+    : m_lib(path.isEmpty() ? defaultPath() : path)
+{
+    if (!m_lib.load()) {
+        m_error = m_lib.errorString();
+        return;
+    }
+    const auto version = reinterpret_cast<decltype(&dn_abi_version)>(m_lib.resolve("dn_abi_version"));
+    if (!version) {
+        m_error = QStringLiteral("not a Dockly native library");
+        return;
+    }
+    if (const uint32_t v = version(); v != DN_ABI_VERSION) {
+        m_error = QStringLiteral("ABI version %1, expected %2").arg(v).arg(DN_ABI_VERSION);
+        return;
+    }
+    m_read = reinterpret_cast<decltype(&dn_system_info_read)>(m_lib.resolve("dn_system_info_read"));
+    if (!m_read)
+        m_error = QStringLiteral("dn_system_info_read is missing");
+}
+
+int NativeBridge::systemInfo(dn_system_info *out) const
+{
+    return m_read ? m_read(out) : DN_ERR_OS;
+}
+
