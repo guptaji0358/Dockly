@@ -10,6 +10,7 @@
   Keep it in the normal git format: a short subject line, a blank line, then the body.
 - On a successful build, `build.bat` runs `git add -A`, `git commit -F commit.txt`, and `git push`.
   If the build fails, nothing is committed or pushed.
+- `build.bat` deletes `commit.txt` after a successful commit, so write a new one for each change.
 - End `commit.txt` with this trailer line:
 
   Co-Authored-By: Claude Haiku 5.5 <noreply@anthropic.com>
