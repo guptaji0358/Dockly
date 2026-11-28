@@ -16,6 +16,8 @@ function(lh_add_version_info target description)
     target_sources(${target} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/${target}.rc)
 endfunction()
 
+option(DOCKLY_NATIVE "Build the Rust native layer (native/); needs cargo" OFF)
+
 enable_testing()
 add_subdirectory(scripts)
 add_subdirectory(qml)
