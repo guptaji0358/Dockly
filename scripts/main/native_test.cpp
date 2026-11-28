@@ -135,6 +135,26 @@ private slots:
         QVERIFY2(b.error().startsWith("ABI version"), qPrintable(b.error()));
     }
 
+    // timing only: what one call across the boundary costs, beside the plain Win32 memory query
+    void benchmarkSystemInfo()
+    {
+        const NativeBridge b;
+        dn_system_info i = blank();
+        QBENCHMARK { b.systemInfo(&i); }
+    }
+
+    void benchmarkWin32MemoryStatus()
+    {
+        MEMORYSTATUSEX ms{};
+        ms.dwLength = sizeof(ms);
+        QBENCHMARK { GlobalMemoryStatusEx(&ms); }
+    }
+
+    void benchmarkBoundaryOnly()
+    {
+        const NativeBridge b;
+        QBENCHMARK { b.systemInfo(nullptr); }
+    }
 };
 
 QTEST_GUILESS_MAIN(NativeTest)
