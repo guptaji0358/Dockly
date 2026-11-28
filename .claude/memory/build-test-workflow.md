@@ -41,7 +41,8 @@ are not recorded here.
 - Write the commit message to `commit.txt` (git-ignored) before running `build.bat`: subject line,
   blank line, body, then the Co-Authored-By trailer required by CLAUDE.md.
 - `build.bat` on success does `git add -A`, `git commit -F commit.txt`, `git push` (skipped when
-  nothing is staged or `commit.txt` is missing; build failure commits nothing).
+  nothing is staged or `commit.txt` is missing; build failure commits nothing). It deletes
+  `commit.txt` once the commit succeeds (even if the push then fails), so write a new one each time.
 - User-level rule (`~/.claude/rules/git-commit-push.md`): when asked to commit/push, use the LIAS
   `git-commit-push` automation if the project has it. This project has no `.claude/lias` folder,
   so say so and ask before using plain git.
