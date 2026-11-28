@@ -41,6 +41,9 @@ target_link_libraries(lhcore PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Network
 
 # core_test.exe
 find_package(Qt6 REQUIRED COMPONENTS Test)
+if(DOCKLY_NATIVE)
+    include(${CMAKE_SOURCE_DIR}/cmake/native.cmake)
+endif()
 qt_add_executable(core_test ${LH_MAIN}/core_test.cpp)
 if(WIN32)
     target_link_libraries(lhcore PUBLIC psapi dwmapi pdh version ole32 shell32 uuid gdi32 crypt32)
