@@ -47,3 +47,40 @@ pub unsafe fn write_out<T: OutStruct>(out: *mut T, produce: impl FnOnce() -> Res
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct Sample {
+        size: u32,
+        value: u32,
+    }
+    // SAFETY: repr(C), integers only, size first.
+    unsafe impl OutStruct for Sample {
+        fn set_struct_size(&mut self, size: u32) {
+            self.size = size;
+        }
+    }
+    const FULL: u32 = size_of::<Sample>() as u32;
+
+    fn made() -> Result<Sample, i32> {
+        Ok(Sample { size: 0, value: 7 })
+    }
+
+    #[test]
+    fn panic_becomes_status() {
+        assert_eq!(guard(|| panic!("boom")), ERR_PANIC);
+        assert_eq!(guard(|| OK), OK);
+    }
+
+    #[test]
+    fn rejects_null_and_misaligned() {
+        assert_eq!(unsafe { write_out::<Sample>(std::ptr::null_mut(), made) }, ERR_ARG);
+        let mut words = [FULL; 4];
+        let odd = words.as_mut_ptr().cast::<u8>().wrapping_add(1).cast::<Sample>();
+        assert_eq!(unsafe { write_out(odd, made) }, ERR_ARG);
+    }
+
+}
