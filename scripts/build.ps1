@@ -1,7 +1,8 @@
 ﻿# Configure + build Dockly with the Qt 6.12.0 MinGW kit, then (optionally) deploy.
 #   .\scripts\build.ps1            incremental build (Ninja recompiles only what changed)
 #   .\scripts\build.ps1 -Deploy    build + copy Qt DLLs/plugins into .\dist so Dockly.exe runs anywhere
-param([switch]$Deploy)
+#   .\scripts\build.ps1 -Native    also build the Rust layer in .\native (needs cargo); combines with -Deploy
+param([switch]$Deploy, [switch]$Native)
 Set-Location (Split-Path $PSScriptRoot -Parent)
 
 $qtRoot = 'C:\Qt'
@@ -22,7 +23,8 @@ if (Test-Path $cache) {
 }
 
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=$qt" `
-      "-DCMAKE_CXX_COMPILER=$qtRoot/Tools/mingw1310_64/bin/g++.exe"
+      "-DCMAKE_CXX_COMPILER=$qtRoot/Tools/mingw1310_64/bin/g++.exe" `
+      "-DDOCKLY_NATIVE=$(if ($Native) { 'ON' } else { 'OFF' })"
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
 cmake --build build
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
