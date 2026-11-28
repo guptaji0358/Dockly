@@ -42,6 +42,7 @@ private slots:
         QVERIFY(m_realFile.open());
         core = AppCore::instance();
         core->settings()->set("checkMissingOnStartup", false);
+        m_autostart = runKey().value("Dockly");
         core->init();
         QVERIFY(QFile::exists(m_dir.path() + "/library.db"));
         QVERIFY(QFile::exists(m_dir.path() + "/catalog.db"));
