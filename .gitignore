@@ -2,6 +2,7 @@ build/
 dist/
 *.user
 build-*/
+native/target/
 
 # Commit message for build.bat
 commit.txt
