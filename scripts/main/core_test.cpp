@@ -51,6 +51,29 @@ private slots:
         QCOMPARE(core->queryIds(LH::ModeCategory, LH::Software, {}, {}).size(), 0);
     }
 
+    // A separate profile (LH_DATA_DIR) must never add, change or remove the user's autostart entry.
+    void separateProfileLeavesAutostartAlone()
+    {
+#ifndef Q_OS_WIN
+        QSKIP("Windows only");
+#endif
+        // put the entry back if the check fails, so a regression does not damage the machine
+        const auto restore = qScopeGuard([this] {
+            QSettings run = runKey();
+            if (run.value("Dockly") == m_autostart)
+                return;
+            if (m_autostart.isValid())
+                run.setValue("Dockly", m_autostart);
+            else
+                run.remove("Dockly");
+        });
+        QCOMPARE(runKey().value("Dockly"), m_autostart); // after init()
+        core->settings()->set("startWithWindows", true);
+        QCOMPARE(runKey().value("Dockly"), m_autostart);
+        core->settings()->set("startWithWindows", false);
+        QCOMPARE(runKey().value("Dockly"), m_autostart);
+    }
+
     void addNormalizesAndDedupes()
     {
         const QString id = core->addItem(LH::Web, {}, "example.com/path");
