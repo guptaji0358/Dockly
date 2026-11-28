@@ -9,6 +9,8 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QFile>
+#include <QScopeGuard>
+#include <QSettings>
 #include <QTcpSocket>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -24,6 +26,13 @@ class CoreTest : public QObject
     QTemporaryDir m_dir;
     QTemporaryFile m_realFile;
     AppCore *core = nullptr;
+    QVariant m_autostart; // the real Windows autostart entry, read before AppCore starts
+
+    static QSettings runKey()
+    {
+        return QSettings(QStringLiteral("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run"),
+                         QSettings::NativeFormat);
+    }
 
 private slots:
     void initTestCase()
