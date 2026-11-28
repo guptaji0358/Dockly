@@ -24,3 +24,15 @@ add_custom_target(dockly_native
     COMMENT "Building the Rust native layer"
     VERBATIM)
 
+target_sources(lhcore PRIVATE ${LH_INCLUDE}/nativebridge.h ${LH_SRC}/nativebridge.cpp)
+target_include_directories(lhcore PUBLIC ${DN_DIR}/include)
+target_compile_definitions(lhcore PUBLIC DOCKLY_NATIVE)
+add_dependencies(lhcore dockly_native) # the DLL is loaded at run time, not linked
+
+add_library(dn_badabi MODULE ${LH_MAIN}/native_badabi.c)
+qt_add_executable(native_test ${LH_MAIN}/native_test.cpp)
+target_link_libraries(native_test PRIVATE lhcore Qt6::Test)
+target_compile_definitions(native_test PRIVATE DN_BADABI_PATH="$<TARGET_FILE:dn_badabi>")
+add_dependencies(native_test dn_badabi)
+add_test(NAME native_test COMMAND native_test)
+add_test(NAME native_rust COMMAND ${DN_ENV} -- ${DOCKLY_CARGO} test ${DN_CARGO_ARGS})
